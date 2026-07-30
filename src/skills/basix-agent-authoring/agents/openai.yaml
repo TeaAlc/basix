@@ -1,0 +1,6 @@
+interface:
+  display_name: "Basix Agent Authoring"
+  short_description: "Basix-Skill: Author and validate native agents"
+  default_prompt: "Create or update a native Basix agent with the appropriate Luna reasoning level and /root JSON communication contract."
+policy:
+  allow_implicit_invocation: true

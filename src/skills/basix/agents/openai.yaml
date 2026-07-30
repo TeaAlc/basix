@@ -1,0 +1,6 @@
+interface:
+  display_name: "Basix"
+  short_description: "Basix-Skill: Maintain and extend the Codex collection"
+  default_prompt: "Use the Basix conventions to maintain or extend this collection."
+policy:
+  allow_implicit_invocation: true

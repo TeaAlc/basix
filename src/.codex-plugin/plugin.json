@@ -1,0 +1,6 @@
+{
+  "name": "basix",
+  "version": "0.1.0",
+  "description": "Reusable Basix conventions, skills, and agent setup for Codex.",
+  "skills": "./skills/"
+}
