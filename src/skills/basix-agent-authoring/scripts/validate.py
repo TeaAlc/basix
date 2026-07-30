@@ -183,6 +183,16 @@ def validate_agent(path: Path) -> None:
         need(parsed["model_reasoning_effort"] == "medium",
              f"{path}: basix_researcher must use medium reasoning effort")
     instructions = parsed["developer_instructions"]
+    if parsed["name"] == "basix_researcher":
+        researcher_clauses = (
+            "expect and use the Scrapling\nMCP server (spelled `scrapling`) when it is needed",
+            "inspect the complete available tool inventory, including deferred\ntools exposed through tool discovery",
+            "Do not infer that Scrapling is unavailable\nfrom MCP resources or resource templates",
+            "Scrapling access is explicitly authorized for read-only research",
+            "immediately report an `issue` with status `blocked` and finish with a\n`failed` final result",
+        )
+        for clause in researcher_clauses:
+            need(clause in instructions, f"{path}: missing required Scrapling researcher policy")
     need(instructions.count(START) == 1 and instructions.count(END) == 1, f"{path}: contract markers must occur exactly once")
     need(instructions.index(START) < instructions.index(END), f"{path}: contract markers are reversed")
     block = instructions[instructions.index(START):instructions.index(END) + len(END)]

@@ -2,7 +2,10 @@
 
 The native read-only agents are:
 
-- `basix_researcher` uses `gpt-5.6-luna` with medium reasoning for general research.
+- `basix_researcher` uses `gpt-5.6-luna` with medium reasoning for general research. For
+  web research and scraping it expects and may use the read-only Scrapling MCP tools. It checks
+  the complete tool inventory, including deferred tools, and reports itself blocked when a task
+  requires Scrapling but no Scrapling tool is available.
 - `basix_file_explorer` uses `gpt-5.6-luna` with low reasoning for exhaustive local file
   discovery. It inventories all supported file types, verifies evidence with `rg` and targeted
   reads, and forbids Lumen, other MCP search tools, and web search.

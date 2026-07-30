@@ -11,6 +11,18 @@ contract-compliant `send_message` payloads defined below. Keep visible prose lim
 to the contract's prescribed confirmation or transmission-failure lines.
 Do not expand into implementation unless `/root` explicitly asks for it.
 
+For web research, website inspection, or scraping, expect and use the Scrapling
+MCP server (spelled `scrapling`) when it is needed. Its tools normally appear as
+`mcp__scrapling__get`, `mcp__scrapling__fetch`,
+`mcp__scrapling__stealthy_fetch`, and related tools. Before work that requires
+Scrapling, inspect the complete available tool inventory, including deferred
+tools exposed through tool discovery. Do not infer that Scrapling is unavailable
+from MCP resources or resource templates; tools and resources are separate.
+Scrapling access is explicitly authorized for read-only research. If the task
+requires Scrapling and no Scrapling tool is present in the complete tool
+inventory, immediately report an `issue` with status `blocked` and finish with a
+`failed` final result.
+
 <!-- basix-agent-authoring:contract:start version=1.0 -->
 Communicate task progress and results to `/root` exclusively through `send_message`.
 Every `send_message` payload must be exactly one JSON object conforming to the

@@ -30,6 +30,14 @@ def plan(sequence=1, revision=1, checklist=None):
 
 UNSET = object()
 
+RESEARCHER_PREAMBLE = """For web research, expect and use the Scrapling
+MCP server (spelled `scrapling`) when it is needed. Before work, inspect the complete available tool inventory, including deferred
+tools exposed through tool discovery. Do not infer that Scrapling is unavailable
+from MCP resources or resource templates. Scrapling access is explicitly authorized for read-only research.
+If unavailable, immediately report an `issue` with status `blocked` and finish with a
+`failed` final result.
+"""
+
 
 def final(sequence=2, status="completed", errors=None, data=UNSET):
     return {
@@ -163,12 +171,15 @@ class StreamTests(unittest.TestCase):
 
 class AgentTests(unittest.TestCase):
     def write_agent(self, model="gpt-5.6-luna", effort="medium", marker="", block=True,
-                    description="Basix-Agent: Test agent", name="agent", sandbox="read-only"):
+                    description="Basix-Agent: Test agent", name="agent", sandbox="read-only",
+                    preamble=None):
         reference = CONTRACT_REFERENCE.read_text()
         contract = reference[reference.index(validator.START):reference.index(validator.END) + len(validator.END)]
         if not block:
             contract = "Instructions without a managed communication contract."
-        text = f'''name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\nsandbox_mode = "{sandbox}"\ndeveloper_instructions = """{contract}"""\n'''
+        if preamble is None:
+            preamble = RESEARCHER_PREAMBLE if name == "basix_researcher" else ""
+        text = f'''name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\nsandbox_mode = "{sandbox}"\ndeveloper_instructions = """{preamble}{contract}"""\n'''
         directory = tempfile.TemporaryDirectory()
         path = Path(directory.name) / "agent.toml"
         path.write_text(text)
@@ -247,6 +258,11 @@ class AgentTests(unittest.TestCase):
             directory, path = self.write_agent(name="basix_researcher", **kwargs)
             with directory, self.assertRaises(validator.Invalid):
                 validator.validate_agent(path)
+
+    def test_researcher_requires_scrapling_policy(self):
+        directory, path = self.write_agent(name="basix_researcher", preamble="")
+        with directory, self.assertRaisesRegex(validator.Invalid, "Scrapling researcher policy"):
+            validator.validate_agent(path)
 
 
 class CliTests(unittest.TestCase):

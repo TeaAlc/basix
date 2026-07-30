@@ -1,3 +1,8 @@
+.codex/*
+.agents
+
+!.codex/config.toml
+
 # Python and test/tool caches
 __pycache__/
 *.py[cod]
