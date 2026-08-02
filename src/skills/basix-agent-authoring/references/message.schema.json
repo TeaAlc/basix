@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://basix.local/schemas/agent-message-1.1.json",
+  "$id": "https://basix.local/schemas/agent-message-1.2.json",
   "title": "Basix agent communication message",
   "type": "object",
   "additionalProperties": false,
   "required": ["contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"],
   "properties": {
-    "contract_version": {"const": "1.1"},
-    "message_type": {"enum": ["plan", "status", "issue", "permission_request", "intermediate_result", "final_result"]},
+    "contract_version": {"const": "1.2"},
+    "message_type": {"enum": ["plan", "status", "issue", "permission_request", "report_started", "intermediate_result", "final_result"]},
     "agent_name": {"type": "string", "minLength": 1},
     "task_name": {"type": "string", "minLength": 1},
     "sequence": {"type": "integer", "minimum": 1},
@@ -65,6 +65,14 @@
         "blocks_current_step": {"type": "boolean"}
       }
     },
+    "report_started_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["report_type"],
+      "properties": {
+        "report_type": {"enum": ["intermediate_result", "final_result"]}
+      }
+    },
     "concise_error": {
       "type": "object",
       "additionalProperties": false,
@@ -81,6 +89,7 @@
     {"if": {"properties": {"message_type": {"const": "plan"}}}, "then": {"properties": {"status": {"const": "planned"}, "data": {"$ref": "#/$defs/plan_data"}, "errors": {"maxItems": 0}}}},
     {"if": {"properties": {"message_type": {"const": "status"}}}, "then": {"properties": {"status": {"const": "in_progress"}, "data": {"$ref": "#/$defs/plan_data"}, "errors": {"maxItems": 0}}}},
     {"if": {"properties": {"message_type": {"const": "issue"}}}, "then": {"properties": {"data": {"type": "null"}, "errors": {"minItems": 1, "maxItems": 3, "items": {"$ref": "#/$defs/concise_error"}}}}},
+    {"if": {"properties": {"message_type": {"const": "report_started"}}}, "then": {"properties": {"status": {"const": "in_progress"}, "data": {"$ref": "#/$defs/report_started_data"}, "errors": {"maxItems": 0}}}},
     {"if": {"properties": {"message_type": {"const": "intermediate_result"}}}, "then": {"properties": {"data": {"type": "null"}, "errors": {"maxItems": 3, "items": {"$ref": "#/$defs/concise_error"}}}}},
     {"if": {"properties": {"message_type": {"const": "permission_request"}}}, "then": {"properties": {"status": {"const": "blocked"}, "data": {"$ref": "#/$defs/permission_data"}, "errors": {"maxItems": 0}}}},
     {"if": {"properties": {"message_type": {"const": "final_result"}, "status": {"const": "completed"}}}, "then": {"properties": {"errors": {"maxItems": 0}}}},

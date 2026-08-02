@@ -22,7 +22,7 @@ SPEC.loader.exec_module(validator)
 
 def plan(sequence=1, revision=1, checklist=None, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.1", "message_type": "plan", "agent_name": agent,
+        "contract_version": "1.2", "message_type": "plan", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "planned",
         "summary": "Inspect and report.",
         "data": {"plan_revision": revision, "checklist": checklist or [
@@ -45,10 +45,18 @@ If unavailable, immediately report an `issue` with status `blocked` and finish w
 
 def final(sequence=2, status="completed", errors=None, data=UNSET, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.1", "message_type": "final_result", "agent_name": agent,
+        "contract_version": "1.2", "message_type": "final_result", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": status,
         "summary": "Work finished.", "data": {} if data is UNSET else data,
         "errors": [] if errors is None else errors,
+    }
+
+
+def report_started(sequence, report_type, cycle=1, agent="tester", task="task"):
+    return {
+        "contract_version": "1.2", "message_type": "report_started", "agent_name": agent,
+        "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "in_progress",
+        "summary": "Preparing requested report.", "data": {"report_type": report_type}, "errors": [],
     }
 
 
@@ -68,8 +76,9 @@ class MessageTests(unittest.TestCase):
             "request_id": "p1", "action": "read outside workspace", "reason": "Evidence required",
             "required_permission": "filesystem read", "scope": "/external/file", "blocks_current_step": True,
         }})
-        messages.append({**plan(5), "message_type": "intermediate_result", "status": "in_progress", "data": None})
-        messages.append(final(6))
+        messages.append(report_started(5, "intermediate_result"))
+        messages.append({**plan(6), "message_type": "intermediate_result", "status": "in_progress", "data": None})
+        messages.append(final(7))
         for message in messages:
             validator.validate_message(message)
 
@@ -98,6 +107,18 @@ class MessageTests(unittest.TestCase):
         del message["data"]["scope"]
         with self.assertRaisesRegex(validator.Invalid, "missing fields"):
             validator.validate_message(message)
+
+    def test_report_started_fields(self):
+        validator.validate_message(report_started(1, "intermediate_result"))
+        validator.validate_message(report_started(1, "final_result"))
+        for mutation, expected in (
+            ({"status": "blocked"}, "status"),
+            ({"data": {"report_type": "status"}}, "report_type"),
+            ({"data": {}}, "missing fields"),
+            ({"errors": [error()]}, "errors must be empty"),
+        ):
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(validator.Invalid, expected):
+                validator.validate_message({**report_started(1, "intermediate_result"), **mutation})
 
     def test_issue_and_intermediate_forbid_details(self):
         for kind in ("issue", "intermediate_result"):
@@ -158,29 +179,71 @@ class StreamTests(unittest.TestCase):
                       "data": {"request_id": "p1", "action": "read evidence", "reason": "Needed",
                                "required_permission": "filesystem read", "scope": "/outside",
                                "blocks_current_step": True}, "errors": []}
-        intermediate = {**plan(5), "message_type": "intermediate_result", "status": "in_progress",
+        announcement = report_started(5, "intermediate_result")
+        intermediate = {**plan(6), "message_type": "intermediate_result", "status": "in_progress",
                         "data": None, "errors": []}
         revised_items = [
             {"id": "inspect", "text": "Inspect inputs", "checked": True},
             {"id": "report", "text": "Report findings", "checked": False},
             {"id": "verify", "text": "Verify new evidence", "checked": False},
         ]
-        revised = plan(6, revision=2, checklist=revised_items)
-        revised_status = {**plan(7, revision=2, checklist=revised_items),
+        revised = plan(7, revision=2, checklist=revised_items)
+        revised_status = {**plan(8, revision=2, checklist=revised_items),
                           "message_type": "status", "status": "in_progress"}
         validator.validate_stream([
-            first, status, issue, permission, intermediate, revised, revised_status, final(8)
+            first, status, issue, permission, announcement, intermediate, revised, revised_status, final(9)
         ])
 
     def test_review_fix_final_flow_is_terminal(self):
         first = plan()
-        review = {**plan(2), "message_type": "intermediate_result", "status": "in_progress", "data": None}
-        revised = plan(3, revision=2)
-        fixed_status = {**plan(4, revision=2), "message_type": "status", "status": "in_progress"}
-        terminal = final(5)
-        validator.validate_stream([first, review, revised, fixed_status, terminal])
+        announcement = report_started(2, "intermediate_result")
+        review = {**plan(3), "message_type": "intermediate_result", "status": "in_progress", "data": None}
+        revised = plan(4, revision=2)
+        fixed_status = {**plan(5, revision=2), "message_type": "status", "status": "in_progress"}
+        terminal = final(6)
+        validator.validate_stream([first, announcement, review, revised, fixed_status, terminal])
         with self.assertRaisesRegex(validator.Invalid, "follows final"):
-            validator.validate_stream([first, terminal, {**review, "sequence": 6}])
+            validator.validate_stream([first, final(2), {**announcement, "sequence": 3}])
+
+    def test_requested_final_is_announced_and_terminal(self):
+        validator.validate_stream([plan(), report_started(2, "final_result"), final(3)])
+
+    def test_autonomous_final_needs_no_announcement(self):
+        validator.validate_stream([plan(), final(2)])
+
+    def test_report_type_must_match_announcement(self):
+        with self.assertRaisesRegex(validator.Invalid, "expected announced intermediate_result"):
+            validator.validate_stream([plan(), report_started(2, "intermediate_result"), final(3)])
+        intermediate = {**plan(3), "message_type": "intermediate_result", "status": "in_progress", "data": None}
+        with self.assertRaisesRegex(validator.Invalid, "expected announced final_result"):
+            validator.validate_stream([plan(), report_started(2, "final_result"), intermediate, final(4)])
+
+    def test_rejects_duplicate_and_uncompleted_announcement(self):
+        with self.assertRaisesRegex(validator.Invalid, "expected announced intermediate_result"):
+            validator.validate_stream([
+                plan(), report_started(2, "intermediate_result"),
+                report_started(3, "intermediate_result"), final(4),
+            ])
+        with self.assertRaisesRegex(validator.Invalid, "uncompleted report_started"):
+            validator.validate_stream([plan(), report_started(2, "final_result")])
+
+    def test_only_operational_messages_allowed_during_report_preparation(self):
+        status = {**plan(3), "message_type": "status", "status": "in_progress"}
+        issue = {**plan(4), "message_type": "issue", "status": "blocked", "data": None, "errors": [error()]}
+        permission = {**plan(5), "message_type": "permission_request", "status": "blocked", "data": {
+            "request_id": "p1", "action": "read evidence", "reason": "Needed",
+            "required_permission": "filesystem read", "scope": "/outside", "blocks_current_step": True,
+        }}
+        intermediate = {**plan(6), "message_type": "intermediate_result", "status": "in_progress", "data": None}
+        validator.validate_stream([
+            plan(), report_started(2, "intermediate_result"), status, issue, permission,
+            intermediate, final(7),
+        ])
+
+    def test_intermediate_result_requires_announcement(self):
+        intermediate = {**plan(2), "message_type": "intermediate_result", "status": "in_progress", "data": None}
+        with self.assertRaisesRegex(validator.Invalid, "requires report_started"):
+            validator.validate_stream([plan(), intermediate, final(3)])
 
     def test_continuation_requires_incremented_cycle_and_new_plan(self):
         continued = plan(3, cycle=2)
@@ -396,7 +459,7 @@ class AgentTests(unittest.TestCase):
 
 
 class RepositoryPolicyTests(unittest.TestCase):
-    def test_native_agents_use_only_contract_1_1_and_validate(self):
+    def test_native_agents_use_only_contract_1_2_and_validate(self):
         repository = Path(__file__).resolve().parents[4]
         agents = sorted((repository / "src/agents/native").glob("*.toml"))
         self.assertTrue(agents)
@@ -406,7 +469,7 @@ class RepositoryPolicyTests(unittest.TestCase):
                 path.read_text(),
             )
             self.assertTrue(versions, path)
-            self.assertEqual(set(versions), {"1.1"}, path)
+            self.assertEqual(set(versions), {"1.2"}, path)
             validator.validate_agent(path)
 
     def test_documented_repository_test_paths_exist(self):

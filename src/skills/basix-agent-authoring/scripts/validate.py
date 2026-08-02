@@ -11,12 +11,12 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-TYPES = {"plan", "status", "issue", "permission_request", "intermediate_result", "final_result"}
+TYPES = {"plan", "status", "issue", "permission_request", "report_started", "intermediate_result", "final_result"}
 STATUSES = {"planned", "in_progress", "blocked", "completed", "completed_with_errors", "failed"}
 EFFORTS = {"low", "medium", "high", "max"}
 OVERRIDE = "# basix-agent-authoring: explicit-model-override"
 SANDBOX_OVERRIDE = "# basix-agent-authoring: explicit-sandbox-override"
-START = "<!-- basix-agent-authoring:contract:start version=1.1 -->"
+START = "<!-- basix-agent-authoring:contract:start version=1.2 -->"
 END = "<!-- basix-agent-authoring:contract:end -->"
 WORD_RE = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", re.UNICODE)
 
@@ -72,7 +72,7 @@ def validate_plan_data(value: Any) -> dict[str, Any]:
 def validate_message(value: Any) -> dict[str, Any]:
     required = {"contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"}
     msg = object_exact(value, required)
-    need(msg["contract_version"] == "1.1", "contract_version must be 1.1")
+    need(msg["contract_version"] == "1.2", "contract_version must be 1.2")
     kind = msg["message_type"]
     need(kind in TYPES, "invalid message_type")
     for key in ("agent_name", "task_name", "summary"):
@@ -86,7 +86,7 @@ def validate_message(value: Any) -> dict[str, Any]:
     for error in msg["errors"]:
         validate_error(error, allow_details=not concise)
 
-    limit = 64 if kind in {"plan", "intermediate_result"} else 32 if kind in {"status", "issue"} else None
+    limit = 64 if kind in {"plan", "intermediate_result"} else 32 if kind in {"status", "issue", "report_started"} else None
     need(limit is None or words(msg["summary"]) <= limit, f"{kind} summary exceeds {limit} words")
     if kind == "plan":
         need(msg["status"] == "planned", "plan status must be planned")
@@ -96,6 +96,12 @@ def validate_message(value: Any) -> dict[str, Any]:
         need(msg["status"] == "in_progress", "status message status must be in_progress")
         validate_plan_data(msg["data"])
         need(not msg["errors"], "status errors must be empty")
+    elif kind == "report_started":
+        need(msg["status"] == "in_progress", "report_started status must be in_progress")
+        data = object_exact(msg["data"], {"report_type"})
+        need(data["report_type"] in {"intermediate_result", "final_result"},
+             "report_started report_type must be intermediate_result or final_result")
+        need(not msg["errors"], "report_started errors must be empty")
     elif kind in {"issue", "intermediate_result"}:
         need(msg["data"] is None, f"{kind} data must be null")
         need(len(msg["errors"]) <= 3, f"{kind} permits at most three errors")
@@ -140,6 +146,7 @@ def validate_stream(messages: list[Any]) -> None:
             "ids": {},
             "revision": 0,
             "cycles": 0,
+            "open_report": None,
         })
         task = msg["task_name"]
         need(msg["sequence"] > current["sequence"],
@@ -159,6 +166,7 @@ def validate_stream(messages: list[Any]) -> None:
             current["final"] = False
             current["ids"] = {}
             current["revision"] = 0
+            current["open_report"] = None
         elif cycle == current["cycle"]:
             need(not current["final"], f"line {line}: message follows final_result for task {task}; explicit continuation required")
         elif cycle == current["cycle"] + 1:
@@ -171,11 +179,24 @@ def validate_stream(messages: list[Any]) -> None:
             current["final"] = False
             current["ids"] = {}
             current["revision"] = 0
+            current["open_report"] = None
         else:
             need(False, f"line {line}: cycle_revision must increase by exactly one after explicit continuation")
 
         current["sequence"] = msg["sequence"]
-        if msg["message_type"] in {"plan", "status"}:
+        kind = msg["message_type"]
+        if current["open_report"] is not None:
+            if kind in {"status", "issue", "permission_request"}:
+                pass
+            else:
+                need(kind == current["open_report"],
+                     f"line {line}: expected announced {current['open_report']}, got {kind}")
+                current["open_report"] = None
+        elif kind == "report_started":
+            current["open_report"] = msg["data"]["report_type"]
+        elif kind == "intermediate_result":
+            need(False, f"line {line}: intermediate_result requires report_started")
+        if kind in {"plan", "status"}:
             data = msg["data"]
             revision = data["plan_revision"]
             old_ids = current["ids"]
@@ -202,13 +223,15 @@ def validate_stream(messages: list[Any]) -> None:
                 current["plan"] = data
                 current["ids"] = new_ids
                 current["revision"] = revision
-        if msg["message_type"] == "final_result":
+        if kind == "final_result":
             need(current["plan"] is not None,
                  f"line {line}: final_result requires a plan in the current cycle")
             need(not current["final"],
                  f"line {line}: duplicate final_result in cycle {cycle}")
             current["final"] = True
     for agent, current in state.items():
+        need(current["open_report"] is None,
+             f"agent {agent} stream has an uncompleted report_started announcement")
         need(current["final"], f"agent {agent} stream must end with exactly one final_result per cycle")
 
 

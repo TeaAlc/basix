@@ -80,7 +80,12 @@ root = Path(sys.argv[1])
 policy = tomllib.load(open(sys.argv[2], 'rb'))['developer_instructions']
 for text in (
     '## Basix conventions',
+    'Do not use gender-inclusive language',
+    'first read the Basix router skill',
+    'only once per session',
     '## Agent selection',
+    '## Agent management',
+    'must not perform the same task or any overlapping part in parallel',
     '## Mandatory delegation',
     'Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`',
     'Assign agents only concrete, bounded tasks',
@@ -92,7 +97,7 @@ for text in (
     'basix_verifier',
 ):
     assert text in policy, text
-for removed in ('Subagent confirmations', 'wait_agent', 'timeout_ms', 'task_profile',
+for removed in ('Subagent confirmations', 'timeout_ms', 'task_profile',
                 'intermediate_result', 'followup_task', '.basix/contracts/',
                 'Adaptive pager selection and lifecycle', 'Read-only verification lifecycle'):
     assert removed not in policy, removed
@@ -128,10 +133,14 @@ for text in ('Verification assignment and lifecycle', 'basix_verifier', 'immutab
              'Manual pager smoke scenarios', 'run-pager-smoke.sh', 'real 120-second', 'intentionally not automated'):
     assert text in agent_docs, text
 contract = (root / 'skills/basix-agent-authoring/references/communication-contract.md').read_text()
-assert 'version=1.1' in contract and 'cycle_revision' in contract
+assert 'version=1.2' in contract and 'cycle_revision' in contract
+assert '`Berichtsbeginn an /root übermittelt.`' in contract
+assert 'automatically resume the interrupted task' in contract
 assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', contract)
 for path in (root / 'agents/native').glob('*.toml'):
     text = path.read_text()
+    assert 'version=1.2' in text, path
+    assert '`report_started`' in text, path
     assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', text), path
 PY
 then ok 'installed policy mandates basix_researcher without generic-web fallback'; else not_ok 'installed policy mandates basix_researcher without generic-web fallback'; fi
@@ -217,7 +226,7 @@ assert 'before the third filesystem-exploration tool call' in policy
 assert 'Delegate every task requiring current or external facts' in policy
 for role in ('basix_researcher', 'basix_file_explorer', 'basix_pager', 'basix_verifier'):
     assert role in policy, role
-for removed in ('wait_agent', 'timeout_ms', 'task_profile', 'intermediate_result', 'followup_task'):
+for removed in ('timeout_ms', 'task_profile', 'intermediate_result', 'followup_task'):
     assert removed not in policy, removed
 assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', (root / 'skills/basix-agent-authoring/references/communication-contract.md').read_text())
 PY

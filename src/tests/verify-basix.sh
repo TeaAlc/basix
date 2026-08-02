@@ -64,7 +64,13 @@ policy = instructions.split("<!-- basix:developer-instructions:start -->", 1)[1]
 )[0]
 assert "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`" in policy
 for phrase in (
+    "## Basix conventions",
+    "Do not use gender-inclusive language",
+    "first read the Basix router skill",
+    "only once per session",
     "## Agent selection",
+    "## Agent management",
+    "must not perform the same task or any overlapping part in parallel",
     "## Mandatory delegation",
     "Assign agents only concrete, bounded tasks",
     "Delegate every task requiring current or external facts",
@@ -77,7 +83,6 @@ for phrase in (
     assert phrase in policy, phrase
 for removed in (
     "Subagent confirmations",
-    "wait_agent",
     "timeout_ms",
     "task_profile",
     "intermediate_result",
@@ -150,15 +155,21 @@ for phrase in (
     "real 120-second",
     "intentionally not automated",
     "single `intermediate_result` review handoff",
+    "Contract 1.2 adds `report_started`",
+    "automatic resumption at the next safe transition",
 ):
     assert phrase in agent_docs, phrase
 
 heartbeat = (root / "skills/basix-agent-authoring/references/communication-contract.md").read_text()
-assert "version=1.1" in heartbeat
+assert "version=1.2" in heartbeat
 assert "cycle_revision" in heartbeat
+assert "`Berichtsbeginn an /root übermittelt.`" in heartbeat
+assert "automatically resume the interrupted task" in heartbeat
 assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", heartbeat)
 for path in (root / "agents/native").glob("*.toml"):
     text = path.read_text()
+    assert "version=1.2" in text, path
+    assert "`report_started`" in text, path
     assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", text), path
 PY
 if command -v shellcheck >/dev/null; then shellcheck --severity=warning "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh; else printf 'SKIP: shellcheck not installed\n'; fi

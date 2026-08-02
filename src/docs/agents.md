@@ -1,5 +1,12 @@
 # Agents
 
+The persistent Basix developer instructions require Root to load the Basix router
+before any specialized Basix skill or Basix subagent. Within a session, skills,
+subagents, and reference documents are read only once unless the user explicitly
+requests another read. Root does not duplicate or overlap an assigned subagent's
+work while that assignment is active and waits for its response. User-facing text
+avoids gender-inclusive forms unless the user explicitly requests them.
+
 The native agents are discovered from every TOML under `src/agents/native/`:
 
 - `basix_pager` is a Highly complex reference role using `gpt-5.6-luna` with
@@ -36,6 +43,13 @@ All managed communication blocks implement the versioned JSON handoff contract. 
 content and handoff payloads use English, while visible chat confirmations and errors use the
 current conversation's language. Global setup binds every `agents/native/*.toml` file to
 `$CODEX_HOME/agents/`; project setup binds all of them to `.codex/agents/`.
+
+Contract 1.2 adds `report_started` for reports requested by Root. A requested
+intermediate or explicit final report is announced first with its exact report
+type; status, issue, and permission messages may still occur while it is being
+prepared. An intermediate result resumes interrupted work automatically at the
+next safe transition unless Root directs otherwise. Autonomous final results need
+no announcement, and every final result remains terminal.
 
 ## Verification assignment and lifecycle
 
@@ -131,8 +145,9 @@ done
 ```
 
 Expected observations are a profile-scoped plan, repository evidence before
-edits, applicable quality gates, the explicitly authorized single
-`intermediate_result` review handoff, any Root-directed fix loop, and exactly
+edits, applicable quality gates, a `report_started` announcement followed by the
+explicitly authorized single `intermediate_result` review handoff, automatic
+resumption at the next safe transition, any Root-directed fix loop, and exactly
 one terminal `final_result` with no later message. The launcher and automated
 tests verify configuration and argument routing only: real 120-second
 heartbeat cadence, live web/Scrapling capability, and end-to-end review/fix
@@ -153,7 +168,10 @@ interface is frozen, ownership is disjoint, contract sections are separate,
 shared generated outputs are untouched, and Root has planned integration.
 
 Before finalization, Root explicitly authorizes an `intermediate_result` review
-handoff. Root may send an assignment-specific `followup_task` for fixes; the
+handoff. The pager announces it with `report_started`, delivers it, and resumes
+remaining planned work at the next safe transition unless Root directs otherwise;
+the handoff alone does not imply acceptance. Root may send an assignment-specific
+`followup_task` for fixes; the
 pager reopens a plan item with a new revision, reruns relevant gates, and stays
 within the same ownership. After Root sends `finalize`, the pager sends exactly
 one complete `final_result` and no later messages. The identity and task name
@@ -168,7 +186,8 @@ status heartbeat. Only an explicit user instruction in the current conversation 
 another timeout; repository instructions do not override system or genuine platform rules.
 Prefer useful independent work to passive waiting; incoming `send_message` messages need no
 preceding wait, and `list_agents` polling or artificial sleep must not substitute for the wait
-or heartbeat. The native agent TOMLs remain unchanged.
+or heartbeat. Role-specific native-agent behavior remains unchanged outside the
+managed communication block.
 
 For isolated explorer benchmarks, run:
 

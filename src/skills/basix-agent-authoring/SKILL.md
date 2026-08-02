@@ -42,7 +42,7 @@ After collection changes, run `./src/tests/verify-basix.sh` and
 Embed the communication rules in `developer_instructions` between these exact markers:
 
 ```text
-<!-- basix-agent-authoring:contract:start version=1.1 -->
+<!-- basix-agent-authoring:contract:start version=1.2 -->
 ...
 <!-- basix-agent-authoring:contract:end -->
 ```
@@ -50,5 +50,6 @@ Embed the communication rules in `developer_instructions` between these exact ma
 The block must require JSON-only `send_message` communication to `/root`, an initial
 plan before domain tools, 120-second status updates, immediate issue and permission
 messages, monotonic sequence numbers, explicit versioned cycles, exactly one complete
-final result per cycle, and the short visible confirmations from the communication
+final result per cycle, announced requested reports, automatic task resumption after
+intermediate results, and the short visible confirmations from the communication
 reference. Re-running authoring replaces this block idempotently.
