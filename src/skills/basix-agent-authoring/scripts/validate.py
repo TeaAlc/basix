@@ -13,9 +13,10 @@ from typing import Any
 
 TYPES = {"plan", "status", "issue", "permission_request", "intermediate_result", "final_result"}
 STATUSES = {"planned", "in_progress", "blocked", "completed", "completed_with_errors", "failed"}
-EFFORTS = {"low", "medium", "high"}
+EFFORTS = {"low", "medium", "high", "max"}
 OVERRIDE = "# basix-agent-authoring: explicit-model-override"
-START = "<!-- basix-agent-authoring:contract:start version=1.0 -->"
+SANDBOX_OVERRIDE = "# basix-agent-authoring: explicit-sandbox-override"
+START = "<!-- basix-agent-authoring:contract:start version=1.1 -->"
 END = "<!-- basix-agent-authoring:contract:end -->"
 WORD_RE = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", re.UNICODE)
 
@@ -69,14 +70,16 @@ def validate_plan_data(value: Any) -> dict[str, Any]:
 
 
 def validate_message(value: Any) -> dict[str, Any]:
-    required = {"contract_version", "message_type", "agent_name", "task_name", "sequence", "status", "summary", "data", "errors"}
+    required = {"contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"}
     msg = object_exact(value, required)
-    need(msg["contract_version"] == "1.0", "contract_version must be 1.0")
+    need(msg["contract_version"] == "1.1", "contract_version must be 1.1")
     kind = msg["message_type"]
     need(kind in TYPES, "invalid message_type")
     for key in ("agent_name", "task_name", "summary"):
         need(isinstance(msg[key], str) and bool(msg[key].strip()), f"{key} must be non-empty")
     need(type(msg["sequence"]) is int and msg["sequence"] >= 1, "sequence must be a positive integer")
+    need(type(msg["cycle_revision"]) is int and msg["cycle_revision"] >= 1,
+         "cycle_revision must be a positive integer")
     need(msg["status"] in STATUSES, "invalid status")
     need(isinstance(msg["errors"], list), "errors must be an array")
     concise = kind in {"issue", "intermediate_result"}
@@ -118,39 +121,95 @@ def validate_message(value: Any) -> dict[str, Any]:
 
 def validate_stream(messages: list[Any]) -> None:
     need(bool(messages), "stream is empty")
+    # State is keyed by agent identity.  Sequence numbers are global for that
+    # agent, while each task is one immutable assignment that may have explicit
+    # continuation cycles.
     state: dict[str, dict[str, Any]] = {}
     for line, raw in enumerate(messages, 1):
         try:
             msg = validate_message(raw)
         except Invalid as exc:
             raise Invalid(f"line {line}: {exc}") from exc
+        agent = msg["agent_name"]
+        current = state.setdefault(agent, {
+            "sequence": 0,
+            "task": None,
+            "cycle": None,
+            "plan": None,
+            "final": False,
+            "ids": {},
+            "revision": 0,
+            "cycles": 0,
+        })
         task = msg["task_name"]
-        current = state.setdefault(task, {"sequence": 0, "plan": None, "finals": 0, "ids": {}, "revision": 0})
-        need(msg["sequence"] > current["sequence"], f"line {line}: sequence is not strictly increasing for task {task}")
-        need(current["finals"] == 0, f"line {line}: message follows final_result for task {task}")
-        current["sequence"] = msg["sequence"]
-        if current["plan"] is None:
+        need(msg["sequence"] > current["sequence"],
+             f"line {line}: sequence is not strictly increasing for agent {agent}")
+        if current["task"] is None:
+            current["task"] = task
+        else:
+            need(task == current["task"],
+                 f"line {line}: task_name changed for agent {agent}; use a fresh agent")
+        cycle = msg["cycle_revision"]
+        if current["cycle"] is None:
             need(msg["message_type"] == "plan", f"line {line}: first task message must be plan")
+            need(cycle == 1, f"line {line}: initial cycle_revision must be 1")
+            current["cycle"] = cycle
+            current["cycles"] = 1
+            current["plan"] = None
+            current["final"] = False
+            current["ids"] = {}
+            current["revision"] = 0
+        elif cycle == current["cycle"]:
+            need(not current["final"], f"line {line}: message follows final_result for task {task}; explicit continuation required")
+        elif cycle == current["cycle"] + 1:
+            need(current["final"], f"line {line}: cycle_revision advanced before final_result")
+            need(msg["message_type"] == "plan",
+                 f"line {line}: continued cycle must begin with a plan")
+            current["cycle"] = cycle
+            current["cycles"] += 1
+            current["plan"] = None
+            current["final"] = False
+            current["ids"] = {}
+            current["revision"] = 0
+        else:
+            need(False, f"line {line}: cycle_revision must increase by exactly one after explicit continuation")
+
+        current["sequence"] = msg["sequence"]
         if msg["message_type"] in {"plan", "status"}:
             data = msg["data"]
             revision = data["plan_revision"]
-            need(revision >= current["revision"], f"line {line}: plan_revision decreased")
             old_ids = current["ids"]
             new_ids = {item["id"]: item["text"] for item in data["checklist"]}
-            for item_id in old_ids.keys() & new_ids.keys():
-                need(old_ids[item_id] == new_ids[item_id], f"line {line}: checklist id {item_id} changed text")
-            if msg["message_type"] == "status":
-                need(revision == current["revision"], f"line {line}: structural revision requires a plan message")
-                need(set(new_ids) == set(old_ids), f"line {line}: status changed checklist structure")
+            if current["plan"] is None:
+                need(msg["message_type"] == "plan",
+                     f"line {line}: cycle must begin with a plan")
+                need(revision == 1,
+                     f"line {line}: first plan in a cycle must use plan_revision 1")
             else:
-                need(current["plan"] is None or revision > current["revision"], f"line {line}: revised plan must increment plan_revision")
+                need(revision >= current["revision"], f"line {line}: plan_revision decreased")
+                for item_id in old_ids.keys() & new_ids.keys():
+                    need(old_ids[item_id] == new_ids[item_id],
+                         f"line {line}: checklist id {item_id} changed text")
+                if msg["message_type"] == "status":
+                    need(revision == current["revision"],
+                         f"line {line}: structural revision requires a plan message")
+                    need(set(new_ids) == set(old_ids),
+                         f"line {line}: status changed checklist structure")
+                else:
+                    need(revision > current["revision"],
+                         f"line {line}: revised plan must increment plan_revision")
+            if msg["message_type"] == "plan":
                 current["plan"] = data
                 current["ids"] = new_ids
                 current["revision"] = revision
         if msg["message_type"] == "final_result":
-            current["finals"] += 1
-    for task, current in state.items():
-        need(current["finals"] == 1, f"task {task} must contain exactly one final_result")
+            need(current["plan"] is not None,
+                 f"line {line}: final_result requires a plan in the current cycle")
+            need(not current["final"],
+                 f"line {line}: duplicate final_result in cycle {cycle}")
+            current["final"] = True
+    for agent, current in state.items():
+        need(current["final"], f"agent {agent} stream must end with exactly one final_result per cycle")
 
 
 def validate_agent(path: Path) -> None:
@@ -163,15 +222,27 @@ def validate_agent(path: Path) -> None:
         need(isinstance(parsed.get(key), str) and bool(parsed[key].strip()), f"{path}: missing string field {key}")
     need(parsed["description"].startswith("Basix-Agent: "),
          f"{path}: description must begin with 'Basix-Agent: '")
-    model_lines = [i for i, line in enumerate(text.splitlines()) if re.match(r"^\s*model\s*=", line)]
+    lines = text.splitlines()
+    model_lines = [i for i, line in enumerate(lines) if re.match(r"^\s*model\s*=", line)]
     need(len(model_lines) == 1, f"{path}: expected exactly one model field")
     index = model_lines[0]
-    lines = text.splitlines()
     override = index > 0 and lines[index - 1].strip() == OVERRIDE
     if not override:
         need(parsed["model"] == "gpt-5.6-luna", f"{path}: non-Luna model requires explicit override marker")
-        need(parsed["model_reasoning_effort"] in EFFORTS, f"{path}: effort must be low, medium, or high")
-    need(parsed["sandbox_mode"] == "read-only", f"{path}: sandbox_mode must be read-only")
+        need(parsed["model_reasoning_effort"] in EFFORTS, f"{path}: effort must be low, medium, high, or max")
+    sandbox_lines = [i for i, line in enumerate(lines) if re.match(r"^\s*sandbox_mode\s*=", line)]
+    need(len(sandbox_lines) == 1, f"{path}: expected exactly one sandbox_mode field")
+    sandbox_index = sandbox_lines[0]
+    sandbox_override = sandbox_index > 0 and lines[sandbox_index - 1].strip() == SANDBOX_OVERRIDE
+    if parsed["sandbox_mode"] == "workspace-write":
+        need(parsed["name"] == "basix_pager",
+             f"{path}: workspace-write is reserved for basix_pager")
+        need(sandbox_override,
+             f"{path}: workspace-write requires an adjacent explicit sandbox override marker")
+    else:
+        need(parsed["sandbox_mode"] == "read-only", f"{path}: sandbox_mode must be read-only")
+        need(not sandbox_override,
+             f"{path}: explicit sandbox override marker is reserved for basix_pager workspace-write")
     if parsed["name"] == "basix_file_explorer":
         need(not override and parsed["model"] == "gpt-5.6-luna",
              f"{path}: basix_file_explorer must use gpt-5.6-luna without override")
@@ -182,6 +253,18 @@ def validate_agent(path: Path) -> None:
              f"{path}: basix_researcher must use gpt-5.6-luna without override")
         need(parsed["model_reasoning_effort"] == "medium",
              f"{path}: basix_researcher must use medium reasoning effort")
+    if parsed["name"] == "basix_pager":
+        need(not override and parsed["model"] == "gpt-5.6-luna",
+             f"{path}: basix_pager must use classified gpt-5.6-luna without an override")
+        need(parsed["model_reasoning_effort"] == "max",
+             f"{path}: basix_pager must use max reasoning effort")
+    if parsed["name"] == "basix_verifier":
+        need(not override and parsed["model"] == "gpt-5.6-luna",
+             f"{path}: basix_verifier must use classified gpt-5.6-luna without an override")
+        need(parsed["model_reasoning_effort"] == "max",
+             f"{path}: basix_verifier must use max reasoning effort")
+        need(parsed["sandbox_mode"] == "read-only",
+             f"{path}: basix_verifier must remain read-only")
     instructions = parsed["developer_instructions"]
     if parsed["name"] == "basix_researcher":
         researcher_clauses = (

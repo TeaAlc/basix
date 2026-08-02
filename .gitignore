@@ -1,5 +1,6 @@
 .codex/*
-.agents
+.agents/
+archive/
 
 !.codex/config.toml
 

@@ -129,6 +129,7 @@ def main() -> int:
     parser.add_argument("--instructions", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--remove-empty-file", action="store_true")
+    parser.add_argument("--status-json", action="store_true")
     args = parser.parse_args()
 
     if args.action == "add" and not args.instructions:
@@ -139,15 +140,45 @@ def main() -> int:
         if block.count(START) != 1 or block.count(END) != 1 or block.index(START) >= block.index(END):
             raise ConfigError("instruction source must contain exactly one ordered marker pair")
     updated, changed = update_text(original, block, args.action)
+    current = tomllib.loads(original).get("developer_instructions", "") if original.strip() else ""
+    existing_span = marker_span(current)
     if not changed:
+        if args.status_json:
+            print(json.dumps({"status": "unchanged", "action": args.action}))
+            return 0
+        if args.action == "add":
+            print(f"Basix developer instructions already current: {args.config}")
+        else:
+            print(f"Basix developer instructions not present: {args.config}")
         return 0
     if args.dry_run:
-        print(f"Would update {args.config}")
+        if args.status_json:
+            print(json.dumps({"status": "changed", "action": args.action, "dry_run": True}))
+            return 0
+        if args.action == "add":
+            verb = "update" if existing_span else "add"
+            print(f"Would {verb} Basix developer instructions: {args.config}")
+        else:
+            print(f"Would remove Basix developer instructions: {args.config}")
+            if args.remove_empty_file and not updated.strip():
+                print(f"Would remove empty configuration file: {args.config}")
         return 0
     if args.action == "remove" and args.remove_empty_file and not updated.strip():
         args.config.unlink(missing_ok=True)
+        if not args.status_json:
+            print(f"Removed Basix developer instructions: {args.config}")
+            print(f"Removed empty configuration file: {args.config}")
     else:
         atomic_write(args.config, updated)
+        if args.action == "add" and not args.status_json:
+            verb = "Updated" if existing_span else "Added"
+            print(f"{verb} Basix developer instructions: {args.config}")
+        elif not args.status_json:
+            print(f"Removed Basix developer instructions: {args.config}")
+    if args.status_json:
+        # The human-readable branch above is retained for direct use; installers
+        # request JSON and consume only the final record.
+        print(json.dumps({"status": "changed", "action": args.action, "dry_run": False}))
     return 0
 
 

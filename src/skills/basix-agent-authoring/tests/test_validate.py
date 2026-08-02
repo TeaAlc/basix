@@ -1,25 +1,29 @@
 import importlib.util
 import io
 import json
+import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "validate.py"
 CONTRACT_REFERENCE = ROOT / "references" / "communication-contract.md"
+PAGER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-pager.toml"
+VERIFIER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-verifier.toml"
 SPEC = importlib.util.spec_from_file_location("authoring_validate", SCRIPT)
 validator = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
 SPEC.loader.exec_module(validator)
 
 
-def plan(sequence=1, revision=1, checklist=None):
+def plan(sequence=1, revision=1, checklist=None, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.0", "message_type": "plan", "agent_name": "tester",
-        "task_name": "task", "sequence": sequence, "status": "planned",
+        "contract_version": "1.1", "message_type": "plan", "agent_name": agent,
+        "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "planned",
         "summary": "Inspect and report.",
         "data": {"plan_revision": revision, "checklist": checklist or [
             {"id": "inspect", "text": "Inspect inputs", "checked": False},
@@ -39,10 +43,10 @@ If unavailable, immediately report an `issue` with status `blocked` and finish w
 """
 
 
-def final(sequence=2, status="completed", errors=None, data=UNSET):
+def final(sequence=2, status="completed", errors=None, data=UNSET, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.0", "message_type": "final_result", "agent_name": "tester",
-        "task_name": "task", "sequence": sequence, "status": status,
+        "contract_version": "1.1", "message_type": "final_result", "agent_name": agent,
+        "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": status,
         "summary": "Work finished.", "data": {} if data is UNSET else data,
         "errors": [] if errors is None else errors,
     }
@@ -168,18 +172,77 @@ class StreamTests(unittest.TestCase):
             first, status, issue, permission, intermediate, revised, revised_status, final(8)
         ])
 
+    def test_review_fix_final_flow_is_terminal(self):
+        first = plan()
+        review = {**plan(2), "message_type": "intermediate_result", "status": "in_progress", "data": None}
+        revised = plan(3, revision=2)
+        fixed_status = {**plan(4, revision=2), "message_type": "status", "status": "in_progress"}
+        terminal = final(5)
+        validator.validate_stream([first, review, revised, fixed_status, terminal])
+        with self.assertRaisesRegex(validator.Invalid, "follows final"):
+            validator.validate_stream([first, terminal, {**review, "sequence": 6}])
+
+    def test_continuation_requires_incremented_cycle_and_new_plan(self):
+        continued = plan(3, cycle=2)
+        continued_status = {**plan(4, cycle=2), "message_type": "status", "status": "in_progress"}
+        validator.validate_stream([plan(), final(2), continued, continued_status, final(5, cycle=2)])
+
+    def test_post_final_activity_without_continuation_is_rejected(self):
+        status = {**plan(3), "message_type": "status", "status": "in_progress"}
+        with self.assertRaisesRegex(validator.Invalid, "follows final"):
+            validator.validate_stream([plan(), final(2), status])
+
+    def test_unchanged_cycle_revision_cannot_reactivate(self):
+        with self.assertRaisesRegex(validator.Invalid, "follows final|cycle_revision"):
+            validator.validate_stream([plan(), final(2), plan(3, cycle=1)])
+
+    def test_cycle_revision_must_advance_one_and_reset_plan_revision(self):
+        with self.assertRaisesRegex(validator.Invalid, "increase by exactly one"):
+            validator.validate_stream([plan(), final(2), plan(3, cycle=3)])
+        with self.assertRaisesRegex(validator.Invalid, "plan_revision 1"):
+            validator.validate_stream([plan(), final(2), plan(3, revision=2, cycle=2)])
+
+    def test_sequence_is_global_for_agent_lifetime(self):
+        with self.assertRaisesRegex(validator.Invalid, "strictly increasing"):
+            validator.validate_stream([plan(2), final(3), plan(1, cycle=2), final(4, cycle=2)])
+
 
 class AgentTests(unittest.TestCase):
+    def test_canonical_pager_definition_and_profiles(self):
+        validator.validate_agent(PAGER_NATIVE)
+        agent = tomllib.loads(PAGER_NATIVE.read_text())
+        self.assertEqual(agent["name"], "basix_pager")
+        self.assertEqual(agent["model"], "gpt-5.6-luna")
+        self.assertEqual(agent["model_reasoning_effort"], "max")
+        self.assertEqual(agent["sandbox_mode"], "workspace-write")
+        instructions = agent["developer_instructions"]
+        for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
+            self.assertIn(f"`{profile}`", instructions)
+        for phrase in ("fork_turns=\"none\"", ".basix/contracts/<chain-id>.md", "intermediate_result", "final_result"):
+            self.assertIn(phrase, instructions)
+
+    def test_canonical_verifier_definition(self):
+        validator.validate_agent(VERIFIER_NATIVE)
+        agent = tomllib.loads(VERIFIER_NATIVE.read_text())
+        self.assertEqual(agent["name"], "basix_verifier")
+        self.assertEqual(agent["model"], "gpt-5.6-luna")
+        self.assertEqual(agent["model_reasoning_effort"], "max")
+        self.assertEqual(agent["sandbox_mode"], "read-only")
+        instructions = agent["developer_instructions"]
+        for phrase in ("immutable", "inconclusive", "remediation", "fork_turns=\"none\"",
+                       "Fingerprint", "followup_task", "cycle_revision"):
+            self.assertIn(phrase, instructions)
+
     def write_agent(self, model="gpt-5.6-luna", effort="medium", marker="", block=True,
                     description="Basix-Agent: Test agent", name="agent", sandbox="read-only",
-                    preamble=None):
+                    sandbox_marker="", preamble=None):
         reference = CONTRACT_REFERENCE.read_text()
         contract = reference[reference.index(validator.START):reference.index(validator.END) + len(validator.END)]
         if not block:
             contract = "Instructions without a managed communication contract."
         if preamble is None:
             preamble = RESEARCHER_PREAMBLE if name == "basix_researcher" else ""
-        text = f'''name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\nsandbox_mode = "{sandbox}"\ndeveloper_instructions = """{preamble}{contract}"""\n'''
+        text = f'''name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\n{sandbox_marker}sandbox_mode = "{sandbox}"\ndeveloper_instructions = """{preamble}{contract}"""\n'''
         directory = tempfile.TemporaryDirectory()
         path = Path(directory.name) / "agent.toml"
         path.write_text(text)
@@ -187,6 +250,11 @@ class AgentTests(unittest.TestCase):
 
     def test_default_agent(self):
         directory, path = self.write_agent()
+        with directory:
+            validator.validate_agent(path)
+
+    def test_highly_complex_agent_uses_luna_max_without_override(self):
+        directory, path = self.write_agent(effort="max")
         with directory:
             validator.validate_agent(path)
 
@@ -227,8 +295,70 @@ class AgentTests(unittest.TestCase):
     def test_requires_read_only_sandbox(self):
         for sandbox in ("workspace-write", "danger-full-access", ""):
             directory, path = self.write_agent(sandbox=sandbox)
-            with directory, self.assertRaisesRegex(validator.Invalid, "sandbox_mode"):
+            with directory, self.assertRaisesRegex(validator.Invalid, "sandbox_mode|workspace-write"):
                 validator.validate_agent(path)
+
+    def test_pager_max_is_classified_and_workspace_write_needs_marker(self):
+        directory, path = self.write_agent(name="basix_pager", effort="max", sandbox="workspace-write")
+        with directory, self.assertRaisesRegex(validator.Invalid, "sandbox override"):
+            validator.validate_agent(path)
+
+        directory, path = self.write_agent(
+            name="basix_pager", effort="max", sandbox="workspace-write",
+            sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+        )
+        with directory:
+            validator.validate_agent(path)
+
+        directory, path = self.write_agent(
+            name="basix_pager", effort="max", marker=validator.OVERRIDE + "\n",
+            sandbox="workspace-write", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+        )
+        with directory, self.assertRaisesRegex(validator.Invalid, "without an override"):
+            validator.validate_agent(path)
+
+        directory, path = self.write_agent(
+            name="basix_pager", effort="high", sandbox="workspace-write",
+            sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+        )
+        with directory, self.assertRaisesRegex(validator.Invalid, "max reasoning"):
+            validator.validate_agent(path)
+
+    def test_verifier_uses_classified_max_without_override_and_read_only(self):
+        directory, path = self.write_agent(name="basix_verifier", effort="max")
+        with directory:
+            validator.validate_agent(path)
+        directory, path = self.write_agent(name="basix_verifier", effort="max", sandbox="workspace-write")
+        with directory, self.assertRaisesRegex(validator.Invalid, "reserved for basix_pager|read-only"):
+            validator.validate_agent(path)
+
+        directory, path = self.write_agent(name="basix_verifier", effort="max", marker=validator.OVERRIDE + "\n")
+        with directory, self.assertRaisesRegex(validator.Invalid, "without an override"):
+            validator.validate_agent(path)
+
+    def test_sandbox_override_is_reserved_for_pager(self):
+        directory, path = self.write_agent(
+            name="agent", sandbox="workspace-write", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+        )
+        with directory, self.assertRaisesRegex(validator.Invalid, "reserved for basix_pager"):
+            validator.validate_agent(path)
+
+        directory, path = self.write_agent(
+            name="agent", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+        )
+        with directory, self.assertRaisesRegex(validator.Invalid, "reserved for basix_pager"):
+            validator.validate_agent(path)
+
+    def test_model_and_sandbox_fields_must_be_unique(self):
+        directory, path = self.write_agent()
+        path.write_text(path.read_text() + '\n[metadata]\nmodel = "gpt-5.6-luna"\n')
+        with directory, self.assertRaisesRegex(validator.Invalid, "exactly one model field"):
+            validator.validate_agent(path)
+
+        directory, path = self.write_agent()
+        path.write_text(path.read_text() + '\n[metadata]\nsandbox_mode = "read-only"\n')
+        with directory, self.assertRaisesRegex(validator.Invalid, "exactly one sandbox_mode field"):
+            validator.validate_agent(path)
 
     def test_file_explorer_requires_luna_low_without_override(self):
         directory, path = self.write_agent(name="basix_file_explorer", effort="low")
@@ -263,6 +393,34 @@ class AgentTests(unittest.TestCase):
         directory, path = self.write_agent(name="basix_researcher", preamble="")
         with directory, self.assertRaisesRegex(validator.Invalid, "Scrapling researcher policy"):
             validator.validate_agent(path)
+
+
+class RepositoryPolicyTests(unittest.TestCase):
+    def test_native_agents_use_only_contract_1_1_and_validate(self):
+        repository = Path(__file__).resolve().parents[4]
+        agents = sorted((repository / "src/agents/native").glob("*.toml"))
+        self.assertTrue(agents)
+        for path in agents:
+            versions = re.findall(
+                r"(?i)\bcontract(?:\s+version)?\s+(\d+\.\d+)\b",
+                path.read_text(),
+            )
+            self.assertTrue(versions, path)
+            self.assertEqual(set(versions), {"1.1"}, path)
+            validator.validate_agent(path)
+
+    def test_documented_repository_test_paths_exist(self):
+        repository = Path(__file__).resolve().parents[4]
+        skills = (
+            repository / "src/skills/basix/SKILL.md",
+            repository / "src/skills/basix-agent-authoring/SKILL.md",
+        )
+        documented_paths = ("./src/tests/verify-basix.sh", "./src/tests/test-setup.sh")
+        for skill in skills:
+            text = skill.read_text()
+            for documented_path in documented_paths:
+                self.assertIn(documented_path, text, skill)
+                self.assertTrue((repository / documented_path.removeprefix("./")).is_file())
 
 
 class CliTests(unittest.TestCase):
