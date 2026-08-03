@@ -41,8 +41,11 @@ The native read-only agents are:
 
 All managed communication blocks implement the versioned JSON handoff contract. Technical
 content and handoff payloads use English, while visible chat confirmations and errors use the
-current conversation's language. Global setup binds every `agents/native/*.toml` file to
-`$CODEX_HOME/agents/`; project setup binds all of them to `.codex/agents/`.
+current conversation's language. Global setup exposes the complete native-agent
+payload at `$CODEX_HOME/basix/agents/`; project setup exposes it at
+`.codex/basix/agents/`. Each agent is registered by its TOML `name` through a
+managed absolute `[agents.<name>].config_file` entry. Basix never writes its
+TOMLs into the shared global or project `agents/` directories.
 
 Contract 1.2 adds `report_started` for reports requested by Root. A requested
 intermediate or explicit final report is announced first with its exact report

@@ -29,7 +29,11 @@ The source of truth for agent behavior is `src/agents/native/`; setup scripts on
 bind those definitions into supported Codex locations. Persistent shared
 instructions come from `src/setup/developer_instruction.md`. Installer state is
 used to ensure that uninstall operations preserve foreign or locally modified
-files.
+files. Copy-mode state inventories every installed file, so uninstall can remove
+unchanged Basix files from a mixed tree without deleting changed files, foreign
+siblings, symlinks, special files, or nonempty parent directories. Configuration
+markers define the Basix-owned spans; content outside them remains byte-for-byte
+unchanged.
 
 ### Making changes
 
@@ -57,6 +61,14 @@ bash test/test-codex-integration.sh
 PYTHONPATH=src/scripts python3 test/test_system_cavify.py
 ```
 
+The live discovery check is intentionally separate because it performs one real
+model turn and therefore requires Codex authentication, network access, and
+available usage quota:
+
+```bash
+bash test/test-codex-discovery.sh
+```
+
 For changes to shell scripts, also run ShellCheck when it is installed:
 
 ```bash
@@ -82,17 +94,20 @@ Run all commands below from a Basix repository checkout. Unless `--mode link` or
 installs and ordinary project targets default dynamically to `link`; a project
 target that is the canonical parent of this checkout's runtime `src/` defaults
 to `copy` for self-hosting. Interactive and noninteractive invocations use the
-same computed default. Link mode points installed agents and skills directly at
-`src/`; copy mode writes independent files directly into the supported project
-target paths. In global plugin mode, skill payload links/copies follow the
-selected mode while generated metadata remains copied.
+same computed default. Link mode links each complete skill directory and the
+private native-agent directory directly to `src/`; copy mode writes independent
+complete trees. Native agents are registered with managed `[agents.<name>]`
+`config_file` entries instead of being written into shared agent directories.
+In global plugin mode, skill payload links/copies follow the selected mode while
+generated metadata remains copied.
 On reinstall, recorded links and copies converge back to the current
 `src` payload even when locally changed or redirected; obsolete managed agent
 and skill files are removed. Exact current-manifest file targets also converge
 when their prior state is absent; only unrecorded foreign directories or
 parents, out-of-manifest targets, and physical aliases recorded as `same` remain
-protected. Uninstall is intentionally more conservative and keeps locally
-modified targets.
+protected. Uninstall is intentionally more conservative: it removes only state-
+and hash-confirmed Basix content, including unchanged files inside otherwise
+mixed copy trees, and keeps locally modified or foreign targets.
 
 ### Option A: Install Basix globally
 
@@ -105,8 +120,10 @@ the current user:
 
 This creates an independent plugin bundle at `$CODEX_HOME/basix-plugin-root/`,
 registers it as the local Codex marketplace `basix-local`, installs the Basix
-plugin, binds every native agent into `$CODEX_HOME/agents/`, and merges the marked
-Basix instruction block into `$CODEX_HOME/config.toml`.
+plugin, stores native agents under `$CODEX_HOME/basix/agents/`, registers their
+absolute `config_file` paths, and merges the marked Basix instruction block into
+`$CODEX_HOME/config.toml`. It never writes Basix agents into the shared
+`$CODEX_HOME/agents/` directory.
 
 Common variants:
 
@@ -134,10 +151,12 @@ cd /path/to/project
 /path/to/basix/src/setup/install_for_project.sh
 ```
 
-The installer installs complete skills directly under `.agents/skills/`, native
-agents directly under `.codex/agents/`, and merges the managed instruction block
-into `.codex/config.toml`. It never creates or manages `.basix`; that directory
-is reserved for project-owned memory and credential files. Only load
+The installer installs complete skill directory links or copies under
+`.agents/skills/`, stores native agents privately under `.codex/basix/agents/`,
+and registers them with managed `[agents.<name>].config_file` entries in
+`.codex/config.toml`. It never writes Basix TOMLs into the shared
+`.codex/agents/` directory and never creates or manages project `.basix`; that
+directory is reserved for project-owned memory and credential files. Only load
 project-level Codex configuration from projects you trust.
 
 Useful variants:

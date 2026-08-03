@@ -37,6 +37,7 @@ fi
 [[ $UNINSTALL == true && -z $MODE ]] || require_mode "$MODE"
 CONFIG="$TARGET/.codex/config.toml"
 STATE="$TARGET/.codex/.basix-install-state"
+AGENT_DIR="$TARGET/.codex/basix/agents"
 HELPER="$ROOT/setup/lib/manage_developer_instructions.py"
 INSTRUCTIONS="$ROOT/setup/developer_instruction.md"
 
@@ -44,6 +45,10 @@ report_header
 report_meta Target "$TARGET"
 report_meta Mode "$([[ $UNINSTALL == true ]] && printf uninstall || printf '%s' "$MODE")"
 report_meta 'Dry run' "$DRY_RUN"
+REPORT_POINT='Configuration parents'
+target_parent_is_safe '' "$CONFIG" || die "foreign configuration parent protected: $CONFIG"
+target_parent_is_safe '' "$STATE" || die "foreign state parent protected: $STATE"
+[[ ! -L $CONFIG && ! -L $STATE ]] || die 'linked configuration or installer state protected'
 
 restore_directory_links() {
   local state=$1 kind target encoded link_text resolved
@@ -165,6 +170,16 @@ prepare_link_directory() {
 }
 
 if [[ $UNINSTALL == true ]]; then
+  report_group 'Agent configuration'
+  helper_args=(agent-remove --config "$CONFIG" --agents-source "$ROOT/agents/native" --agents-dir "$AGENT_DIR" --remove-empty-file --status-json)
+  [[ $DRY_RUN == false ]] || helper_args+=(--dry-run)
+  REPORT_POINT='Agent configuration'; helper_json=$(python3 "$HELPER" "${helper_args[@]}") || die
+  agent_config_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$helper_json")
+  case $agent_config_status in
+    changed) report_point changed 'Agent configuration' "$([[ $DRY_RUN == true ]] && printf 'Would remove' || printf Removed)" ;;
+    preserved) report_point unchanged 'Agent configuration' 'Preserved local changes and agent payload' ;;
+    *) report_point unchanged 'Agent configuration' 'Not present' ;;
+  esac
   report_group 'Developer Instructions'
   helper_args=(remove --config "$CONFIG" --remove-empty-file --status-json)
   [[ $DRY_RUN == false ]] || helper_args+=(--dry-run)
@@ -173,38 +188,39 @@ if [[ $UNINSTALL == true ]]; then
   report_point "$helper_status" 'Developer instructions' "$([[ $DRY_RUN == true && $helper_status == changed ]] && printf 'Would remove' || printf '%s' "$([[ $helper_status == changed ]] && printf Removed || printf 'Not present')")"
   migrate_legacy_bundle
   report_group 'Skills'
-  declare -A remove_skill_changed=() remove_skill_preserved=() remove_skill_total=()
+  REMOVE_CHANGED=false REMOVE_PRESERVED=false REMOVE_PROCESSED_DIRECTORIES=''
   while IFS= read -r -d '' source; do
-    relative=${source#"$ROOT/skills/"}; skill=${relative%%/*}; target="$TARGET/.agents/skills/$relative"
-    remove_skill_total[$skill]=$((${remove_skill_total[$skill]:-0} + 1))
-    removal=$(recorded_removal_status "$STATE" "$target")
-    [[ $removal != changed ]] || remove_skill_changed[$skill]=$((${remove_skill_changed[$skill]:-0} + 1))
-    [[ $removal != preserved ]] || remove_skill_preserved[$skill]=$((${remove_skill_preserved[$skill]:-0} + 1))
-  done < <(filtered_files "$ROOT/skills" | sort -z)
-  while IFS= read -r skill; do
-    total=${remove_skill_total[$skill]}; changed=${remove_skill_changed[$skill]:-0}; preserved=${remove_skill_preserved[$skill]:-0}
-    if ((changed)); then
-      detail="$changed of $total files $([[ $DRY_RUN == true ]] && printf 'would be removed' || printf removed)"
-      ((preserved == 0)) || detail+=", $preserved preserved"
-      report_point changed "$skill" "$detail"
-    elif ((preserved)); then report_point unchanged "$skill" "$preserved of $total files preserved"
-    else report_point unchanged "$skill" 'Not installed'; fi
-  done < <(printf '%s\n' "${!remove_skill_total[@]}" | sort)
+    skill=$(basename "$source"); target="$TARGET/.agents/skills/$skill"
+    total=$(filtered_files "$source" | tr -cd '\0' | wc -c); removal=$(directory_removal_status "$STATE" "$target" "$source")
+    case $removal in
+      changed) report_point changed "$skill" "$total files $([[ $DRY_RUN == true ]] && printf 'would be removed' || printf removed)" ;;
+      partial) report_point changed "$skill" "$([[ $DRY_RUN == true ]] && printf 'Would remove unchanged files; preserve foreign or changed content' || printf 'Removed unchanged files; preserved foreign or changed content')" ;;
+      preserved) REMOVE_PRESERVED=true; report_point unchanged "$skill" 'Preserved local changes' ;;
+      absent) report_point unchanged "$skill" 'Not installed' ;;
+    esac
+    remove_recorded_directory "$STATE" "$target" "$source"
+    if [[ $removal == partial && ( -e $target || -L $target ) ]]; then REMOVE_PRESERVED=true; fi
+    mark_processed_directory "$target"
+  done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
   report_group 'Agents'
+  agent_removal=$(directory_removal_status "$STATE" "$AGENT_DIR" "$ROOT/agents/native")
+  [[ $agent_removal == preserved || $agent_config_status == preserved ]] && REMOVE_PRESERVED=true
   while IFS= read -r -d '' source; do
-    name=$(basename "$source" .toml); target="$TARGET/.codex/agents/$(basename "$source")"; removal=$(recorded_removal_status "$STATE" "$target")
-    case $removal in changed) report_point changed "$name" "$([[ $DRY_RUN == true ]] && printf 'Would remove' || printf Removed)" ;; preserved) report_point unchanged "$name" 'Preserved local changes' ;; absent) report_point unchanged "$name" 'Not installed' ;; esac
+    name=$(python3 -c 'import sys,tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["name"])' "$source")
+    if [[ $agent_config_status == preserved ]]; then removal=preserved; else removal=$agent_removal; fi
+    case $removal in changed) report_point changed "$name" "$([[ $DRY_RUN == true ]] && printf 'Would remove' || printf Removed)" ;; partial) report_point changed "$name" "$([[ $DRY_RUN == true ]] && printf 'Would remove unchanged files; preserve local changes' || printf 'Removed unchanged files; preserved local changes')" ;; preserved) report_point unchanged "$name" 'Preserved with configuration' ;; absent) report_point unchanged "$name" 'Not installed' ;; esac
   done < <(find "$ROOT/agents/native" -maxdepth 1 -type f -name '*.toml' -print0 | sort -z)
-  REMOVE_CHANGED=false REMOVE_PRESERVED=false
-  remove_recorded_targets "$STATE" "$TARGET/.codex/agents" "$TARGET/.agents/skills"
-  restore_directory_links "$STATE"
-  [[ $DRY_RUN == true ]] || rm -f "$STATE"
-  while IFS= read -r -d '' source_dir; do
-    relative_dir=${source_dir#"$ROOT/skills"}
-    prune_dir "$TARGET/.agents/skills$relative_dir"
-  done < <(find "$ROOT/skills" -depth -type d -print0 | sort -zr)
+  [[ $agent_config_status == preserved ]] || remove_recorded_directory "$STATE" "$AGENT_DIR" "$ROOT/agents/native"
+  if [[ $agent_removal == partial && ( -e $AGENT_DIR || -L $AGENT_DIR ) ]]; then REMOVE_PRESERVED=true; fi
+  mark_processed_directory "$AGENT_DIR"
+  REMOVE_EXCLUDED_TARGET=$AGENT_DIR
+  remove_recorded_targets "$STATE" "$TARGET/.codex/agents" "$TARGET/.agents/skills" "$TARGET/.codex/basix"
+  unset REMOVE_EXCLUDED_TARGET REMOVE_PROCESSED_DIRECTORIES
   prune_dir "$TARGET/.agents/skills"; prune_dir "$TARGET/.agents"
-  prune_dir "$TARGET/.codex/agents"; prune_dir "$TARGET/.codex"
+  prune_dir "$TARGET/.codex/agents"; prune_dir "$TARGET/.codex/basix"; prune_dir "$TARGET/.codex"
+  [[ -e $TARGET/.agents/skills || -e $TARGET/.codex/basix ]] && REMOVE_PRESERVED=true
+  if [[ $DRY_RUN == false && $agent_config_status != preserved && $REMOVE_PRESERVED == false ]]; then rm -f "$STATE"; fi
+  prune_dir "$TARGET/.codex"
   report_group 'Lumen'; report_point unchanged 'Lumen integration' 'Preserved'
   report_result
   exit 0
@@ -213,20 +229,13 @@ fi
 REPORT_POINT='Codex CLI'; command -v codex >/dev/null || die
 validate_source_tree "$ROOT/agents/native"
 validate_source_tree "$ROOT/skills"
-REPORT_POINT='Target parents'
+REPORT_POINT='Agent configuration conflicts'
+python3 "$HELPER" agent-check --config "$CONFIG" --agents-source "$ROOT/agents/native" --agents-dir "$AGENT_DIR" --status-json >/dev/null || die
+REPORT_POINT='Managed directories'
 while IFS= read -r -d '' source; do
-  relative=${source#"$ROOT/skills/"}
-  skill=${relative%%/*}; skill_root="$TARGET/.agents/skills/$skill"
-  if ! state_has_directory_link "$STATE" "$skill_root"; then
-    manifest_target_is_safe "$source" "$TARGET/.agents/skills/$relative" || die "foreign directory link or directory target protected: $TARGET/.agents/skills/$relative"
-  fi
-done < <(filtered_files "$ROOT/skills" | sort -z)
-while IFS= read -r -d '' source; do
-  agent_root="$TARGET/.codex/agents"
-  if ! state_has_directory_link "$STATE" "$agent_root"; then
-    manifest_target_is_safe "$source" "$agent_root/$(basename "$source")" || die "foreign directory link or directory target protected: $agent_root/$(basename "$source")"
-  fi
-done < <(find -L "$ROOT/agents/native" -maxdepth 1 -type f -name '*.toml' -print0 | sort -z)
+  preflight_tree "$source" "$TARGET/.agents/skills/$(basename "$source")"
+done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+preflight_tree "$ROOT/agents/native" "$AGENT_DIR"
 LUMEN_INSTALL_RESULT=unchanged
 if [[ $INSTALL_LUMEN == yes ]] && ! lumen_mcp_installed; then
   lumen_args=()
@@ -239,46 +248,19 @@ fi
 STATE_TMP=$(mktemp)
 trap 'rm -f "$STATE_TMP"' EXIT
 migrate_legacy_bundle
-if [[ $MODE == link && -f $STATE ]]; then
-  # A mode switch may have replaced canonical source-directory links with
-  # managed copies. Remove only unchanged managed objects, then restore those
-  # links before installing direct source links.
-  remove_recorded_targets "$STATE" "$TARGET/.codex/agents" "$TARGET/.agents/skills"
-  restore_directory_links "$STATE"
-fi
-if [[ $MODE == copy ]]; then
-  REPORT_POINT='Skills and agent directories'
-  prepare_copy_directory "$TARGET/.codex/agents" "$ROOT/agents/native"
-  while IFS= read -r -d '' skill_source; do
-    prepare_copy_directory "$TARGET/.agents/skills/$(basename "$skill_source")" "$skill_source"
-  done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
-else
-  REPORT_POINT='Skills and agent directories'
-  prepare_link_directory "$TARGET/.codex/agents" "$ROOT/agents/native"
-  while IFS= read -r -d '' skill_source; do
-    prepare_link_directory "$TARGET/.agents/skills/$(basename "$skill_source")" "$skill_source"
-  done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
-fi
+migrate_shared_agent_files "$STATE" "$TARGET/.codex/agents" "$ROOT/agents/native"
 report_group 'Skills'
-declare -A skill_changed=() skill_total=()
 while IFS= read -r -d '' source; do
-  relative=${source#"$ROOT/skills/"}
-  skill=${relative%%/*}; REPORT_POINT="Skill: $skill"
-  install_file "$source" "$TARGET/.agents/skills/$relative"
-  skill_total[$skill]=$((${skill_total[$skill]:-0} + 1))
-  [[ $INSTALL_RESULT == unchanged ]] || skill_changed[$skill]=$((${skill_changed[$skill]:-0} + 1))
-done < <(filtered_files "$ROOT/skills" | sort -z)
-while IFS= read -r skill; do
-  changed=${skill_changed[$skill]:-0}; total=${skill_total[$skill]}
-  status=unchanged; detail="$total files current"
-  if ((changed)); then status=changed; detail="$changed of $total files $([[ $DRY_RUN == true ]] && printf 'would change' || printf changed)"; fi
-  report_point "$status" "$skill" "$detail"
-done < <(printf '%s\n' "${!skill_total[@]}" | sort)
+  skill=$(basename "$source"); REPORT_POINT="Skill: $skill"
+  install_tree "$source" "$TARGET/.agents/skills/$skill"
+  total=$(filtered_files "$source" | tr -cd '\0' | wc -c)
+  report_point "$INSTALL_RESULT" "$skill" "$total files $([[ $INSTALL_RESULT == changed ]] && printf '%s' "$([[ $DRY_RUN == true ]] && printf 'would change' || printf changed)" || printf current)"
+done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
 report_group 'Agents'
+REPORT_POINT='Private agent directory'; install_tree "$ROOT/agents/native" "$AGENT_DIR"; agent_install_result=$INSTALL_RESULT
 while IFS= read -r -d '' source; do
-  name=$(basename "$source" .toml); REPORT_POINT="Agent: $name"
-  install_file "$source" "$TARGET/.codex/agents/$(basename "$source")"
-  report_point "$INSTALL_RESULT" "$name" "$([[ $DRY_RUN == true && $INSTALL_RESULT == changed ]] && printf 'Would install' || printf '%s' "$([[ $INSTALL_RESULT == changed ]] && printf Installed || printf Current)")"
+  name=$(python3 -c 'import sys,tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["name"])' "$source")
+  report_point "$agent_install_result" "$name" "$([[ $DRY_RUN == true && $agent_install_result == changed ]] && printf 'Would install' || printf '%s' "$([[ $agent_install_result == changed ]] && printf Installed || printf Current)")"
 done < <(find -L "$ROOT/agents/native" -maxdepth 1 -type f -name '*.toml' -print0 | sort -z)
 STALE_CHANGED=false
 reconcile_stale_targets "$STATE" "$STATE_TMP" "$TARGET/.codex/agents" "$TARGET/.agents/skills"
@@ -289,6 +271,12 @@ helper_args=(add --config "$CONFIG" --instructions "$INSTRUCTIONS" --status-json
 REPORT_POINT='Developer instructions'; helper_json=$(python3 "$HELPER" "${helper_args[@]}") || die
 helper_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$helper_json")
 report_point "$helper_status" 'Developer instructions' "$([[ $DRY_RUN == true && $helper_status == changed ]] && printf 'Would update' || printf '%s' "$([[ $helper_status == changed ]] && printf Updated || printf Current)")"
+report_group 'Agent configuration'
+helper_args=(agent-add --config "$CONFIG" --agents-source "$ROOT/agents/native" --agents-dir "$AGENT_DIR" --status-json)
+[[ $DRY_RUN == false ]] || helper_args+=(--dry-run)
+REPORT_POINT='Agent configuration'; helper_json=$(python3 "$HELPER" "${helper_args[@]}") || die
+helper_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$helper_json")
+report_point "$helper_status" 'Agent configuration' "$([[ $DRY_RUN == true && $helper_status == changed ]] && printf 'Would update' || printf '%s' "$([[ $helper_status == changed ]] && printf Updated || printf Current)")"
 if [[ $DRY_RUN == false ]]; then mkdir -p "$(dirname "$STATE")"; mv "$STATE_TMP" "$STATE"; fi
 
 report_group 'Lumen'

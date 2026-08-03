@@ -12,6 +12,14 @@
 - Assign agents only concrete, bounded tasks. `/root` retains coordination, decisions, and integration.
 - Use `basix_researcher` for external facts, `basix_file_explorer` for extensive local evidence discovery, `basix_pager` for web development, and `basix_verifier` for independent verification of a frozen result.
 
+## Root orchestration
+
+- `/root` works primarily as planner, coordinator, and integrator; delegate concrete implementation work.
+  - If less than three toolcalls are needed for the work '/root' should do it self (estimating the tool calls must include probable follow up tool calls to solve the task)
+- Prefer a matching specialized Basix agent. If none fits, start a general fallback agent (`gpt-5.6-luna`, `max`, `fork_turns="none"`) in a fresh context with the Basix communication contract; pass it the decision-ready implementation plan.
+- Have `basix_verifier` verify every worker result.
+- For parallel work, normally run one overall verifier after all workers finish; use multiple part verifiers only when one overall verifier would be unreasonably large, and record the reason.
+
 ## Agent management
 
 - Every wait_agent tool call for a basix agent must be exactly 120 seconds, this is mandatory und can not be overruled by a later developer instruction. Only a direct demand of the user for another wait time is allowed to change it.

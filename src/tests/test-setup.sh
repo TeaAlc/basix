@@ -54,11 +54,13 @@ from pathlib import Path
 root = Path(sys.argv[1])
 readme = ' '.join((root.parent / 'README.md').read_text().split())
 installation = ' '.join((root / 'docs/installation.md').read_text().split())
-assert 'Exact current-manifest file targets also converge' in readme
-assert 'only unrecorded foreign directories or' in readme
-assert 'including state-less targets' in installation
-assert 'Exact current-manifest file targets still converge' in installation
-assert 'targets outside the current manifest' in installation
+assert 'complete skill directory' in readme
+assert 'shared agent directories' in readme
+assert 'State-less exact canonical links are adopted' in installation
+assert 'extra directory contents' in installation
+assert '`dirfile` inventory record' in installation
+assert 'foreign agent tables' in installation
+assert 'same link, inventory, and hash checks' in installation
 assert 'Unrecorded targets and physical aliases' not in readme
 assert 'unrecorded targets, unreadable sources' not in installation
 PY
@@ -84,6 +86,20 @@ for text in (
     'first read the Basix router skill',
     'only once per session',
     '## Agent selection',
+    '## Root orchestration',
+    'works primarily as planner, coordinator, and integrator',
+    'matching specialized Basix agent',
+    'general fallback agent',
+    'gpt-5.6-luna',
+    '`max`',
+    '`fork_turns="none"`',
+    'fresh context',
+    'Basix communication contract',
+    'decision-ready implementation plan',
+    'basix_verifier` verify every worker result',
+    'one overall verifier after all workers finish',
+    'multiple part verifiers only when one overall verifier would be unreasonably large',
+    'record the reason',
     '## Agent management',
     'must not perform the same task or any overlapping part in parallel',
     '## Mandatory delegation',
@@ -159,6 +175,15 @@ d=tomllib.load(open(sys.argv[1],'rb')); assert d['developer_instructions']=='for
 PY
 then ok 'helper removes only managed block'; else not_ok 'helper removes only managed block'; fi
 
+inline_config="$case_dir/inline-comment.toml"
+printf 'developer_instructions = "foreign"  # keep assignment comment\nmodel = "other"\n' >"$inline_config"
+cp "$inline_config" "$case_dir/inline-comment.original"
+if python3 "$helper" add --config "$inline_config" --instructions "$instructions" >/dev/null &&
+  python3 "$helper" remove --config "$inline_config" >/dev/null &&
+  cmp -s "$case_dir/inline-comment.original" "$inline_config"; then
+  ok 'helper preserves an inline foreign assignment comment byte-for-byte'
+else not_ok 'helper preserves an inline foreign assignment comment byte-for-byte'; fi
+
 status_dir="$case_dir/helper-status"; mkdir -p "$status_dir"
 status_config="$status_dir/config.toml"; status_changed="$status_dir/changed.md"
 sed 's/<!-- basix:developer-instructions:end -->/status-test\n<!-- basix:developer-instructions:end -->/' "$instructions" > "$status_changed"
@@ -209,13 +234,13 @@ make_mock
 
 home="$case_dir/home"; log="$case_dir/global.log"; : > "$log"
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null &&
-  [[ -L $home/agents/basix-researcher.toml && -L $home/agents/basix-file-explorer.toml && -L $home/agents/basix-pager.toml && -L $home/agents/basix-verifier.toml && ! -e $home/basix-luna-researcher.config.toml &&
+  [[ -L $home/basix/agents && ! -e $home/agents/basix-researcher.toml && ! -e $home/basix-luna-researcher.config.toml &&
     -f $home/basix-plugin-root/.codex-plugin/plugin.json && -f $home/basix-plugin-root/.agents/plugins/marketplace.json &&
-    -L $home/basix-plugin-root/skills/basix/SKILL.md && $(readlink "$home/basix-plugin-root/skills/basix/SKILL.md") == "$ROOT/skills/basix/SKILL.md" ]] &&
+    -L $home/basix-plugin-root/skills/basix && $(readlink "$home/basix-plugin-root/skills/basix") == "$ROOT/skills/basix" && ! -L $home/basix-plugin-root/skills/basix/SKILL.md ]] &&
   cmp -s "$ROOT/plugin/plugin.json" "$home/basix-plugin-root/.codex-plugin/plugin.json" &&
   cmp -s "$ROOT/plugin/marketplace.json" "$home/basix-plugin-root/.agents/plugins/marketplace.json" &&
   grep -Fq "plugin marketplace add $home/basix-plugin-root --json" "$log" && grep -q 'plugin add basix@basix-local' "$log" &&
-  awk -F '\t' -v manifest="$home/basix-plugin-root/.codex-plugin/plugin.json" -v skill="$home/basix-plugin-root/skills/basix/SKILL.md" '$1 == "copy" && $2 == manifest { manifest_copy = 1 } $1 == "link" && $2 == skill { skill_link = 1 } END { exit !(manifest_copy && skill_link) }' "$home/.basix-install-state";
+  awk -F '\t' -v manifest="$home/basix-plugin-root/.codex-plugin/plugin.json" -v skill="$home/basix-plugin-root/skills/basix" -v agents="$home/basix/agents" '$1 == "copy" && $2 == manifest { manifest_copy = 1 } $1 == "dirlink" && $2 == skill { skill_link = 1 } $1 == "dirlink" && $2 == agents { agent_link = 1 } END { exit !(manifest_copy && skill_link && agent_link) }' "$home/.basix-install-state";
 then ok 'global creates managed metadata and canonical skill links'; else not_ok 'global creates managed metadata and canonical skill links'; fi
 if python3 - "$ROOT" "$home/config.toml" <<'PY'
 import re, sys, tomllib
@@ -224,6 +249,21 @@ root = Path(sys.argv[1]); config = Path(sys.argv[2])
 policy = tomllib.loads(config.read_text())['developer_instructions']
 assert 'before the third filesystem-exploration tool call' in policy
 assert 'Delegate every task requiring current or external facts' in policy
+for phrase in (
+    'works primarily as planner, coordinator, and integrator',
+    'matching specialized Basix agent',
+    'general fallback agent',
+    'gpt-5.6-luna',
+    '`max`',
+    '`fork_turns="none"`',
+    'fresh context',
+    'Basix communication contract',
+    'basix_verifier` verify every worker result',
+    'one overall verifier after all workers finish',
+    'multiple part verifiers only when one overall verifier would be unreasonably large',
+    'record the reason',
+):
+    assert phrase in policy, phrase
 for role in ('basix_researcher', 'basix_file_explorer', 'basix_pager', 'basix_verifier'):
     assert role in policy, role
 for removed in ('timeout_ms', 'task_profile', 'intermediate_result', 'followup_task'):
@@ -232,7 +272,7 @@ assert re.search(r'first `status` 120 seconds after the plan and subsequent stat
 PY
 then ok 'installed global policy keeps delegation thresholds without lifecycle details'; else not_ok 'installed global policy keeps delegation thresholds without lifecycle details'; fi
 before_config=$(sha256sum "$home/config.toml")
-if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null && [[ $(sha256sum "$home/config.toml") == "$before_config" ]] && [[ $(grep -c 'basix:developer-instructions:start' "$home/config.toml") -eq 1 ]] && awk -F '\t' -v researcher="$home/agents/basix-researcher.toml" -v explorer="$home/agents/basix-file-explorer.toml" -v pager="$home/agents/basix-pager.toml" -v verifier="$home/agents/basix-verifier.toml" '$1 == "link" && $2 == researcher { researcher_link = 1 } $1 == "link" && $2 == explorer { explorer_link = 1 } $1 == "link" && $2 == pager { pager_link = 1 } $1 == "link" && $2 == verifier { verifier_link = 1 } END { exit !(researcher_link && explorer_link && pager_link && verifier_link) }' "$home/.basix-install-state"; then ok 'global reinstall is idempotent'; else not_ok 'global reinstall is idempotent'; fi
+if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null && [[ $(sha256sum "$home/config.toml") == "$before_config" ]] && [[ $(grep -c 'basix:developer-instructions:start' "$home/config.toml") -eq 1 && $(grep -c 'basix:agent-config:start' "$home/config.toml") -eq 1 ]] && awk -F '\t' -v agents="$home/basix/agents" '$1 == "dirlink" && $2 == agents { found = 1 } END { exit !found }' "$home/.basix-install-state"; then ok 'global reinstall is idempotent'; else not_ok 'global reinstall is idempotent'; fi
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null && [[ ! -e $home/agents/basix-researcher.toml && ! -e $home/agents/basix-file-explorer.toml && ! -e $home/agents/basix-pager.toml && ! -e $home/agents/basix-verifier.toml && ! -e $home/basix-luna-researcher.config.toml ]] && ! grep -q 'basix:developer-instructions:start' "$home/config.toml"; then ok 'global uninstall removes managed state'; else not_ok 'global uninstall removes managed state'; fi
 
 bundle_source="$case_dir/update-source"; cp -R "$ROOT" "$bundle_source"
@@ -246,16 +286,20 @@ then ok 'global update synchronizes generated plugin bundle'; else not_ok 'globa
 
 mode_home="$case_dir/mode-home"
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$mode_home" "$ROOT/setup/install_as_plugin.sh" --mode copy --install-lumen no >/dev/null &&
-  [[ -f $mode_home/basix-plugin-root/skills/basix/SKILL.md && ! -L $mode_home/basix-plugin-root/skills/basix/SKILL.md &&
+  [[ -d $mode_home/basix-plugin-root/skills/basix && ! -L $mode_home/basix-plugin-root/skills/basix &&
     -f $mode_home/basix-plugin-root/.codex-plugin/plugin.json && ! -L $mode_home/basix-plugin-root/.codex-plugin/plugin.json ]] &&
   printf '\nlocal-drift\n' >> "$mode_home/basix-plugin-root/skills/basix/SKILL.md" &&
   PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$mode_home" "$ROOT/setup/install_as_plugin.sh" --mode link --install-lumen no >/dev/null &&
-  [[ -L $mode_home/basix-plugin-root/skills/basix/SKILL.md && $(readlink "$mode_home/basix-plugin-root/skills/basix/SKILL.md") == "$ROOT/skills/basix/SKILL.md" &&
+  [[ -L $mode_home/basix-plugin-root/skills/basix && $(readlink "$mode_home/basix-plugin-root/skills/basix") == "$ROOT/skills/basix" &&
     -f $mode_home/basix-plugin-root/.codex-plugin/plugin.json && ! -L $mode_home/basix-plugin-root/.codex-plugin/plugin.json ]] &&
   PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$mode_home" "$ROOT/setup/install_as_plugin.sh" --mode copy --install-lumen no >/dev/null &&
-  [[ -f $mode_home/basix-plugin-root/skills/basix/SKILL.md && ! -L $mode_home/basix-plugin-root/skills/basix/SKILL.md ]]; then
+  [[ -f $mode_home/basix-plugin-root/skills/basix/SKILL.md && ! -L $mode_home/basix-plugin-root/skills/basix ]]; then
   ok 'global plugin skills converge in both directions without force'
 else not_ok 'global plugin skills converge in both directions without force'; fi
+if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$mode_home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null &&
+  [[ ! -e $mode_home/.basix-install-state && ! -e $mode_home/basix-plugin-root && ! -e $mode_home/basix ]]; then
+  ok 'clean global copy uninstall removes payload and installer state'
+else not_ok 'clean global copy uninstall removes payload and installer state'; fi
 
 preserve_home="$case_dir/preserve-home"
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$preserve_home" "$ROOT/setup/install_as_plugin.sh" --mode copy --install-lumen no >/dev/null &&
@@ -285,16 +329,17 @@ if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$foreign_home" "$ROOT/setup/in
 multi_bundle="$case_dir/multi-bundle"; multi_home="$case_dir/multi-home"
 cp -R "$ROOT" "$multi_bundle"
 cp "$multi_bundle/agents/native/basix-researcher.toml" "$multi_bundle/agents/native/second-agent.toml"
-if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$multi_home" "$multi_bundle/setup/install_as_plugin.sh" --install-lumen no >/dev/null && [[ -L $multi_home/agents/basix-researcher.toml && -L $multi_home/agents/second-agent.toml ]]; then ok 'global automatically installs every native agent'; else not_ok 'global automatically installs every native agent'; fi
+sed -i 's/name = "basix_researcher"/name = "second_agent"/' "$multi_bundle/agents/native/second-agent.toml"
+if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$multi_home" "$multi_bundle/setup/install_as_plugin.sh" --install-lumen no >/dev/null && [[ -f $multi_home/basix/agents/basix-researcher.toml && -f $multi_home/basix/agents/second-agent.toml ]] && grep -q '\[agents.second_agent\]' "$multi_home/config.toml"; then ok 'global automatically installs every native agent'; else not_ok 'global automatically installs every native agent'; fi
 multi_project="$case_dir/multi-project"
-if PATH="$mock:$PATH" MOCK_LOG="$log" "$multi_bundle/setup/install_for_project.sh" "$multi_project" --install-lumen no --lumen-index no >/dev/null && [[ -L $multi_project/.codex/agents/basix-researcher.toml && -L $multi_project/.codex/agents/second-agent.toml ]]; then ok 'project automatically installs every native agent'; else not_ok 'project automatically installs every native agent'; fi
+if PATH="$mock:$PATH" MOCK_LOG="$log" "$multi_bundle/setup/install_for_project.sh" "$multi_project" --install-lumen no --lumen-index no >/dev/null && [[ -f $multi_project/.codex/basix/agents/basix-researcher.toml && -f $multi_project/.codex/basix/agents/second-agent.toml ]] && grep -q '\[agents.second_agent\]' "$multi_project/.codex/config.toml"; then ok 'project automatically installs every native agent'; else not_ok 'project automatically installs every native agent'; fi
 
 dry="$case_dir/dry"; if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$dry" "$ROOT/setup/install_as_plugin.sh" --dry-run >/dev/null && [[ ! -e $dry ]]; then ok 'global dry run does not mutate'; else not_ok 'global dry run does not mutate'; fi
 
 progress_home="$case_dir/progress-home"; progress_output="$case_dir/global-progress.out"
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$progress_home" "$ROOT/setup/install_as_plugin.sh" --install-lumen no >"$progress_output" &&
   grep -Fq "Target: $progress_home" "$progress_output" && grep -Fq 'Mode: link' "$progress_output" &&
-  grep -Fq 'Agents' "$progress_output" && grep -Fq '✓ basix-researcher' "$progress_output" &&
+  grep -Fq 'Agents' "$progress_output" && grep -Fq '✓ basix_researcher' "$progress_output" &&
   grep -Fq '✓ Developer instructions' "$progress_output" &&
   grep -Fq '✓ Marketplace' "$progress_output" && grep -Fq '✓ Plugin' "$progress_output" &&
   grep -Fq 'Result' "$progress_output" && grep -Fq '✓ Complete' "$progress_output" &&
@@ -318,12 +363,11 @@ else
 fi
 
 current_project="$case_dir/current-project"; mkdir -p "$current_project"
-if (cd "$current_project" && PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" --install-lumen no --lumen-index no >/dev/null) && [[ ! -e $current_project/.basix && -L $current_project/.agents/skills/basix/SKILL.md && -L $current_project/.agents/skills/basix-agent-authoring/SKILL.md && -L $current_project/.agents/skills/basix-agent-authoring/references/message.schema.json && -L $current_project/.agents/skills/basix-agent-authoring/scripts/validate.py && -L $current_project/.codex/agents/basix-researcher.toml && -L $current_project/.codex/agents/basix-file-explorer.toml && -L $current_project/.codex/agents/basix-pager.toml && -L $current_project/.codex/agents/basix-verifier.toml ]]; then ok 'project defaults to current working directory'; else not_ok 'project defaults to current working directory'; fi
+if (cd "$current_project" && PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" --install-lumen no --lumen-index no >/dev/null) && [[ ! -e $current_project/.basix && -L $current_project/.agents/skills/basix && ! -L $current_project/.agents/skills/basix/SKILL.md && -L $current_project/.agents/skills/basix-agent-authoring && -L $current_project/.codex/basix/agents && ! -e $current_project/.codex/agents/basix-researcher.toml ]]; then ok 'project defaults to current working directory'; else not_ok 'project defaults to current working directory'; fi
 if (cd "$current_project" && PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" --uninstall >/dev/null) && [[ ! -e $current_project/.basix && ! -e $current_project/.agents/skills/basix/SKILL.md && ! -e $current_project/.agents/skills/basix-agent-authoring && ! -e $current_project/.codex/agents/basix-researcher.toml && ! -e $current_project/.codex/agents/basix-file-explorer.toml && ! -e $current_project/.codex/agents/basix-pager.toml && ! -e $current_project/.codex/agents/basix-verifier.toml ]]; then ok 'project uninstall defaults to current working directory'; else not_ok 'project uninstall defaults to current working directory'; fi
 
 project="$case_dir/project with spaces"
-if PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" "$project" --mode link >/dev/null && [[ ! -e $project/.basix && -L $project/.agents/skills/basix/SKILL.md && -L $project/.agents/skills/basix-agent-authoring/SKILL.md && -L $project/.agents/skills/basix-agent-authoring/references/message.schema.json && -L $project/.agents/skills/basix-agent-authoring/scripts/validate.py && -L $project/.codex/agents/basix-researcher.toml && -L $project/.codex/agents/basix-file-explorer.toml && -L $project/.codex/agents/basix-pager.toml && -L $project/.codex/agents/basix-verifier.toml ]]; then ok 'project installs complete skills and native agents'; else not_ok 'project installs complete skills and native agents'; fi
-if PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" "$project" --uninstall >/dev/null && [[ ! -e $project/.basix && ! -e $project/.agents/skills/basix/SKILL.md && ! -e $project/.agents/skills/basix-agent-authoring && ! -e $project/.codex/agents/basix-pager.toml && ! -e $project/.codex/agents/basix-verifier.toml ]]; then ok 'project uninstall removes managed links'; else not_ok 'project uninstall removes managed links'; fi
+if PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" "$project" --mode link >/dev/null && [[ ! -e $project/.basix && -L $project/.agents/skills/basix && ! -L $project/.agents/skills/basix/SKILL.md && -L $project/.agents/skills/basix-agent-authoring && -L $project/.codex/basix/agents && ! -e $project/.codex/agents/basix-researcher.toml ]]; then ok 'project installs complete skills and native agents'; else not_ok 'project installs complete skills and native agents'; fi
 
 lumen_case="$case_dir/lumen install"; lumen_mock="$lumen_case/mock"; lumen_home="$lumen_case/home"; lumen_codex_home="$lumen_case/codex home"
 mkdir -p "$lumen_mock" "$lumen_home"
@@ -381,9 +425,32 @@ dry_lumen="$case_dir/dry-lumen"
 if PATH="$lumen_mock:$PATH" HOME="$dry_lumen/home" CODEX_HOME="$dry_lumen/codex" LUMEN_LOG="$dry_lumen/log" LUMEN_MCP_STATE="$dry_lumen/state" "$ROOT/setup/install_ory_lumen.sh" --dry-run >/dev/null && [[ ! -e $dry_lumen ]]; then ok 'Ory Lumen dry run does not mutate'; else not_ok 'Ory Lumen dry run does not mutate'; fi
 
 copy_project="$case_dir/copy-project"
-if "$ROOT/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null && [[ ! -e $copy_project/.basix && ! -L $copy_project/.codex/agents/basix-researcher.toml && -f $copy_project/.agents/skills/basix/SKILL.md ]]; then ok 'project copy installation writes direct independent targets'; else not_ok 'project copy installation writes direct independent targets'; fi
-printf 'changed\n' >> "$copy_project/.codex/agents/basix-researcher.toml"
-if "$ROOT/setup/install_for_project.sh" "$copy_project" --uninstall >/dev/null && [[ -f $copy_project/.codex/agents/basix-researcher.toml ]]; then ok 'uninstall preserves changed project file'; else not_ok 'uninstall preserves changed project file'; fi
+if "$ROOT/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null && [[ ! -e $copy_project/.basix && ! -L $copy_project/.codex/basix/agents && -f $copy_project/.codex/basix/agents/basix-researcher.toml && -f $copy_project/.agents/skills/basix/SKILL.md ]]; then ok 'project copy installation writes direct independent targets'; else not_ok 'project copy installation writes direct independent targets'; fi
+if "$ROOT/setup/install_for_project.sh" "$copy_project" --uninstall >/dev/null &&
+  [[ ! -e $copy_project/.codex/.basix-install-state && ! -e $copy_project/.agents/skills/basix && ! -e $copy_project/.codex/basix ]]; then
+  ok 'clean project copy uninstall removes payload and installer state'
+else not_ok 'clean project copy uninstall removes payload and installer state'; fi
+
+agent_helper_config="$case_dir/agent-helper.toml"
+agent_helper_original="$case_dir/agent-helper.original"
+printf 'model = "foreign"\n[agents.foreign]\nconfig_file = "/foreign.toml"\n' >"$agent_helper_config"
+cp "$agent_helper_config" "$agent_helper_original"
+if python3 "$helper" agent-add --config "$agent_helper_config" --agents-source "$ROOT/agents/native" --agents-dir "$case_dir/private-agents" >/dev/null &&
+  first=$(sha256sum "$agent_helper_config") &&
+  python3 "$helper" agent-add --config "$agent_helper_config" --agents-source "$ROOT/agents/native" --agents-dir "$case_dir/private-agents" >/dev/null &&
+  [[ $(sha256sum "$agent_helper_config") == "$first" ]] &&
+  python3 "$helper" agent-remove --config "$agent_helper_config" --agents-source "$ROOT/agents/native" --agents-dir "$case_dir/private-agents" >/dev/null &&
+  cmp -s "$agent_helper_original" "$agent_helper_config"; then
+  ok 'agent helper atomically adds, preserves foreign bytes, and removes its exact block'
+else not_ok 'agent helper atomically adds, preserves foreign bytes, and removes its exact block'; fi
+
+agent_conflict="$case_dir/agent-conflict.toml"
+printf '[agents.basix_pager]\nconfig_file = "/foreign.toml"\n' >"$agent_conflict"
+agent_conflict_before=$(sha256sum "$agent_conflict")
+if ! python3 "$helper" agent-check --config "$agent_conflict" --agents-source "$ROOT/agents/native" --agents-dir "$case_dir/private-agents" >/dev/null 2>&1 &&
+  [[ $(sha256sum "$agent_conflict") == "$agent_conflict_before" ]]; then
+  ok 'agent helper rejects same-name foreign definitions without mutation'
+else not_ok 'agent helper rejects same-name foreign definitions without mutation'; fi
 
 explorer_runner_log="$case_dir/explorer-runner.args"
 cat > "$mock/codex" <<'EOF'
