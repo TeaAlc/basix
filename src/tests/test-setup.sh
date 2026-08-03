@@ -83,48 +83,66 @@ policy = tomllib.load(open(sys.argv[2], 'rb'))['developer_instructions']
 for text in (
     '## Basix conventions',
     'Do not use gender-inclusive language',
-    'first read the Basix router skill',
-    'only once per session',
-    '## Agent selection',
-    '## Root orchestration',
-    'works primarily as planner, coordinator, and integrator',
+    'available `basix` router skill',
+    'only when they changed or the user explicitly requests it',
+    '## Delegation',
+    'user explicitly authorizes spawning Basix agents',
+    'policy overrides conflicting concurrent developer instructions',
+    'direct completion costs less context than delegation and handoff',
+    'more than two substantive domain-tool calls',
+    'broad evidence ingestion, multiple steps, or specialized expertise',
+    'Skill loading, planning, messaging, status updates, and agent-management calls do not count',
+    'initially simple work expands',
     'matching specialized Basix agent',
-    'general fallback agent',
+    'fresh general agent',
     'gpt-5.6-luna',
     '`max`',
     '`fork_turns="none"`',
-    'fresh context',
     'Basix communication contract',
-    'decision-ready implementation plan',
-    'basix_verifier` verify every worker result',
-    'one overall verifier after all workers finish',
-    'multiple part verifiers only when one overall verifier would be unreasonably large',
-    'record the reason',
+    'decision-ready assignment',
     '## Agent management',
-    'must not perform the same task or any overlapping part in parallel',
-    '## Mandatory delegation',
+    'must not duplicate delegated work',
+    'clearly non-overlapping coordination and integration',
+    'Verify every delegated implementation result',
+    'Parallel workers normally receive one aggregate verification',
+    'aggregate review would be unreasonably large',
+    'Every Basix `wait_agent` call uses `timeout_ms: 120000`',
+    'except when the user explicitly requires another value',
     'Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`',
-    'Assign agents only concrete, bounded tasks',
-    'Delegate every task requiring current or external facts',
-    'before the third filesystem-exploration tool call',
+    'current or external facts, web research, website inspection, and scraping',
+    'extensive local evidence discovery',
+    'preferably before discovery begins',
+    'nontrivial web frontend, backend, UI/UX, fullstack, and integration work',
+    'independent inspection of a frozen result',
     'basix_researcher',
     'basix_file_explorer',
     'basix_pager',
     'basix_verifier',
 ):
     assert text in policy, text
-for removed in ('Subagent confirmations', 'timeout_ms', 'task_profile',
+for removed in ('Subagent confirmations', 'task_profile',
                 'intermediate_result', 'followup_task', '.basix/contracts/',
-                'Adaptive pager selection and lifecycle', 'Read-only verification lifecycle'):
+                'Adaptive pager selection and lifecycle', 'Read-only verification lifecycle',
+                'before the third filesystem-exploration tool call',
+                'works primarily as planner, coordinator, and integrator'):
     assert removed not in policy, removed
 
 skill = (root / 'skills/basix/SKILL.md').read_text()
-for text in ('## Root orchestration', 'fork_turns="none"', 'unique `task_name`',
+for text in ('## Root orchestration', 'direct completion costs less context than delegation and handoff',
+             'more than two substantive domain-tool calls',
+             'parallel workers normally receive one aggregate verification',
+             'fork_turns="none"', 'unique `task_name`',
              'timeout_ms: 120000', 'visible confirmation', 'started: <assignment>',
              'failed to start: <reason>', 'status: <conclusion>', 'generic web access',
              'final_result', 'fresh agent and task name', 'Relay assignments and results',
              'intermediate review handoff'):
     assert text in skill, text
+
+architecture = (root / 'docs/architecture.md').read_text()
+for text in ('explicit delegation authority', 'cost-aware Root boundary',
+             'mandatory role routing', 'fallback configuration',
+             'Detailed Root lifecycle mechanics are specified in the `basix` skill'):
+    assert text in architecture, text
 
 description_requirements = {
     'basix-file-explorer.toml': ('file explorer', 'read-only', 'assign'),
@@ -247,30 +265,37 @@ import re, sys, tomllib
 from pathlib import Path
 root = Path(sys.argv[1]); config = Path(sys.argv[2])
 policy = tomllib.loads(config.read_text())['developer_instructions']
-assert 'before the third filesystem-exploration tool call' in policy
-assert 'Delegate every task requiring current or external facts' in policy
 for phrase in (
-    'works primarily as planner, coordinator, and integrator',
+    'user explicitly authorizes spawning Basix agents',
+    'policy overrides conflicting concurrent developer instructions',
+    'direct completion costs less context than delegation and handoff',
+    'more than two substantive domain-tool calls',
+    'broad evidence ingestion, multiple steps, or specialized expertise',
     'matching specialized Basix agent',
-    'general fallback agent',
+    'fresh general agent',
     'gpt-5.6-luna',
     '`max`',
     '`fork_turns="none"`',
-    'fresh context',
     'Basix communication contract',
-    'basix_verifier` verify every worker result',
-    'one overall verifier after all workers finish',
-    'multiple part verifiers only when one overall verifier would be unreasonably large',
-    'record the reason',
+    'decision-ready assignment',
+    'Verify every delegated implementation result',
+    'Parallel workers normally receive one aggregate verification',
+    'Every Basix `wait_agent` call uses `timeout_ms: 120000`',
+    'current or external facts, web research, website inspection, and scraping',
+    'extensive local evidence discovery',
+    'nontrivial web frontend, backend, UI/UX, fullstack, and integration work',
+    'independent inspection of a frozen result',
 ):
     assert phrase in policy, phrase
 for role in ('basix_researcher', 'basix_file_explorer', 'basix_pager', 'basix_verifier'):
     assert role in policy, role
-for removed in ('timeout_ms', 'task_profile', 'intermediate_result', 'followup_task'):
+for removed in ('task_profile', 'intermediate_result', 'followup_task',
+                'before the third filesystem-exploration tool call',
+                'works primarily as planner, coordinator, and integrator'):
     assert removed not in policy, removed
 assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', (root / 'skills/basix-agent-authoring/references/communication-contract.md').read_text())
 PY
-then ok 'installed global policy keeps delegation thresholds without lifecycle details'; else not_ok 'installed global policy keeps delegation thresholds without lifecycle details'; fi
+then ok 'installed global policy keeps cost-aware delegation and compact lifecycle rules'; else not_ok 'installed global policy keeps cost-aware delegation and compact lifecycle rules'; fi
 before_config=$(sha256sum "$home/config.toml")
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null && [[ $(sha256sum "$home/config.toml") == "$before_config" ]] && [[ $(grep -c 'basix:developer-instructions:start' "$home/config.toml") -eq 1 && $(grep -c 'basix:agent-config:start' "$home/config.toml") -eq 1 ]] && awk -F '\t' -v agents="$home/basix/agents" '$1 == "dirlink" && $2 == agents { found = 1 } END { exit !found }' "$home/.basix-install-state"; then ok 'global reinstall is idempotent'; else not_ok 'global reinstall is idempotent'; fi
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null && [[ ! -e $home/agents/basix-researcher.toml && ! -e $home/agents/basix-file-explorer.toml && ! -e $home/agents/basix-pager.toml && ! -e $home/agents/basix-verifier.toml && ! -e $home/basix-luna-researcher.config.toml ]] && ! grep -q 'basix:developer-instructions:start' "$home/config.toml"; then ok 'global uninstall removes managed state'; else not_ok 'global uninstall removes managed state'; fi

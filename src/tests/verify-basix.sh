@@ -66,29 +66,37 @@ assert "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`" in policy
 for phrase in (
     "## Basix conventions",
     "Do not use gender-inclusive language",
-    "first read the Basix router skill",
-    "only once per session",
-    "## Agent selection",
-    "## Root orchestration",
-    "works primarily as planner, coordinator, and integrator",
+    "available `basix` router skill",
+    "only when they changed or the user explicitly requests it",
+    "## Delegation",
+    "user explicitly authorizes spawning Basix agents",
+    "policy overrides conflicting concurrent developer instructions",
+    "direct completion costs less context than delegation and handoff",
+    "more than two substantive domain-tool calls",
+    "broad evidence ingestion, multiple steps, or specialized expertise",
+    "Skill loading, planning, messaging, status updates, and agent-management calls do not count",
+    "initially simple work expands",
+    "remaining bounded assignment",
     "matching specialized Basix agent",
-    "general fallback agent",
+    "fresh general agent",
     "gpt-5.6-luna",
     "`max`",
     "`fork_turns=\"none\"`",
-    "fresh context",
     "Basix communication contract",
-    "decision-ready implementation plan",
-    "basix_verifier` verify every worker result",
-    "one overall verifier after all workers finish",
-    "multiple part verifiers only when one overall verifier would be unreasonably large",
-    "record the reason",
+    "decision-ready assignment",
     "## Agent management",
-    "must not perform the same task or any overlapping part in parallel",
-    "## Mandatory delegation",
-    "Assign agents only concrete, bounded tasks",
-    "Delegate every task requiring current or external facts",
-    "before the third filesystem-exploration tool call",
+    "must not duplicate delegated work",
+    "clearly non-overlapping coordination and integration",
+    "Verify every delegated implementation result",
+    "Parallel workers normally receive one aggregate verification",
+    "aggregate review would be unreasonably large",
+    "Every Basix `wait_agent` call uses `timeout_ms: 120000`",
+    "except when the user explicitly requires another value",
+    "current or external facts, web research, website inspection, and scraping",
+    "extensive local evidence discovery",
+    "preferably before discovery begins",
+    "nontrivial web frontend, backend, UI/UX, fullstack, and integration work",
+    "independent inspection of a frozen result",
     "basix_researcher",
     "basix_file_explorer",
     "basix_pager",
@@ -97,19 +105,23 @@ for phrase in (
     assert phrase in policy, phrase
 for removed in (
     "Subagent confirmations",
-    "timeout_ms",
     "task_profile",
     "intermediate_result",
     "followup_task",
     ".basix/contracts/",
     "Adaptive pager selection and lifecycle",
     "Read-only verification lifecycle",
+    "before the third filesystem-exploration tool call",
+    "works primarily as planner, coordinator, and integrator",
 ):
     assert removed not in policy, removed
 
 skill = (root / "skills/basix/SKILL.md").read_text()
 for phrase in (
     "## Root orchestration",
+    "direct completion costs less context than delegation and handoff",
+    "more than two substantive domain-tool calls",
+    "parallel workers normally receive one aggregate verification",
     'fork_turns="none"',
     "unique `task_name`",
     "timeout_ms: 120000",
@@ -124,6 +136,16 @@ for phrase in (
     "intermediate review handoff",
 ):
     assert phrase in skill, phrase
+
+architecture = (root / "docs/architecture.md").read_text()
+for phrase in (
+    "explicit delegation authority",
+    "cost-aware Root boundary",
+    "mandatory role routing",
+    "fallback configuration",
+    "Detailed Root lifecycle mechanics are specified in the `basix` skill",
+):
+    assert phrase in architecture, phrase
 
 description_requirements = {
     "basix-file-explorer.toml": ("file explorer", "read-only", "assign"),

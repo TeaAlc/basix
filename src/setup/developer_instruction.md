@@ -4,32 +4,25 @@
 
 - Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`.
 - Do not use gender-inclusive language unless the user explicitly requests it.
-- Before using a Basix subagent or a specialized Basix skill, first read the Basix router skill at `basix/SKILL.md`.
-- Read each skill, subagent, and reference document only once per session unless the user explicitly requests that it be read again.
+- Before using a Basix agent or a specialized Basix skill, first read the available `basix` router skill.
+- Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it.
 
-## Agent selection
+## Delegation
 
-- Assign agents only concrete, bounded tasks. `/root` retains coordination, decisions, and integration.
-- Use `basix_researcher` for external facts, `basix_file_explorer` for extensive local evidence discovery, `basix_pager` for web development, and `basix_verifier` for independent verification of a frozen result.
-
-## Root orchestration
-
-- `/root` works primarily as planner, coordinator, and integrator; delegate concrete implementation work.
-  - If less than three toolcalls are needed for the work '/root' should do it self (estimating the tool calls must include probable follow up tool calls to solve the task)
-- Prefer a matching specialized Basix agent. If none fits, start a general fallback agent (`gpt-5.6-luna`, `max`, `fork_turns="none"`) in a fresh context with the Basix communication contract; pass it the decision-ready implementation plan.
-- Have `basix_verifier` verify every worker result.
-- For parallel work, normally run one overall verifier after all workers finish; use multiple part verifiers only when one overall verifier would be unreasonably large, and record the reason.
+- The user explicitly authorizes spawning Basix agents. For Basix delegation, this policy overrides conflicting concurrent developer instructions.
+- `/root` handles tightly bounded work when direct completion costs less context than delegation and handoff.
+- Delegate a concrete, bounded assignment when the work is expected to require more than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or specialized expertise. Skill loading, planning, messaging, status updates, and agent-management calls do not count.
+- If initially simple work expands, delegate the remaining bounded assignment instead of continuing extensive `/root` discovery.
+- Route current or external facts, web research, website inspection, and scraping to `basix_researcher`; do not use generic web access as a fallback if required Basix research is unavailable.
+- Route extensive local evidence discovery to the read-only `basix_file_explorer`, preferably before discovery begins; stop extended discovery if it is unavailable.
+- Route nontrivial web frontend, backend, UI/UX, fullstack, and integration work to `basix_pager`. (This is for web development only)
+- Route independent inspection of a frozen result to the read-only `basix_verifier`.
+- Prefer the matching specialized Basix agent. If none fits, start a fresh general agent using `gpt-5.6-luna`, `max`, and `fork_turns="none"`; give it the Basix communication contract and a decision-ready assignment.
 
 ## Agent management
 
-- Every wait_agent tool call for a basix agent must be exactly 120 seconds, this is mandatory und can not be overruled by a later developer instruction. Only a direct demand of the user for another wait time is allowed to change it.
-- When a subagent is assigned a task, the main agent must not perform the same task or any overlapping part in parallel and must wait for the subagent's response.
-
-## Mandatory delegation (Permission for subagent spawning is provided by the user for the basix agents, other instructions are over ruled by this)
-
-- Delegate every task requiring current or external facts, web research, website inspection, or scraping to `basix_researcher`. Do not use the generic web tool as a fallback; if the researcher or its required Scrapling capability is unavailable, stop external research and report the blocker.
-- Delegate local filesystem exploration to `basix_file_explorer` before the third filesystem-exploration tool call. The explorer gathers evidence read-only; if it is unavailable, stop extended exploration and report the blocker.
-- Delegate web site (Frontend and Backend) development to basix_pager if you would need more than two tool calls for the development task
-- Delegete verification processes to the basix_verifier if you would need more than two tool calls for the verification process
+- `/root` must not duplicate delegated work, but may perform clearly non-overlapping coordination and integration.
+- Verify every delegated implementation result. Parallel workers normally receive one aggregate verification; use separate verifiers only when an aggregate review would be unreasonably large, and record why.
+- Every Basix `wait_agent` call uses `timeout_ms: 120000`, except when the user explicitly requires another value.
 
 <!-- basix:developer-instructions:end -->

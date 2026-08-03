@@ -1,17 +1,19 @@
 # Agents
 
-The persistent Basix developer instructions require Root to load the Basix router
-before any specialized Basix skill or Basix subagent. Within a session, skills,
-subagents, and reference documents are read only once unless the user explicitly
-requests another read. Root does not duplicate or overlap an assigned subagent's
-work while that assignment is active and waits for its response. User-facing text
-avoids gender-inclusive forms unless the user explicitly requests them.
+The persistent Basix developer instructions require Root to load the available
+`basix` router skill before any specialized Basix skill or Basix agent. Instructions
+are reread only when changed or explicitly requested. Root completes tightly bounded,
+compact work directly and delegates concrete assignments expected to require more
+than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or
+specialized expertise. Root does not duplicate delegated work, but may continue
+clearly non-overlapping coordination and integration. User-facing text avoids
+gender-inclusive forms unless the user explicitly requests them.
 
 The native agents are discovered from every TOML under `src/agents/native/`:
 
 - `basix_pager` is a Highly complex reference role using `gpt-5.6-luna` with
   `max` reasoning and is the sole native agent with `workspace-write`. It
-  is a fresh, single-assignment web principal selected by Root with exactly one
+  is a fresh, single-assignment nontrivial web principal selected by Root with exactly one
   profile: `ui_ux`, `frontend`, `backend_web`, `fullstack`, or `integration`.
   Root owns the architecture, scope, acceptance gates, and any shared contract;
   the pager owns only its assigned files and may not expand its profile.
@@ -32,10 +34,10 @@ The native read-only agents are:
   and scraping the researcher uses the read-only Scrapling MCP tools. It checks the complete tool
   inventory, including deferred tools, and reports itself blocked when a task requires Scrapling
   but no Scrapling tool is available; the main agent must not fall back to the generic web tool.
-- `basix_file_explorer` uses `gpt-5.6-luna` with low reasoning for exhaustive local file
+- `basix_file_explorer` uses `gpt-5.6-luna` with low reasoning for extensive local file
   discovery. It inventories all supported file types, verifies evidence with `rg` and targeted
   reads, and forbids Lumen, other MCP search tools, and web search. Persistent developer instructions
-  require the main agent to delegate filesystem exploration before its third tool call; the Basix
+  require the main agent to delegate broad evidence discovery, preferably before it begins; the Basix
   skill supplies fresh-context and bounded-assignment orchestration. The explorer discovers evidence read-only; implementation
   and final code analysis remain the main agent's responsibility.
 

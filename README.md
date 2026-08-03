@@ -240,11 +240,14 @@ and persistent instructions are loaded. Basix then supplies:
 - mandatory routing of all external research, website inspection, and scraping to
   `basix_researcher`, which uses Scrapling for web tasks and reports a blocker if
   that capability is unavailable;
-- mandatory routing of local filesystem exploration that would require more than
-  two tool calls to `basix_file_explorer` for exhaustive read-only evidence
-  discovery, while implementation and final code analysis remain with the main agent;
+- cost-aware routing that keeps tightly bounded, compact work with Root and sends
+  broad evidence ingestion, multi-step work, specialized work, or assignments
+  expected to need more than two substantive domain-tool calls to a Basix agent;
+- mandatory routing of extensive local evidence discovery to
+  `basix_file_explorer`, preferably before discovery begins, while implementation
+  and final code analysis remain with Root;
 - the `basix-agent-authoring` skill for creating and validating native agents;
-- the writable `basix_pager` for one Root-authorized web assignment, selected
+- the writable `basix_pager` for one Root-authorized nontrivial web assignment, selected
   with exactly one profile (`ui_ux`, `frontend`, `backend_web`, `fullstack`, or
   `integration`), while explorer and researcher agents remain read-only;
 - the read-only `basix_verifier` for one fresh-context, immutable-result review;
