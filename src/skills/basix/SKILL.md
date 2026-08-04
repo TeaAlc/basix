@@ -8,6 +8,9 @@ description: Basix-Skill: Use whenever Basix is mentioned or when maintaining or
 Load this skill for every Basix-related task. Use it to navigate, maintain, and
 extend the Basix collection and its installable standards.
 
+- Follow all active instructions inside the managed
+  `basix:developer-instructions` block. This router supplements those instructions;
+  it does not replace or override them.
 - In the Basix source repository, treat `<Basix-Repo>/src/agents`,
   `<Basix-Repo>/src/skills`, and `<Basix-Repo>/src/scripts` as canonical.
 - In an installed skill, resolve skill-local scripts, references, and assets

@@ -23,6 +23,10 @@ for path in skill_paths:
     if ui.exists():
         match = re.search(r'(?m)^\s*short_description:\s*["\']?(Basix-Skill: .+?)["\']?\s*$', ui.read_text())
         assert match, ui
+router = (root / "skills/basix/SKILL.md").read_text()
+assert "Follow all active instructions inside the managed" in router
+assert "`basix:developer-instructions` block" in router
+assert "does not replace or override them" in router
 for path in sorted((root / "agents/native").glob("*.toml")):
     agent = tomllib.loads(path.read_text())
     assert agent["description"].startswith("Basix-Agent: "), path
