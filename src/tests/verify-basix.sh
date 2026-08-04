@@ -77,9 +77,13 @@ for phrase in (
     "Exclude secrets, credentials, personal data, transient task status, guesses",
     "Update or replace an existing entry rather than adding a duplicate or contradiction",
     "Use `version = 1` and zero or more `[[entries]]`",
-    "exactly `date`, `category`, and `insight`",
+    "except a `Subagent Insight` record also contains exactly `subagent_type`",
     "quoted ISO 8601 `YYYY-MM-DD` calendar date",
-    "`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, or `Other`",
+    "`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`",
+    "exact role used for delegation",
+    "Store every accepted subagent insight as a separate entry",
+    "Evaluate every `final_result.data.subagent_insights` proposal",
+    "Retain only useful insights supported by strong evidence",
     "no longer than three sentences",
     "no longer than 32 words in total",
     "Before every commit and context-compaction summary",
@@ -131,14 +135,25 @@ memory = tomllib.loads((root.parent / ".basix/memory.toml").read_text())
 assert set(memory) == {"version", "entries"} and memory["version"] == 1
 categories = {
     "User Instruction", "Repository", "Data Discovery", "Tooling",
-    "Verification", "Agent Collaboration", "Workflow", "Other",
+    "Verification", "Agent Collaboration", "Workflow", "Subagent Insight", "Other",
 }
-for entry in memory["entries"]:
-    assert set(entry) == {"date", "category", "insight"}
+def validate_memory_entry(entry):
+    expected = {"date", "category", "insight"}
+    if entry["category"] == "Subagent Insight":
+        expected.add("subagent_type")
+        assert isinstance(entry["subagent_type"], str) and entry["subagent_type"].strip()
+    assert set(entry) == expected
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry["date"])
     assert entry["category"] in categories
     assert len(re.findall(r"\b[\w.-]+\b", entry["insight"])) <= 32
     assert len(re.findall(r"[.!?]+(?:\s|$)", entry["insight"])) <= 3
+for entry in memory["entries"]:
+    validate_memory_entry(entry)
+validate_memory_entry({"date": "2026-01-01", "category": "Repository", "insight": "Legacy entry."})
+validate_memory_entry({
+    "date": "2026-01-01", "category": "Subagent Insight", "subagent_type": "default",
+    "insight": "Strongly evidenced reusable lesson.",
+})
 for removed in (
     "Subagent confirmations",
     "task_profile",
@@ -227,20 +242,22 @@ for phrase in (
     "real 120-second",
     "intentionally not automated",
     "single `intermediate_result` review handoff",
-    "Contract 1.2 adds `report_started`",
+    "Contract 1.3 retains `report_started`",
+    "subagent_insights",
     "automatic resumption at the next safe transition",
 ):
     assert phrase in agent_docs, phrase
 
 heartbeat = (root / "skills/basix-agent-authoring/references/communication-contract.md").read_text()
-assert "version=1.2" in heartbeat
+assert "version=1.3" in heartbeat
 assert "cycle_revision" in heartbeat
 assert "`Berichtsbeginn an /root übermittelt.`" in heartbeat
 assert "automatically resume the interrupted task" in heartbeat
+assert "subagent_insights" in heartbeat and "at most 24 words" in heartbeat
 assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", heartbeat)
 for path in (root / "agents/native").glob("*.toml"):
     text = path.read_text()
-    assert "version=1.2" in text, path
+    assert "version=1.3" in text, path
     assert "`report_started`" in text, path
     assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", text), path
 PY

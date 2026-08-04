@@ -42,7 +42,7 @@ After collection changes, run `./src/tests/verify-basix.sh` and
 Embed the communication rules in `developer_instructions` between these exact markers:
 
 ```text
-<!-- basix-agent-authoring:contract:start version=1.2 -->
+<!-- basix-agent-authoring:contract:start version=1.3 -->
 ...
 <!-- basix-agent-authoring:contract:end -->
 ```
@@ -52,4 +52,6 @@ plan before domain tools, 120-second status updates, immediate issue and permiss
 messages, monotonic sequence numbers, explicit versioned cycles, exactly one complete
 final result per cycle, announced requested reports, automatic task resumption after
 intermediate results, and the short visible confirmations from the communication
-reference. Re-running authoring replaces this block idempotently.
+reference. It must also allow only final results to propose independently
+discretionary, strongly evidenced `subagent_insights` of at most 24 words each.
+Re-running authoring replaces this block idempotently.

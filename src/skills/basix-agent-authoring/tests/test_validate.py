@@ -22,7 +22,7 @@ SPEC.loader.exec_module(validator)
 
 def plan(sequence=1, revision=1, checklist=None, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.2", "message_type": "plan", "agent_name": agent,
+        "contract_version": "1.3", "message_type": "plan", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "planned",
         "summary": "Inspect and report.",
         "data": {"plan_revision": revision, "checklist": checklist or [
@@ -48,7 +48,7 @@ Scrapling requires Podman and routes all web requests through the Tor network.
 
 def final(sequence=2, status="completed", errors=None, data=UNSET, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.2", "message_type": "final_result", "agent_name": agent,
+        "contract_version": "1.3", "message_type": "final_result", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": status,
         "summary": "Work finished.", "data": {} if data is UNSET else data,
         "errors": [] if errors is None else errors,
@@ -57,7 +57,7 @@ def final(sequence=2, status="completed", errors=None, data=UNSET, cycle=1, agen
 
 def report_started(sequence, report_type, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.2", "message_type": "report_started", "agent_name": agent,
+        "contract_version": "1.3", "message_type": "report_started", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "in_progress",
         "summary": "Preparing requested report.", "data": {"report_type": report_type}, "errors": [],
     }
@@ -137,6 +137,32 @@ class MessageTests(unittest.TestCase):
         with self.assertRaises(validator.Invalid):
             validator.validate_message(final(status="completed_with_errors", errors=[error()], data=None))
         validator.validate_message(final(status="failed", errors=[error()], data=None))
+
+    def test_final_subagent_insights_absent_or_valid(self):
+        validator.validate_message(final())
+        validator.validate_message(final(data={
+            "evidence": ["verified"],
+            "subagent_insights": [
+                "Repository contract blocks must remain byte-for-byte synchronized.",
+                "Root should independently verify every delegated implementation result.",
+            ],
+        }))
+
+    def test_rejects_empty_malformed_or_overlong_subagent_insights(self):
+        invalid_values = ([], [""], ["   "], "not an array", [42])
+        for value in invalid_values:
+            with self.subTest(value=value), self.assertRaisesRegex(validator.Invalid, "subagent"):
+                validator.validate_message(final(data={"subagent_insights": value}))
+        with self.assertRaisesRegex(validator.Invalid, "24 words"):
+            validator.validate_message(final(data={
+                "subagent_insights": [" ".join(["word"] * 25)],
+            }))
+
+    def test_rejects_subagent_insights_on_non_final_messages(self):
+        message = plan()
+        message["data"]["subagent_insights"] = ["This belongs only in final results."]
+        with self.assertRaisesRegex(validator.Invalid, "only in final_result"):
+            validator.validate_message(message)
 
 
 class StreamTests(unittest.TestCase):
@@ -462,7 +488,7 @@ class AgentTests(unittest.TestCase):
 
 
 class RepositoryPolicyTests(unittest.TestCase):
-    def test_native_agents_use_only_contract_1_2_and_validate(self):
+    def test_native_agents_use_only_contract_1_3_and_validate(self):
         repository = Path(__file__).resolve().parents[4]
         agents = sorted((repository / "src/agents/native").glob("*.toml"))
         self.assertTrue(agents)
@@ -472,8 +498,17 @@ class RepositoryPolicyTests(unittest.TestCase):
                 path.read_text(),
             )
             self.assertTrue(versions, path)
-            self.assertEqual(set(versions), {"1.2"}, path)
+            self.assertEqual(set(versions), {"1.3"}, path)
             validator.validate_agent(path)
+
+    def test_schema_uses_contract_1_3_and_models_subagent_insights(self):
+        schema = json.loads((ROOT / "references" / "message.schema.json").read_text())
+        self.assertTrue(schema["$id"].endswith("agent-message-1.3.json"))
+        self.assertEqual(schema["properties"]["contract_version"]["const"], "1.3")
+        insights = schema["$defs"]["final_data"]["then"]["properties"]["subagent_insights"]
+        self.assertEqual(insights["type"], "array")
+        self.assertEqual(insights["minItems"], 1)
+        self.assertEqual(insights["items"]["pattern"], "\\S")
 
     def test_documented_repository_test_paths_exist(self):
         repository = Path(__file__).resolve().parents[4]

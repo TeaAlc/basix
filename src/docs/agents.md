@@ -14,8 +14,13 @@ The instructions also define `.basix/memory.toml` as optional persistent project
 memory. Root reads it once at session start and once after each context compaction,
 records only durable insights under the versioned entry contract, and checks it
 before commits and compaction summaries. Entries use an ISO date, one of the fixed
-English categories, and an insight limited to three sentences and 32 words. Updated
-memory is committed with task changes unless `.basix` is ignored.
+English categories, and an insight limited to three sentences and 32 words. A
+`Subagent Insight` entry additionally records the exact delegated role as
+`subagent_type`; other categories retain the legacy three-field shape. Root evaluates
+every final-result proposal for strong evidence and usefulness in future assignments,
+result evaluation, or status interpretation. It may preserve meaning while rewriting
+an accepted proposal to 32 words, and stores every accepted insight separately.
+Updated memory is committed with task changes unless `.basix` is ignored.
 
 The native agents are discovered from every TOML under `src/agents/native/`:
 
@@ -59,12 +64,15 @@ payload at `$CODEX_HOME/basix/agents/`; project setup exposes it at
 managed absolute `[agents.<name>].config_file` entry. Basix never writes its
 TOMLs into the shared global or project `agents/` directories.
 
-Contract 1.2 adds `report_started` for reports requested by Root. A requested
+Contract 1.3 retains `report_started` for reports requested by Root. A requested
 intermediate or explicit final report is announced first with its exact report
 type; status, issue, and permission messages may still occur while it is being
 prepared. An intermediate result resumes interrupted work automatically at the
 next safe transition unless Root directs otherwise. Autonomous final results need
-no announcement, and every final result remains terminal.
+no announcement, and every final result remains terminal. A final result may also
+propose `data.subagent_insights`: independently discretionary, strongly evidenced,
+future-useful strings of at most 24 words each. The field is invalid on other message
+types. Root evaluates proposals independently; agents do not write memory directly.
 
 ## Verification assignment and lifecycle
 

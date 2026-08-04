@@ -248,6 +248,8 @@ and persistent instructions are loaded. Basix then supplies:
 - persistent project memory in `.basix/memory.toml`, read once at session start and
   after each context compaction, with concise dated insights grouped into fixed
   English categories and committed with task changes unless `.basix` is ignored;
+  strongly evidenced subagent proposals are reviewed by Root and, when useful,
+  stored separately with category `Subagent Insight` and their originating role;
 - mandatory routing of extensive local evidence discovery to
   `basix_file_explorer`, preferably before discovery begins, while implementation
   and final code analysis remain with Root;
@@ -268,7 +270,7 @@ sequenceDiagram
     participant Root as /root
     participant Agent as Basix agent
 
-    Note over Root,Agent: Contract 1.2 · JSON-only via send_message<br/>globally increasing sequence · positive cycle_revision
+    Note over Root,Agent: Contract 1.3 · JSON-only via send_message<br/>globally increasing sequence · positive cycle_revision
     Agent->>Root: plan (before substantive tool use)
     loop While work in the current cycle continues
         Agent->>Root: status (after 120 s, then every 120 s)
@@ -289,7 +291,15 @@ sequenceDiagram
         Root-->>Agent: report request
         Agent->>Root: report_started
     end
-    Agent->>Root: final_result (exactly once per cycle)
+    Agent->>Root: final_result (exactly once; optional subagent_insights)
+    opt final_result proposes subagent insights
+        Root->>Root: review each proposal for strong evidence and future usefulness
+        alt proposal accepted
+            Root->>Root: persist separate Subagent Insight entry with subagent_type
+        else proposal rejected
+            Root->>Root: do not persist it
+        end
+    end
     alt Same task and unchanged target; retained context is required
         Root-->>Agent: followup_task with continuation justification
         Agent->>Root: plan (cycle_revision + 1)
@@ -303,8 +313,12 @@ machine-validatable handoffs from every native Basix agent. Each message carries
 the contract version, agent and task identity, a lifetime-monotonic sequence,
 cycle state, structured data, and errors; visible agent output is limited to a
 short transmission confirmation. A `final_result` closes its cycle and makes
-the agent idle. Only an explicitly justified continuation of the same unchanged
-task and target may reuse that agent; changed work requires a fresh agent.
+the agent idle. Its data may propose independently discretionary, strongly evidenced
+`subagent_insights` of at most 24 words each. Root reviews each proposal and may
+rewrite and retain useful ones as separate memory entries of at most 32 words,
+recording the exact delegated role as `subagent_type`. Only an explicitly justified
+continuation of the same unchanged task and target may reuse that agent; changed
+work requires a fresh agent.
 
 ### Coordinating pager work
 

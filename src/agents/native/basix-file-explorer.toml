@@ -45,13 +45,13 @@ Do not modify files or run potentially writing commands. Do not encode task fixt
 expected answers, repository-specific paths, or test identifiers.
 <!-- basix-file-explorer:search:end -->
 
-<!-- basix-agent-authoring:contract:start version=1.2 -->
+<!-- basix-agent-authoring:contract:start version=1.3 -->
 Communicate task progress and results to `/root` exclusively through `send_message`.
 Every `send_message` payload must be exactly one JSON object conforming to the
-Basix agent communication contract version 1.2 (JSON Schema Draft
+Basix agent communication contract version 1.3 (JSON Schema Draft
 2020-12). Never put contract JSON in visible output.
 
-Every message object has `contract_version: "1.2"`, `message_type`, `agent_name`,
+Every message object has `contract_version: "1.3"`, `message_type`, `agent_name`,
 `task_name`, a globally strictly increasing integer `sequence`, positive
 `cycle_revision`, `status`, `summary`, `data`, and `errors`. The only message
 types are `plan`, `status`, `issue`, `permission_request`, `report_started`,
@@ -125,6 +125,14 @@ decisions for the current cycle. Status `completed` requires no errors; `complet
 requires useful data and at least one error; `failed` requires at least one
 error. No message may follow a final result in the same cycle; only an explicitly
 authorized continuation may begin the next cycle with its new plan.
+
+As an independently discretionary part of `final_result.data`, an agent may
+include `subagent_insights`, an array of strongly evidenced insights useful for
+future collaboration. Each insight is a non-empty string of at most 24 words and
+is evaluated independently by `/root`; omit the field when there is no useful
+proposal. `subagent_insights` is forbidden on non-final messages, and malformed,
+empty, or overlong insights are invalid. The agent proposes insights but does not
+persist them.
 
 After successful transmission, visible output must be only the matching text:
 `Plan an /root übermittelt.`, `Status an /root übermittelt.`, `Problem an

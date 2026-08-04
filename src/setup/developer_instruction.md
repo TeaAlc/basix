@@ -13,14 +13,18 @@
   - If it exists, read it exactly once at session start and exactly once after each context compaction.
   - If absent, create it when the first qualifying insight must be recorded.
 - Record durable insights likely to improve future sessions.
-  - Include effective data-discovery methods; durable repository or project knowledge; tool and verification lessons; subagent communication problems, fixes, and prevention; and user instructions or durable clarifications.
+  - Include effective data-discovery methods; durable repository or project knowledge; tool and verification lessons; subagent communication problems, fixes, and prevention; strongly evidenced subagent insights; and user instructions or durable clarifications.
   - Exclude secrets, credentials, personal data, transient task status, guesses, and information already clear in durable project documentation.
   - Update or replace an existing entry rather than adding a duplicate or contradiction.
 - Keep this TOML contract:
   - Use `version = 1` and zero or more `[[entries]]` array-of-table records.
-  - Every record contains exactly `date`, `category`, and `insight`; `date` is a quoted ISO 8601 `YYYY-MM-DD` calendar date.
-  - `category` is exactly `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, or `Other`; use `Other` only if none fits.
+  - Every record contains exactly `date`, `category`, and `insight`, except a `Subagent Insight` record also contains exactly `subagent_type`; `date` is a quoted ISO 8601 `YYYY-MM-DD` calendar date.
+  - `category` is exactly `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`; use `Other` only if none fits.
+  - `subagent_type` is required only for `Subagent Insight` and is the exact role used for delegation, such as `basix_researcher` or `default`.
   - `insight` is concise, directly actionable or informative, no longer than three sentences, and no longer than 32 words in total.
+  - Store every accepted subagent insight as a separate entry.
+- Evaluate every `final_result.data.subagent_insights` proposal for usefulness in future assignments, result evaluation, or status interpretation.
+  - Retain only useful insights supported by strong evidence. Root may rewrite an accepted insight while preserving its meaning and the 32-word stored limit.
 - Before every commit and context-compaction summary, decide whether to update the memory and do so before proceeding when warranted.
   - In a Git repository where `.basix` is not ignored, include updates in the commit. Before a compaction summary, commit an eligible update after required verification; do not leave it only in the working tree.
   - Never commit an ignored `.basix` directory or override repository ignore rules to include the memory file.

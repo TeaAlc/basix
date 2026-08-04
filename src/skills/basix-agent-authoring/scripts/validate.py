@@ -16,7 +16,7 @@ STATUSES = {"planned", "in_progress", "blocked", "completed", "completed_with_er
 EFFORTS = {"low", "medium", "high", "max"}
 OVERRIDE = "# basix-agent-authoring: explicit-model-override"
 SANDBOX_OVERRIDE = "# basix-agent-authoring: explicit-sandbox-override"
-START = "<!-- basix-agent-authoring:contract:start version=1.2 -->"
+START = "<!-- basix-agent-authoring:contract:start version=1.3 -->"
 END = "<!-- basix-agent-authoring:contract:end -->"
 WORD_RE = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", re.UNICODE)
 
@@ -72,7 +72,7 @@ def validate_plan_data(value: Any) -> dict[str, Any]:
 def validate_message(value: Any) -> dict[str, Any]:
     required = {"contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"}
     msg = object_exact(value, required)
-    need(msg["contract_version"] == "1.2", "contract_version must be 1.2")
+    need(msg["contract_version"] == "1.3", "contract_version must be 1.3")
     kind = msg["message_type"]
     need(kind in TYPES, "invalid message_type")
     for key in ("agent_name", "task_name", "summary"):
@@ -82,6 +82,16 @@ def validate_message(value: Any) -> dict[str, Any]:
          "cycle_revision must be a positive integer")
     need(msg["status"] in STATUSES, "invalid status")
     need(isinstance(msg["errors"], list), "errors must be an array")
+    data = msg["data"]
+    if isinstance(data, dict) and "subagent_insights" in data:
+        need(kind == "final_result", "subagent_insights is permitted only in final_result data")
+        insights = data["subagent_insights"]
+        need(isinstance(insights, list) and bool(insights),
+             "subagent_insights must be a non-empty array")
+        for index, insight in enumerate(insights, 1):
+            need(isinstance(insight, str) and bool(insight.strip()),
+                 f"subagent insight {index} must be a non-empty string")
+            need(words(insight) <= 24, f"subagent insight {index} exceeds 24 words")
     concise = kind in {"issue", "intermediate_result"}
     for error in msg["errors"]:
         validate_error(error, allow_details=not concise)

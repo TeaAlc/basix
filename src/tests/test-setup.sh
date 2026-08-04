@@ -92,8 +92,12 @@ for text in (
     'Record durable insights likely to improve future sessions',
     'user instructions or durable clarifications',
     'Use `version = 1` and zero or more `[[entries]]`',
-    'exactly `date`, `category`, and `insight`',
-    '`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, or `Other`',
+    'except a `Subagent Insight` record also contains exactly `subagent_type`',
+    '`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`',
+    'exact role used for delegation',
+    'Store every accepted subagent insight as a separate entry',
+    'Evaluate every `final_result.data.subagent_insights` proposal',
+    'Retain only useful insights supported by strong evidence',
     'no longer than three sentences',
     'no longer than 32 words in total',
     'Before every commit and context-compaction summary',
@@ -186,13 +190,14 @@ for text in ('Verification assignment and lifecycle', 'basix_verifier', 'immutab
              'Manual pager smoke scenarios', 'run-pager-smoke.sh', 'real 120-second', 'intentionally not automated'):
     assert text in agent_docs, text
 contract = (root / 'skills/basix-agent-authoring/references/communication-contract.md').read_text()
-assert 'version=1.2' in contract and 'cycle_revision' in contract
+assert 'version=1.3' in contract and 'cycle_revision' in contract
 assert '`Berichtsbeginn an /root übermittelt.`' in contract
 assert 'automatically resume the interrupted task' in contract
+assert 'subagent_insights' in contract and 'at most 24 words' in contract
 assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', contract)
 for path in (root / 'agents/native').glob('*.toml'):
     text = path.read_text()
-    assert 'version=1.2' in text, path
+    assert 'version=1.3' in text, path
     assert '`report_started`' in text, path
     assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', text), path
 PY
@@ -301,7 +306,8 @@ for phrase in (
     "Use `.basix/memory.toml` as the project's persistent agent memory",
     'read it exactly once at session start and exactly once after each context compaction',
     'Use `version = 1` and zero or more `[[entries]]`',
-    '`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, or `Other`',
+    '`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`',
+    'Evaluate every `final_result.data.subagent_insights` proposal',
     'Before every commit and context-compaction summary',
     'Before a compaction summary, commit an eligible update after required verification',
     'Never commit an ignored `.basix` directory',

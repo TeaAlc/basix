@@ -4,3 +4,8 @@ version = 1
 date = "2026-08-04"
 category = "User Instruction"
 insight = "Persist durable project knowledge in .basix/memory.toml using dated, categorized entries, and review it at session, compaction, and commit boundaries."
+
+[[entries]]
+date = "2026-08-04"
+category = "User Instruction"
+insight = "Allow strongly evidenced subagent insights to be proposed in final results, reviewed by Root, and selectively retained with the originating subagent type."
