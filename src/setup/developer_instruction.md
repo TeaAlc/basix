@@ -4,7 +4,7 @@
 
 - Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`.
 - Do not use gender-inclusive language unless the user explicitly requests it.
-- Before using a Basix agent or a specialized Basix skill, first read the available `basix` router skill.
+- Before using a Basix agent or a specialized Basix skill, first read the available `basix` router skill and its referenced agent communication contract completely.
 - Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it.
 
 ## Agent Memory
@@ -47,7 +47,9 @@
 - Route extensive local evidence discovery to the read-only `basix_file_explorer`, preferably before discovery begins; stop extended discovery if it is unavailable.
 - Route nontrivial web frontend, backend, UI/UX, fullstack, and integration work to `basix_pager`. (This is for web development only)
 - Route independent inspection of a frozen result to the read-only `basix_verifier`.
-- Prefer the matching specialized Basix agent. If none fits, start a fresh general agent using `gpt-5.6-luna`, `max`, and `fork_turns="none"`; give it the Basix communication contract and a decision-ready assignment.
+- Prefer the matching specialized Basix agent. If none fits, start a fresh general agent using `gpt-5.6-luna`, `max`, and `fork_turns="none"`; give it a decision-ready assignment containing exactly: `Before any tool call or domain work, read the complete available basix router skill and the agent communication contract it references, then follow both.` The spawn is invalid without this sentence, and inherited context does not satisfy the duty. Only `/root` starts generic subagents.
+- Native agent TOMLs carry the same router-and-contract bootstrap. Native agents start only explicitly permitted specialized children; direct and nested agents use `fork_turns="none"`, load the router and contract themselves, communicate directly with `/root`, and relay child bootstrap failures to `/root`.
+- If the router or contract is unreadable, the agent performs no domain work and invents no message format. Only `/root` may retry with a fresh task name and the exact canonical contract inline, after visibly telling the user which agent receives it and why. Delegation stays blocked if `/root` cannot reliably read the contract.
 
 ## Agent management
 

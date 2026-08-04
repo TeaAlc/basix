@@ -1,7 +1,7 @@
 # Managed communication contract 1.3
 
-The block below is the canonical authoring template. Native agents must embed it
-verbatim in `developer_instructions`; the validator rejects partial or modified copies.
+The block below is the sole canonical runtime source. Agents load it through the
+`basix` router; native definitions contain only the validated bootstrap.
 
 <!-- basix-agent-authoring:contract:start version=1.3 -->
 Communicate task progress and results to `/root` exclusively through `send_message`.

@@ -12,9 +12,12 @@ skill-local links and scripts. Do not orchestrate running agents.
 
 1. Read [model-classification.md](references/model-classification.md), classify the
    assignment, and state the classification, reason, model, and effort before writing.
-2. Read [communication-contract.md](references/communication-contract.md) completely.
-3. Preserve unrelated TOML fields. Insert or replace the marked contract block in
-   `developer_instructions`; never duplicate it. Every native agent TOML description
+2. Read the router-owned
+   [agent-communication-contract.md](../basix/references/agent-communication-contract.md)
+   completely and read
+   [native-agent-bootstrap.md](references/native-agent-bootstrap.md).
+3. Preserve unrelated TOML fields. Insert or replace the marked bootstrap block in
+   `developer_instructions`; never duplicate or embed the full contract. Every native agent TOML description
    must begin exactly with `Basix-Agent: `.
 4. Use `gpt-5.6-luna` with `low`, `medium`, `high`, or `max` according to the
    classification reference, unless the user explicitly overrides it. Put
@@ -37,21 +40,20 @@ Validate one message with `message --stdin` and a JSON-lines stream with
 After collection changes, run `./src/tests/verify-basix.sh` and
 `./src/tests/test-setup.sh` from `<Basix-Repo>`.
 
-## Managed contract block
+## Managed bootstrap block
 
-Embed the communication rules in `developer_instructions` between these exact markers:
+Embed the short bootstrap in `developer_instructions` between these exact markers:
 
 ```text
-<!-- basix-agent-authoring:contract:start version=1.3 -->
+<!-- basix-agent-authoring:bootstrap:start -->
 ...
-<!-- basix-agent-authoring:contract:end -->
+<!-- basix-agent-authoring:bootstrap:end -->
 ```
 
-The block must require JSON-only `send_message` communication to `/root`, an initial
-plan before domain tools, 120-second status updates, immediate issue and permission
-messages, monotonic sequence numbers, explicit versioned cycles, exactly one complete
-final result per cycle, announced requested reports, automatic task resumption after
-intermediate results, and the short visible confirmations from the communication
-reference. It must also allow only final results to propose independently
-discretionary, strongly evidenced `subagent_insights` of at most 24 words each.
-Re-running authoring replaces this block idempotently.
+The block must require the complete router, active persistent developer instructions,
+and the router-owned contract to be read before planning, messages, tools, or domain
+work. It also defines once-per-context loading, continuation reloads only after an
+explicit change notice, and fail-closed behavior when either source is unreadable.
+Re-running authoring replaces this block idempotently. Contract 1.3 and its JSON
+Schema remain unchanged; the authoring skill owns the schema and validator but not a
+second runtime copy of the contract text.

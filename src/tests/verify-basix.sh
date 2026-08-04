@@ -113,7 +113,11 @@ for phrase in (
     "gpt-5.6-luna",
     "`max`",
     "`fork_turns=\"none\"`",
-    "Basix communication contract",
+    "agent communication contract it references",
+    "The spawn is invalid without this sentence",
+    "Only `/root` starts generic subagents",
+    "exact canonical contract inline",
+    "visibly telling the user which agent receives it and why",
     "decision-ready assignment",
     "## Agent management",
     "must not duplicate delegated work",
@@ -189,6 +193,10 @@ for phrase in (
     "fresh agent and task name",
     "Relay assignments and results",
     "intermediate review handoff",
+    "Before any tool call or domain work, read the complete available basix router skill",
+    "Only `/root` may start generic subagents",
+    "exact canonical contract inline",
+    "which agent receives the inline contract and why",
 ):
     assert phrase in skill, phrase
 
@@ -252,18 +260,26 @@ for phrase in (
 ):
     assert phrase in agent_docs, phrase
 
-heartbeat = (root / "skills/basix-agent-authoring/references/communication-contract.md").read_text()
+heartbeat = (root / "skills/basix/references/agent-communication-contract.md").read_text()
 assert "version=1.3" in heartbeat
 assert "cycle_revision" in heartbeat
 assert "`Berichtsbeginn an /root übermittelt.`" in heartbeat
 assert "automatically resume the interrupted task" in heartbeat
 assert "subagent_insights" in heartbeat and "at most 24 words" in heartbeat
 assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", heartbeat)
+bootstrap_reference = (root / "skills/basix-agent-authoring/references/native-agent-bootstrap.md").read_text()
+bootstrap_start = "<!-- basix-agent-authoring:bootstrap:start -->"
+bootstrap_end = "<!-- basix-agent-authoring:bootstrap:end -->"
+bootstrap = bootstrap_reference[
+    bootstrap_reference.index(bootstrap_start):
+    bootstrap_reference.index(bootstrap_end) + len(bootstrap_end)
+]
 for path in (root / "agents/native").glob("*.toml"):
-    text = path.read_text()
-    assert "version=1.3" in text, path
-    assert "`report_started`" in text, path
-    assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", text), path
+    text = tomllib.loads(path.read_text())["developer_instructions"]
+    assert text.count(bootstrap_start) == 1 and text.count(bootstrap_end) == 1, path
+    actual = text[text.index(bootstrap_start):text.index(bootstrap_end) + len(bootstrap_end)]
+    assert actual == bootstrap, path
+    assert "basix-agent-authoring:contract:start" not in text, path
 PY
 if command -v shellcheck >/dev/null; then shellcheck --severity=warning "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh; else printf 'SKIP: shellcheck not installed\n'; fi
 printf 'Static Basix verification passed.\n'

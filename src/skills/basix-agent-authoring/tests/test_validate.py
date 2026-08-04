@@ -11,7 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "validate.py"
-CONTRACT_REFERENCE = ROOT / "references" / "communication-contract.md"
+BOOTSTRAP_REFERENCE = ROOT / "references" / "native-agent-bootstrap.md"
+CONTRACT_REFERENCE = ROOT.parent / "basix" / "references" / "agent-communication-contract.md"
 PAGER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-pager.toml"
 VERIFIER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-verifier.toml"
 SPEC = importlib.util.spec_from_file_location("authoring_validate", SCRIPT)
@@ -328,8 +329,11 @@ class AgentTests(unittest.TestCase):
     def write_agent(self, model="gpt-5.6-luna", effort="medium", marker="", block=True,
                     description="Basix-Agent: Test agent", name="agent", sandbox="read-only",
                     sandbox_marker="", preamble=None):
-        reference = CONTRACT_REFERENCE.read_text()
-        contract = reference[reference.index(validator.START):reference.index(validator.END) + len(validator.END)]
+        reference = BOOTSTRAP_REFERENCE.read_text()
+        contract = reference[
+            reference.index(validator.BOOTSTRAP_START):
+            reference.index(validator.BOOTSTRAP_END) + len(validator.BOOTSTRAP_END)
+        ]
         if not block:
             contract = "Instructions without a managed communication contract."
         if preamble is None:
@@ -344,6 +348,42 @@ class AgentTests(unittest.TestCase):
         directory, path = self.write_agent()
         with directory:
             validator.validate_agent(path)
+
+    def test_rejects_missing_duplicate_or_changed_bootstrap(self):
+        directory, path = self.write_agent(block=False)
+        with directory, self.assertRaisesRegex(validator.Invalid, "bootstrap markers"):
+            validator.validate_agent(path)
+
+        directory, path = self.write_agent()
+        with directory:
+            text = path.read_text()
+            block = text[
+                text.index(validator.BOOTSTRAP_START):
+                text.index(validator.BOOTSTRAP_END) + len(validator.BOOTSTRAP_END)
+            ]
+            path.write_text(text.replace(block, f"{block}\n{block}"))
+            with self.assertRaisesRegex(validator.Invalid, "bootstrap markers"):
+                validator.validate_agent(path)
+
+        directory, path = self.write_agent()
+        with directory:
+            path.write_text(path.read_text().replace(
+                "Read the complete available `basix` router skill.",
+                "Read an available router.",
+            ))
+            with self.assertRaisesRegex(validator.Invalid, "bootstrap block differs"):
+                validator.validate_agent(path)
+
+    def test_rejects_embedded_full_contract_copy(self):
+        directory, path = self.write_agent()
+        with directory:
+            full_contract = CONTRACT_REFERENCE.read_text()
+            path.write_text(path.read_text().replace(
+                validator.BOOTSTRAP_END,
+                f"{validator.BOOTSTRAP_END}\n{full_contract}",
+            ))
+            with self.assertRaisesRegex(validator.Invalid, "full communication contract"):
+                validator.validate_agent(path)
 
     def test_highly_complex_agent_uses_luna_max_without_override(self):
         directory, path = self.write_agent(effort="max")
@@ -364,7 +404,7 @@ class AgentTests(unittest.TestCase):
         with directory:
             validator.validate_agent(path)
 
-    def test_default_effort_and_contract_rejected(self):
+    def test_default_effort_and_missing_bootstrap_rejected(self):
         directory, path = self.write_agent(effort="extreme")
         with directory, self.assertRaisesRegex(validator.Invalid, "effort"):
             validator.validate_agent(path)
@@ -372,14 +412,15 @@ class AgentTests(unittest.TestCase):
         with directory, self.assertRaisesRegex(validator.Invalid, "markers"):
             validator.validate_agent(path)
 
-    def test_rejects_shortened_or_changed_contract(self):
-        for replacement in ("Send exactly one `final_result`.", "Send at most one `final_result`."):
+    def test_rejects_shortened_or_changed_bootstrap(self):
+        canonical = "Read the complete available `basix` router skill."
+        for replacement in (canonical, "Read the available `basix` router skill."):
             directory, path = self.write_agent()
             text = path.read_text()
-            if replacement.startswith("Send exactly"):
+            if replacement == canonical:
                 text = text.replace(replacement, "")
             else:
-                text = text.replace("Send exactly one `final_result`.", replacement)
+                text = text.replace(canonical, replacement)
             path.write_text(text)
             with directory, self.assertRaisesRegex(validator.Invalid, "differs from canonical"):
                 validator.validate_agent(path)
@@ -488,18 +529,21 @@ class AgentTests(unittest.TestCase):
 
 
 class RepositoryPolicyTests(unittest.TestCase):
-    def test_native_agents_use_only_contract_1_3_and_validate(self):
+    def test_native_agents_use_only_canonical_bootstrap_and_validate(self):
         repository = Path(__file__).resolve().parents[4]
         agents = sorted((repository / "src/agents/native").glob("*.toml"))
         self.assertTrue(agents)
         for path in agents:
-            versions = re.findall(
-                r"(?i)\bcontract(?:\s+version)?\s+(\d+\.\d+)\b",
-                path.read_text(),
-            )
-            self.assertTrue(versions, path)
-            self.assertEqual(set(versions), {"1.3"}, path)
+            text = path.read_text()
+            self.assertEqual(text.count(validator.BOOTSTRAP_START), 1, path)
+            self.assertEqual(text.count(validator.BOOTSTRAP_END), 1, path)
+            self.assertNotIn(validator.CONTRACT_START, text, path)
             validator.validate_agent(path)
+
+        contract = (repository / "src/skills/basix/references/agent-communication-contract.md").read_text()
+        versions = re.findall(r"(?i)\bcontract(?:\s+version)?\s+(\d+\.\d+)\b", contract)
+        self.assertTrue(versions)
+        self.assertEqual(set(versions), {"1.3"})
 
     def test_schema_uses_contract_1_3_and_models_subagent_insights(self):
         schema = json.loads((ROOT / "references" / "message.schema.json").read_text())

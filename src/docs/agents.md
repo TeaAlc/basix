@@ -1,8 +1,9 @@
 # Agents
 
 The persistent Basix developer instructions require Root to load the available
-`basix` router skill before any specialized Basix skill or Basix agent. Instructions
-are reread only when changed or explicitly requested. Root completes tightly bounded,
+`basix` router skill and its referenced communication contract before any specialized
+Basix skill or Basix agent. Instructions are reread only when changed or explicitly
+requested. Root completes tightly bounded,
 compact work directly and delegates concrete assignments expected to require more
 than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or
 specialized expertise. Root does not duplicate delegated work, but may continue
@@ -56,8 +57,14 @@ The native read-only agents are:
   skill supplies fresh-context and bounded-assignment orchestration. The explorer discovers evidence read-only; implementation
   and final code analysis remain the main agent's responsibility.
 
-All managed communication blocks implement the versioned JSON handoff contract. Technical
-content and handoff payloads use English, while visible chat confirmations and errors use the
+Every native TOML contains one exact managed bootstrap rather than the complete
+contract. It loads the router, persistent developer instructions, and the router-owned
+Contract 1.3 before any plan, contract message, tool call, or domain work. Router and
+contract are read once in fresh context and during continuation only after Root
+explicitly reports a change. An unreadable source fails closed without an invented
+message format, and the spawning parent relays a nested bootstrap failure to Root.
+
+Technical content and handoff payloads use English, while visible chat confirmations and errors use the
 current conversation's language. Global setup exposes the complete native-agent
 payload at `$CODEX_HOME/basix/agents/`; project setup exposes it at
 `.codex/basix/agents/`. Each agent is registered by its TOML `name` through a
@@ -73,6 +80,20 @@ no announcement, and every final result remains terminal. A final result may als
 propose `data.subagent_insights`: independently discretionary, strongly evidenced,
 future-useful strings of at most 24 words each. The field is invalid on other message
 types. Root evaluates proposals independently; agents do not write memory directly.
+
+## Generic and nested agent bootstrap
+
+Only Root starts generic subagents. Their fresh, self-contained assignment must
+contain the router's exact mandatory sentence requiring the complete router and its
+referenced contract before any tool call or domain work; inherited context is never
+accepted as a substitute. Native agents may start only the specialized children their
+role definition permits. Every direct and nested spawn uses `fork_turns="none"`, loads
+the sources independently, and communicates directly with Root.
+
+When an agent cannot read either source, only Root may make one fail-safe retry with a
+fresh task name and the exact canonical contract inline. Root first tells the user
+which agent receives the inline contract and why. If Root cannot reliably read the
+canonical contract, delegation remains blocked.
 
 ## Verification assignment and lifecycle
 

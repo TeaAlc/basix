@@ -121,7 +121,11 @@ for text in (
     'gpt-5.6-luna',
     '`max`',
     '`fork_turns="none"`',
-    'Basix communication contract',
+    'agent communication contract it references',
+    'The spawn is invalid without this sentence',
+    'Only `/root` starts generic subagents',
+    'exact canonical contract inline',
+    'visibly telling the user which agent receives it and why',
     'decision-ready assignment',
     '## Agent management',
     'must not duplicate delegated work',
@@ -158,7 +162,11 @@ for text in ('## Root orchestration', 'direct completion costs less context than
              'timeout_ms: 120000', 'visible confirmation', 'started: <assignment>',
              'failed to start: <reason>', 'status: <conclusion>', 'generic web access',
              'final_result', 'fresh agent and task name', 'Relay assignments and results',
-             'intermediate review handoff'):
+             'intermediate review handoff',
+             'Before any tool call or domain work, read the complete available basix router skill',
+             'Only `/root` may start generic subagents',
+             'exact canonical contract inline',
+             'which agent receives the inline contract and why'):
     assert text in skill, text
 
 architecture = (root / 'docs/architecture.md').read_text()
@@ -189,17 +197,25 @@ for text in ('Verification assignment and lifecycle', 'basix_verifier', 'immutab
              'mutation_window:', 'report_strictness:', 'fresh verifier',
              'Manual pager smoke scenarios', 'run-pager-smoke.sh', 'real 120-second', 'intentionally not automated'):
     assert text in agent_docs, text
-contract = (root / 'skills/basix-agent-authoring/references/communication-contract.md').read_text()
+contract = (root / 'skills/basix/references/agent-communication-contract.md').read_text()
 assert 'version=1.3' in contract and 'cycle_revision' in contract
 assert '`Berichtsbeginn an /root übermittelt.`' in contract
 assert 'automatically resume the interrupted task' in contract
 assert 'subagent_insights' in contract and 'at most 24 words' in contract
 assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', contract)
+bootstrap_reference = (root / 'skills/basix-agent-authoring/references/native-agent-bootstrap.md').read_text()
+bootstrap_start = '<!-- basix-agent-authoring:bootstrap:start -->'
+bootstrap_end = '<!-- basix-agent-authoring:bootstrap:end -->'
+bootstrap = bootstrap_reference[
+    bootstrap_reference.index(bootstrap_start):
+    bootstrap_reference.index(bootstrap_end) + len(bootstrap_end)
+]
 for path in (root / 'agents/native').glob('*.toml'):
-    text = path.read_text()
-    assert 'version=1.3' in text, path
-    assert '`report_started`' in text, path
-    assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', text), path
+    text = tomllib.loads(path.read_text())['developer_instructions']
+    assert text.count(bootstrap_start) == 1 and text.count(bootstrap_end) == 1, path
+    actual = text[text.index(bootstrap_start):text.index(bootstrap_end) + len(bootstrap_end)]
+    assert actual == bootstrap, path
+    assert 'basix-agent-authoring:contract:start' not in text, path
 PY
 then ok 'installed policy mandates basix_researcher without generic-web fallback'; else not_ok 'installed policy mandates basix_researcher without generic-web fallback'; fi
 
@@ -267,6 +283,10 @@ make_mock() {
 cat > "$mock/codex" <<'EOF'
 #!/usr/bin/env bash
 if [[ $1 == mcp && $2 == get && $3 == lumen ]]; then printf '{"name":"lumen","enabled":true,"disabled_reason":null}\n'; exit; fi
+if [[ ${MOCK_REQUIRE_BOOTSTRAP_ORDER:-false} == true && $1 == plugin && $2 == add ]]; then
+  [[ -f $CODEX_HOME/basix-plugin-root/skills/basix/references/agent-communication-contract.md ]] || exit 81
+  [[ ! -f $CODEX_HOME/config.toml ]] || ! grep -Fq 'basix:agent-config:start' "$CODEX_HOME/config.toml" || exit 82
+fi
 printf '%s\n' "$*" >> "$MOCK_LOG"
 exit "${MOCK_EXIT:-0}"
 EOF
@@ -275,10 +295,11 @@ EOF
 make_mock
 
 home="$case_dir/home"; log="$case_dir/global.log"; : > "$log"
-if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null &&
+if PATH="$mock:$PATH" MOCK_LOG="$log" MOCK_REQUIRE_BOOTSTRAP_ORDER=true CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null &&
   [[ -L $home/basix/agents && ! -e $home/agents/basix-researcher.toml && ! -e $home/basix-luna-researcher.config.toml &&
     -f $home/basix-plugin-root/.codex-plugin/plugin.json && -f $home/basix-plugin-root/.agents/plugins/marketplace.json &&
-    -L $home/basix-plugin-root/skills/basix && $(readlink "$home/basix-plugin-root/skills/basix") == "$ROOT/skills/basix" && ! -L $home/basix-plugin-root/skills/basix/SKILL.md ]] &&
+    -L $home/basix-plugin-root/skills/basix && $(readlink "$home/basix-plugin-root/skills/basix") == "$ROOT/skills/basix" && ! -L $home/basix-plugin-root/skills/basix/SKILL.md &&
+    -f $home/basix-plugin-root/skills/basix/references/agent-communication-contract.md ]] &&
   cmp -s "$ROOT/plugin/plugin.json" "$home/basix-plugin-root/.codex-plugin/plugin.json" &&
   cmp -s "$ROOT/plugin/marketplace.json" "$home/basix-plugin-root/.agents/plugins/marketplace.json" &&
   grep -Fq "plugin marketplace add $home/basix-plugin-root --json" "$log" && grep -q 'plugin add basix@basix-local' "$log" &&
@@ -300,7 +321,11 @@ for phrase in (
     'gpt-5.6-luna',
     '`max`',
     '`fork_turns="none"`',
-    'Basix communication contract',
+    'agent communication contract it references',
+    'The spawn is invalid without this sentence',
+    'Only `/root` starts generic subagents',
+    'exact canonical contract inline',
+    'visibly telling the user which agent receives it and why',
     'decision-ready assignment',
     '## Agent Memory',
     "Use `.basix/memory.toml` as the project's persistent agent memory",
@@ -330,26 +355,30 @@ for removed in ('task_profile', 'intermediate_result', 'followup_task',
                 'before the third filesystem-exploration tool call',
                 'works primarily as planner, coordinator, and integrator'):
     assert removed not in policy, removed
-assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', (root / 'skills/basix-agent-authoring/references/communication-contract.md').read_text())
+assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', (root / 'skills/basix/references/agent-communication-contract.md').read_text())
 PY
 then ok 'installed global policy keeps cost-aware delegation and compact lifecycle rules'; else not_ok 'installed global policy keeps cost-aware delegation and compact lifecycle rules'; fi
 before_config=$(sha256sum "$home/config.toml")
-if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null && [[ $(sha256sum "$home/config.toml") == "$before_config" ]] && [[ $(grep -c 'basix:developer-instructions:start' "$home/config.toml") -eq 1 && $(grep -c 'basix:agent-config:start' "$home/config.toml") -eq 1 ]] && awk -F '\t' -v agents="$home/basix/agents" '$1 == "dirlink" && $2 == agents { found = 1 } END { exit !found }' "$home/.basix-install-state"; then ok 'global reinstall is idempotent'; else not_ok 'global reinstall is idempotent'; fi
+if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" >/dev/null && [[ $(sha256sum "$home/config.toml") == "$before_config" ]] && [[ $(grep -c 'basix:developer-instructions:start' "$home/config.toml") -eq 1 && $(grep -c 'basix:agent-config:start' "$home/config.toml") -eq 1 ]] && [[ -f $home/basix-plugin-root/skills/basix/references/agent-communication-contract.md ]] && awk -F '\t' -v agents="$home/basix/agents" '$1 == "dirlink" && $2 == agents { found = 1 } END { exit !found }' "$home/.basix-install-state"; then ok 'global reinstall is idempotent'; else not_ok 'global reinstall is idempotent'; fi
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null && [[ ! -e $home/agents/basix-researcher.toml && ! -e $home/agents/basix-file-explorer.toml && ! -e $home/agents/basix-pager.toml && ! -e $home/agents/basix-verifier.toml && ! -e $home/basix-luna-researcher.config.toml ]] && ! grep -q 'basix:developer-instructions:start' "$home/config.toml"; then ok 'global uninstall removes managed state'; else not_ok 'global uninstall removes managed state'; fi
 
 bundle_source="$case_dir/update-source"; cp -R "$ROOT" "$bundle_source"
 update_home="$case_dir/update-home"; printf '\nupdate-test\n' >> "$bundle_source/skills/basix/SKILL.md"
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$update_home" "$bundle_source/setup/install_as_plugin.sh" --install-lumen no >/dev/null &&
   grep -Fq update-test "$update_home/basix-plugin-root/skills/basix/SKILL.md" &&
+  printf '\ncontract-update-test\n' >> "$bundle_source/skills/basix/references/agent-communication-contract.md" &&
   printf '\nsecond-update\n' >> "$bundle_source/skills/basix/SKILL.md" &&
   PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$update_home" "$bundle_source/setup/install_as_plugin.sh" --install-lumen no >/dev/null &&
-  grep -Fq second-update "$update_home/basix-plugin-root/skills/basix/SKILL.md";
+  grep -Fq second-update "$update_home/basix-plugin-root/skills/basix/SKILL.md" &&
+  grep -Fq contract-update-test "$update_home/basix-plugin-root/skills/basix/references/agent-communication-contract.md";
 then ok 'global update synchronizes generated plugin bundle'; else not_ok 'global update synchronizes generated plugin bundle'; fi
 
 mode_home="$case_dir/mode-home"
 if PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$mode_home" "$ROOT/setup/install_as_plugin.sh" --mode copy --install-lumen no >/dev/null &&
   [[ -d $mode_home/basix-plugin-root/skills/basix && ! -L $mode_home/basix-plugin-root/skills/basix &&
-    -f $mode_home/basix-plugin-root/.codex-plugin/plugin.json && ! -L $mode_home/basix-plugin-root/.codex-plugin/plugin.json ]] &&
+    -f $mode_home/basix-plugin-root/.codex-plugin/plugin.json && ! -L $mode_home/basix-plugin-root/.codex-plugin/plugin.json &&
+    -f $mode_home/basix-plugin-root/skills/basix/references/agent-communication-contract.md &&
+    ! -L $mode_home/basix-plugin-root/skills/basix/references/agent-communication-contract.md ]] &&
   printf '\nlocal-drift\n' >> "$mode_home/basix-plugin-root/skills/basix/SKILL.md" &&
   PATH="$mock:$PATH" MOCK_LOG="$log" CODEX_HOME="$mode_home" "$ROOT/setup/install_as_plugin.sh" --mode link --install-lumen no >/dev/null &&
   [[ -L $mode_home/basix-plugin-root/skills/basix && $(readlink "$mode_home/basix-plugin-root/skills/basix") == "$ROOT/skills/basix" &&
@@ -425,11 +454,11 @@ else
 fi
 
 current_project="$case_dir/current-project"; mkdir -p "$current_project"
-if (cd "$current_project" && PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" --install-lumen no --lumen-index no >/dev/null) && [[ ! -e $current_project/.basix && -L $current_project/.agents/skills/basix && ! -L $current_project/.agents/skills/basix/SKILL.md && -L $current_project/.agents/skills/basix-agent-authoring && -L $current_project/.codex/basix/agents && ! -e $current_project/.codex/agents/basix-researcher.toml ]]; then ok 'project defaults to current working directory'; else not_ok 'project defaults to current working directory'; fi
+if (cd "$current_project" && PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" --install-lumen no --lumen-index no >/dev/null) && [[ ! -e $current_project/.basix && -L $current_project/.agents/skills/basix && ! -L $current_project/.agents/skills/basix/SKILL.md && -f $current_project/.agents/skills/basix/references/agent-communication-contract.md && -L $current_project/.agents/skills/basix-agent-authoring && -L $current_project/.codex/basix/agents && ! -e $current_project/.codex/agents/basix-researcher.toml ]]; then ok 'project defaults to current working directory'; else not_ok 'project defaults to current working directory'; fi
 if (cd "$current_project" && PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" --uninstall >/dev/null) && [[ ! -e $current_project/.basix && ! -e $current_project/.agents/skills/basix/SKILL.md && ! -e $current_project/.agents/skills/basix-agent-authoring && ! -e $current_project/.codex/agents/basix-researcher.toml && ! -e $current_project/.codex/agents/basix-file-explorer.toml && ! -e $current_project/.codex/agents/basix-pager.toml && ! -e $current_project/.codex/agents/basix-verifier.toml ]]; then ok 'project uninstall defaults to current working directory'; else not_ok 'project uninstall defaults to current working directory'; fi
 
 project="$case_dir/project with spaces"
-if PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" "$project" --mode link >/dev/null && [[ ! -e $project/.basix && -L $project/.agents/skills/basix && ! -L $project/.agents/skills/basix/SKILL.md && -L $project/.agents/skills/basix-agent-authoring && -L $project/.codex/basix/agents && ! -e $project/.codex/agents/basix-researcher.toml ]]; then ok 'project installs complete skills and native agents'; else not_ok 'project installs complete skills and native agents'; fi
+if PATH="$mock:$PATH" MOCK_LOG="$log" "$ROOT/setup/install_for_project.sh" "$project" --mode link >/dev/null && [[ ! -e $project/.basix && -L $project/.agents/skills/basix && ! -L $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix/references/agent-communication-contract.md && -L $project/.agents/skills/basix-agent-authoring && -L $project/.codex/basix/agents && ! -e $project/.codex/agents/basix-researcher.toml ]]; then ok 'project installs complete skills and native agents'; else not_ok 'project installs complete skills and native agents'; fi
 
 lumen_case="$case_dir/lumen install"; lumen_mock="$lumen_case/mock"; lumen_home="$lumen_case/home"; lumen_codex_home="$lumen_case/codex home"
 mkdir -p "$lumen_mock" "$lumen_home"
@@ -486,9 +515,11 @@ if ! PATH="$missing_mock:$PATH" "$ROOT/setup/install_for_project.sh" "$case_dir/
 dry_lumen="$case_dir/dry-lumen"
 if PATH="$lumen_mock:$PATH" HOME="$dry_lumen/home" CODEX_HOME="$dry_lumen/codex" LUMEN_LOG="$dry_lumen/log" LUMEN_MCP_STATE="$dry_lumen/state" "$ROOT/setup/install_ory_lumen.sh" --dry-run >/dev/null && [[ ! -e $dry_lumen ]]; then ok 'Ory Lumen dry run does not mutate'; else not_ok 'Ory Lumen dry run does not mutate'; fi
 
-copy_project="$case_dir/copy-project"
-if "$ROOT/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null && [[ ! -e $copy_project/.basix && ! -L $copy_project/.codex/basix/agents && -f $copy_project/.codex/basix/agents/basix-researcher.toml && -f $copy_project/.agents/skills/basix/SKILL.md ]]; then ok 'project copy installation writes direct independent targets'; else not_ok 'project copy installation writes direct independent targets'; fi
-if "$ROOT/setup/install_for_project.sh" "$copy_project" --uninstall >/dev/null &&
+copy_project="$case_dir/copy-project"; project_bundle="$case_dir/project-update-source"; cp -R "$ROOT" "$project_bundle"
+if "$project_bundle/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null && [[ ! -e $copy_project/.basix && ! -L $copy_project/.codex/basix/agents && -f $copy_project/.codex/basix/agents/basix-researcher.toml && -f $copy_project/.agents/skills/basix/SKILL.md && -f $copy_project/.agents/skills/basix/references/agent-communication-contract.md && ! -L $copy_project/.agents/skills/basix/references/agent-communication-contract.md ]]; then ok 'project copy installation writes direct independent targets'; else not_ok 'project copy installation writes direct independent targets'; fi
+printf '\nproject-contract-update\n' >> "$project_bundle/skills/basix/references/agent-communication-contract.md"
+if "$project_bundle/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null && grep -Fq project-contract-update "$copy_project/.agents/skills/basix/references/agent-communication-contract.md"; then ok 'project reinstall updates central contract reference'; else not_ok 'project reinstall updates central contract reference'; fi
+if "$project_bundle/setup/install_for_project.sh" "$copy_project" --uninstall >/dev/null &&
   [[ ! -e $copy_project/.codex/.basix-install-state && ! -e $copy_project/.agents/skills/basix && ! -e $copy_project/.codex/basix ]]; then
   ok 'clean project copy uninstall removes payload and installer state'
 else not_ok 'clean project copy uninstall removes payload and installer state'; fi

@@ -182,17 +182,6 @@ if [[ -f $STATE ]]; then
 fi
 report_point "$([[ $bundle_changed == true ]] && printf changed || printf unchanged)" 'Plugin bundle' "$([[ $DRY_RUN == true && $bundle_changed == true ]] && printf 'Would synchronize' || printf '%s' "$([[ $bundle_changed == true ]] && printf Synchronized || printf Current)")"
 
-report_group 'Developer Instructions'
-helper_args=(add --config "$CONFIG" --instructions "$INSTRUCTIONS" --status-json); [[ $DRY_RUN == false ]] || helper_args+=(--dry-run)
-REPORT_POINT='Developer instructions'; helper_json=$(python3 "$HELPER" "${helper_args[@]}") || die
-helper_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$helper_json")
-report_point "$helper_status" 'Developer instructions' "$([[ $DRY_RUN == true && $helper_status == changed ]] && printf 'Would update' || printf '%s' "$([[ $helper_status == changed ]] && printf Updated || printf Current)")"
-report_group 'Agent configuration'
-helper_args=(agent-add --config "$CONFIG" --agents-source "$ROOT/agents/native" --agents-dir "$AGENT_DIR" --status-json); [[ $DRY_RUN == false ]] || helper_args+=(--dry-run)
-REPORT_POINT='Agent configuration'; helper_json=$(python3 "$HELPER" "${helper_args[@]}") || die
-helper_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$helper_json")
-report_point "$helper_status" 'Agent configuration' "$([[ $DRY_RUN == true && $helper_status == changed ]] && printf 'Would update' || printf '%s' "$([[ $helper_status == changed ]] && printf Updated || printf Current)")"
-
 report_group 'Marketplace / Plugin'
 marketplace_current=false
 marketplace_registered_at "$PLUGIN_ROOT" && marketplace_current=true
@@ -210,6 +199,17 @@ if [[ $marketplace_current == true ]] && plugin_registered; then report_point un
   if [[ $DRY_RUN == false ]]; then REPORT_POINT='Plugin'; codex plugin add basix@basix-local --json >/dev/null || die; fi
   report_point changed 'Plugin' "$([[ $DRY_RUN == true ]] && printf 'Would install' || printf Installed)"
 fi
+
+report_group 'Developer Instructions'
+helper_args=(add --config "$CONFIG" --instructions "$INSTRUCTIONS" --status-json); [[ $DRY_RUN == false ]] || helper_args+=(--dry-run)
+REPORT_POINT='Developer instructions'; helper_json=$(python3 "$HELPER" "${helper_args[@]}") || die
+helper_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$helper_json")
+report_point "$helper_status" 'Developer instructions' "$([[ $DRY_RUN == true && $helper_status == changed ]] && printf 'Would update' || printf '%s' "$([[ $helper_status == changed ]] && printf Updated || printf Current)")"
+report_group 'Agent configuration'
+helper_args=(agent-add --config "$CONFIG" --agents-source "$ROOT/agents/native" --agents-dir "$AGENT_DIR" --status-json); [[ $DRY_RUN == false ]] || helper_args+=(--dry-run)
+REPORT_POINT='Agent configuration'; helper_json=$(python3 "$HELPER" "${helper_args[@]}") || die
+helper_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$helper_json")
+report_point "$helper_status" 'Agent configuration' "$([[ $DRY_RUN == true && $helper_status == changed ]] && printf 'Would update' || printf '%s' "$([[ $helper_status == changed ]] && printf Updated || printf Current)")"
 [[ $DRY_RUN == true ]] || mv "$STATE_TMP" "$STATE"
 
 report_group 'Lumen'

@@ -268,30 +268,39 @@ and persistent instructions are loaded. Basix then supplies:
 ```mermaid
 sequenceDiagram
     participant Root as /root
-    participant Agent as Basix agent
+    participant Native as Native agent
+    participant Generic as Generic agent
+    participant Child as Nested specialized agent
 
-    Note over Root,Agent: Contract 1.3 · JSON-only via send_message<br/>globally increasing sequence · positive cycle_revision
-    Agent->>Root: plan (before substantive tool use)
+    Root->>Native: fresh spawn, fork_turns="none"
+    Native->>Native: TOML bootstrap: read router, persistent instructions, contract
+    Root->>Generic: fresh spawn with exact router-read sentence
+    Generic->>Generic: read router and referenced contract
+    Native->>Child: permitted fresh specialized spawn
+    Child->>Child: read router and referenced contract
+    Note over Native,Child: Bootstrap completes before plans, tools, or domain work
+    Note over Root,Child: Contract 1.3 · JSON-only via send_message<br/>globally increasing sequence · positive cycle_revision
+    Native->>Root: plan (before substantive tool use)
     loop While work in the current cycle continues
-        Agent->>Root: status (after 120 s, then every 120 s)
+        Native->>Root: status (after 120 s, then every 120 s)
         opt Material error
-            Agent->>Root: issue
+            Native->>Root: issue
         end
         opt Permission required
-            Agent->>Root: permission_request
-            Root-->>Agent: permission decision
+            Native->>Root: permission_request
+            Root-->>Native: permission decision
         end
         opt Root explicitly requests an intermediate report
-            Root-->>Agent: report request
-            Agent->>Root: report_started
-            Agent->>Root: intermediate_result
+            Root-->>Native: report request
+            Native->>Root: report_started
+            Native->>Root: intermediate_result
         end
     end
     opt Root explicitly requests the final report
-        Root-->>Agent: report request
-        Agent->>Root: report_started
+        Root-->>Native: report request
+        Native->>Root: report_started
     end
-    Agent->>Root: final_result (exactly once; optional subagent_insights)
+    Native->>Root: final_result (exactly once; optional subagent_insights)
     opt final_result proposes subagent insights
         Root->>Root: review each proposal for strong evidence and future usefulness
         alt proposal accepted
@@ -301,14 +310,21 @@ sequenceDiagram
         end
     end
     alt Same task and unchanged target; retained context is required
-        Root-->>Agent: followup_task with continuation justification
-        Agent->>Root: plan (cycle_revision + 1)
+        Root-->>Native: followup_task with continuation justification
+        Native->>Root: plan (cycle_revision + 1; reread only if changed)
     else Changed files, scope, criteria, or remediation verification
-        Root->>Agent: start a fresh agent with fork_turns="none"
+        Root->>Native: start a fresh agent with fork_turns="none"
+    end
+    alt Router or contract unreadable
+        Child->>Root: bootstrap failure (parent relays when needed)
+        Root->>Root: tell user which fresh agent gets inline contract and why
+        Root->>Native: fresh task name with exact canonical contract inline
+    else Root cannot reliably read canonical contract
+        Root->>Root: delegation remains blocked
     end
 ```
 
-The managed `basix-agent-authoring` contract gives `/root` predictable,
+The router-owned Contract 1.3 gives `/root` predictable,
 machine-validatable handoffs from every native Basix agent. Each message carries
 the contract version, agent and task identity, a lifetime-monotonic sequence,
 cycle state, structured data, and errors; visible agent output is limited to a
@@ -318,7 +334,9 @@ the agent idle. Its data may propose independently discretionary, strongly evide
 rewrite and retain useful ones as separate memory entries of at most 32 words,
 recording the exact delegated role as `subagent_type`. Only an explicitly justified
 continuation of the same unchanged task and target may reuse that agent; changed
-work requires a fresh agent.
+work requires a fresh agent. Native TOMLs contain only a validated bootstrap;
+generic assignments carry an exact router-read sentence, and nested specialized
+agents bootstrap independently before communicating directly with Root.
 
 ### Coordinating pager work
 

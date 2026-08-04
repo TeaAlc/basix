@@ -16,8 +16,10 @@ STATUSES = {"planned", "in_progress", "blocked", "completed", "completed_with_er
 EFFORTS = {"low", "medium", "high", "max"}
 OVERRIDE = "# basix-agent-authoring: explicit-model-override"
 SANDBOX_OVERRIDE = "# basix-agent-authoring: explicit-sandbox-override"
-START = "<!-- basix-agent-authoring:contract:start version=1.3 -->"
-END = "<!-- basix-agent-authoring:contract:end -->"
+BOOTSTRAP_START = "<!-- basix-agent-authoring:bootstrap:start -->"
+BOOTSTRAP_END = "<!-- basix-agent-authoring:bootstrap:end -->"
+CONTRACT_START = "<!-- basix-agent-authoring:contract:start version=1.3 -->"
+CONTRACT_END = "<!-- basix-agent-authoring:contract:end -->"
 WORD_RE = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", re.UNICODE)
 
 
@@ -311,20 +313,28 @@ def validate_agent(path: Path) -> None:
         )
         for clause in researcher_clauses:
             need(clause in instructions, f"{path}: missing required Scrapling researcher policy")
-    need(instructions.count(START) == 1 and instructions.count(END) == 1, f"{path}: contract markers must occur exactly once")
-    need(instructions.index(START) < instructions.index(END), f"{path}: contract markers are reversed")
-    block = instructions[instructions.index(START):instructions.index(END) + len(END)]
-    reference = path.parents[2] / "skills" / "basix-agent-authoring" / "references" / "communication-contract.md"
+    need(instructions.count(BOOTSTRAP_START) == 1 and instructions.count(BOOTSTRAP_END) == 1,
+         f"{path}: bootstrap markers must occur exactly once")
+    need(instructions.index(BOOTSTRAP_START) < instructions.index(BOOTSTRAP_END),
+         f"{path}: bootstrap markers are reversed")
+    need(CONTRACT_START not in instructions and CONTRACT_END not in instructions,
+         f"{path}: full communication contract copies are forbidden")
+    block = instructions[
+        instructions.index(BOOTSTRAP_START):instructions.index(BOOTSTRAP_END) + len(BOOTSTRAP_END)
+    ]
+    reference = path.parents[2] / "skills" / "basix-agent-authoring" / "references" / "native-agent-bootstrap.md"
     if not reference.is_file():
-        reference = Path(__file__).resolve().parents[1] / "references" / "communication-contract.md"
+        reference = Path(__file__).resolve().parents[1] / "references" / "native-agent-bootstrap.md"
     try:
         canonical_text = reference.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
-        raise Invalid(f"cannot read canonical contract: {exc}") from exc
-    need(canonical_text.count(START) == 1 and canonical_text.count(END) == 1,
-         f"{reference}: canonical contract markers must occur exactly once")
-    canonical = canonical_text[canonical_text.index(START):canonical_text.index(END) + len(END)]
-    need(block == canonical, f"{path}: contract block differs from canonical authoring template")
+        raise Invalid(f"cannot read canonical bootstrap: {exc}") from exc
+    need(canonical_text.count(BOOTSTRAP_START) == 1 and canonical_text.count(BOOTSTRAP_END) == 1,
+         f"{reference}: canonical bootstrap markers must occur exactly once")
+    canonical = canonical_text[
+        canonical_text.index(BOOTSTRAP_START):canonical_text.index(BOOTSTRAP_END) + len(BOOTSTRAP_END)
+    ]
+    need(block == canonical, f"{path}: bootstrap block differs from canonical authoring template")
 
 
 def load_single() -> Any:

@@ -19,6 +19,9 @@ Link mode keeps agents and skills connected directly to `src/agents/native` and
 ordinary entries reached through those directory links, not individual symlink
 nodes. In a global plugin install, `--mode link` links each complete bundle skill
 directory to its canonical source; `--mode copy` materializes the complete tree.
+Consequently both modes install the Basix router together with
+`references/agent-communication-contract.md` before bootstrap-only native agents are
+activated in configuration.
 The generated plugin and marketplace metadata are always real copies in both
 modes. Copy mode installs independent copies of every native agent and every
 complete project skill tree directly in those target paths. Neither mode creates or manages
