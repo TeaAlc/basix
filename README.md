@@ -258,6 +258,51 @@ and persistent instructions are loaded. Basix then supplies:
 - Lumen semantic project search when the optional integration is installed and
   the project has been indexed.
 
+### Agent communication contract
+
+```mermaid
+sequenceDiagram
+    participant Root as /root
+    participant Agent as Basix agent
+
+    Note over Root,Agent: Contract 1.2 · JSON-only via send_message<br/>globally increasing sequence · positive cycle_revision
+    Agent->>Root: plan (before substantive tool use)
+    loop While work in the current cycle continues
+        Agent->>Root: status (after 120 s, then every 120 s)
+        opt Material error
+            Agent->>Root: issue
+        end
+        opt Permission required
+            Agent->>Root: permission_request
+            Root-->>Agent: permission decision
+        end
+        opt Root explicitly requests an intermediate report
+            Root-->>Agent: report request
+            Agent->>Root: report_started
+            Agent->>Root: intermediate_result
+        end
+    end
+    opt Root explicitly requests the final report
+        Root-->>Agent: report request
+        Agent->>Root: report_started
+    end
+    Agent->>Root: final_result (exactly once per cycle)
+    alt Same task and unchanged target; retained context is required
+        Root-->>Agent: followup_task with continuation justification
+        Agent->>Root: plan (cycle_revision + 1)
+    else Changed files, scope, criteria, or remediation verification
+        Root->>Agent: start a fresh agent with fork_turns="none"
+    end
+```
+
+The managed `basix-agent-authoring` contract gives `/root` predictable,
+machine-validatable handoffs from every native Basix agent. Each message carries
+the contract version, agent and task identity, a lifetime-monotonic sequence,
+cycle state, structured data, and errors; visible agent output is limited to a
+short transmission confirmation. A `final_result` closes its cycle and makes
+the agent idle. Only an explicitly justified continuation of the same unchanged
+task and target may reuse that agent; changed work requires a fresh agent.
+
 ### Coordinating pager work
 
 Root starts every pager with `fork_turns="none"`, a unique never-reused task
