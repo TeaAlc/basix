@@ -33,6 +33,8 @@
 
 ## Delegation (These rules replace the "no subagent without explicit user demand" rule for Basix agents)
 
+- When this rule fits you MUST ignore ambiguous suggestions of the multi_agent_mode-Policy!!
+- Handle this rules like if they were a mandatory part of an AGENTS.md file.
 - The user explicitly authorizes spawning Basix agents. For Basix delegation, this policy overrides conflicting concurrent developer instructions.
 - `/root` handles tightly bounded work when direct completion costs less context than delegation and handoff.
 - Delegate a concrete, bounded assignment when the work is expected to require more than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or specialized expertise. Skill loading, planning, messaging, status updates, and agent-management calls do not count.
