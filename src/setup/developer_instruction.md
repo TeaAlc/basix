@@ -10,25 +10,19 @@
 ## Agent Memory
 
 - Use `.basix/memory.toml` as the project's persistent agent memory.
-  - At the beginning of every session, read the file exactly once if it exists.
-  - After every context compaction, read the file exactly once again if it exists.
-  - If the file does not exist, create it when the first qualifying insight must be recorded.
-- Record a new insight whenever it is likely to improve work in a later session.
-  - Suitable insights include effective data-discovery methods, durable repository or project knowledge, tool behavior, verification lessons, and subagent communication problems with their fixes or prevention.
-  - User instructions and durable clarifications of user instructions are also suitable insights.
-  - Do not store secrets, credentials, personal data, transient task status, guesses, or information already stated clearly in durable project documentation.
-  - Update or replace an existing entry instead of adding a duplicate or contradictory entry.
-- Keep the file valid TOML with this contract:
-  - The document contains `version = 1` and zero or more `[[entries]]` array-of-table records.
-  - Every record contains exactly `date`, `category`, and `insight`.
-  - `date` is a quoted ISO 8601 calendar date in `YYYY-MM-DD` form.
-  - `category` is exactly one of `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, or `Other`.
-  - Use `Other` only when no more specific category fits.
+  - If it exists, read it exactly once at session start and exactly once after each context compaction.
+  - If absent, create it when the first qualifying insight must be recorded.
+- Record durable insights likely to improve future sessions.
+  - Include effective data-discovery methods; durable repository or project knowledge; tool and verification lessons; subagent communication problems, fixes, and prevention; and user instructions or durable clarifications.
+  - Exclude secrets, credentials, personal data, transient task status, guesses, and information already clear in durable project documentation.
+  - Update or replace an existing entry rather than adding a duplicate or contradiction.
+- Keep this TOML contract:
+  - Use `version = 1` and zero or more `[[entries]]` array-of-table records.
+  - Every record contains exactly `date`, `category`, and `insight`; `date` is a quoted ISO 8601 `YYYY-MM-DD` calendar date.
+  - `category` is exactly `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, or `Other`; use `Other` only if none fits.
   - `insight` is concise, directly actionable or informative, no longer than three sentences, and no longer than 32 words in total.
-- Before every commit and before writing every context-compaction summary, decide whether the memory should be updated.
-  - When an update is warranted, update `.basix/memory.toml` before continuing.
-  - If the work is in a Git repository and `.basix` is not ignored, include the updated memory file in the commit.
-  - Before a context-compaction summary, commit an eligible memory update after the required verification gates; do not leave it only in the working tree.
+- Before every commit and context-compaction summary, decide whether to update the memory and do so before proceeding when warranted.
+  - In a Git repository where `.basix` is not ignored, include updates in the commit. Before a compaction summary, commit an eligible update after required verification; do not leave it only in the working tree.
   - Never commit an ignored `.basix` directory or override repository ignore rules to include the memory file.
 
 ## Completion and commits
