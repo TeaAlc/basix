@@ -68,6 +68,24 @@ for phrase in (
     "Do not use gender-inclusive language",
     "available `basix` router skill",
     "Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it",
+    "## Agent Memory",
+    "Use `.basix/memory.toml` as the project's persistent agent memory",
+    "At the beginning of every session, read the file exactly once if it exists",
+    "After every context compaction, read the file exactly once again if it exists",
+    "create it when the first qualifying insight must be recorded",
+    "whenever it is likely to improve work in a later session",
+    "User instructions and durable clarifications of user instructions",
+    "Do not store secrets, credentials, personal data, transient task status, guesses",
+    "`version = 1` and zero or more `[[entries]]`",
+    "exactly `date`, `category`, and `insight`",
+    "quoted ISO 8601 calendar date in `YYYY-MM-DD` form",
+    "`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, or `Other`",
+    "no longer than three sentences",
+    "no longer than 32 words in total",
+    "Before every commit and before writing every context-compaction summary",
+    "If the work is in a Git repository and `.basix` is not ignored",
+    "Before a context-compaction summary, commit an eligible memory update after the required verification gates",
+    "Never commit an ignored `.basix` directory",
     "## Completion and commits",
     "wait for every running verification and test to complete successfully",
     "commit only the task's changes using a Conventional Commits message",
@@ -108,6 +126,19 @@ for phrase in (
     "basix_verifier",
 ):
     assert phrase in policy, phrase
+
+memory = tomllib.loads((root.parent / ".basix/memory.toml").read_text())
+assert set(memory) == {"version", "entries"} and memory["version"] == 1
+categories = {
+    "User Instruction", "Repository", "Data Discovery", "Tooling",
+    "Verification", "Agent Collaboration", "Workflow", "Other",
+}
+for entry in memory["entries"]:
+    assert set(entry) == {"date", "category", "insight"}
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry["date"])
+    assert entry["category"] in categories
+    assert len(re.findall(r"\b[\w.-]+\b", entry["insight"])) <= 32
+    assert len(re.findall(r"[.!?]+(?:\s|$)", entry["insight"])) <= 3
 for removed in (
     "Subagent confirmations",
     "task_profile",

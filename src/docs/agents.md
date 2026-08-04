@@ -10,6 +10,12 @@ clearly non-overlapping coordination and integration. User-facing text avoids
 gender-inclusive forms unless the user explicitly requests them. After Root's changes
 and all running verification and tests complete successfully, Root commits only the
 task's changes with a Conventional Commits message when working in a Git repository.
+The instructions also define `.basix/memory.toml` as optional persistent project
+memory. Root reads it once at session start and once after each context compaction,
+records only durable insights under the versioned entry contract, and checks it
+before commits and compaction summaries. Entries use an ISO date, one of the fixed
+English categories, and an insight limited to three sentences and 32 words. Updated
+memory is committed with task changes unless `.basix` is ignored.
 
 The native agents are discovered from every TOML under `src/agents/native/`:
 

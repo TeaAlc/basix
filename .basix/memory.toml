@@ -1,0 +1,6 @@
+version = 1
+
+[[entries]]
+date = "2026-08-04"
+category = "User Instruction"
+insight = "Persist durable project knowledge in .basix/memory.toml using dated, categorized entries, and review it at session, compaction, and commit boundaries."
