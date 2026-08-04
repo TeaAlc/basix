@@ -7,7 +7,9 @@ compact work directly and delegates concrete assignments expected to require mor
 than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or
 specialized expertise. Root does not duplicate delegated work, but may continue
 clearly non-overlapping coordination and integration. User-facing text avoids
-gender-inclusive forms unless the user explicitly requests them.
+gender-inclusive forms unless the user explicitly requests them. After Root's changes
+and all running verification and tests complete successfully, Root commits only the
+task's changes with a Conventional Commits message when working in a Git repository.
 
 The native agents are discovered from every TOML under `src/agents/native/`:
 

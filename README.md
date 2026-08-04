@@ -243,6 +243,8 @@ and persistent instructions are loaded. Basix then supplies:
 - cost-aware routing that keeps tightly bounded, compact work with Root and sends
   broad evidence ingestion, multi-step work, specialized work, or assignments
   expected to need more than two substantive domain-tool calls to a Basix agent;
+- automatic Conventional Commits for Root's task changes in Git repositories, but
+  only after every running verification and test completes successfully;
 - mandatory routing of extensive local evidence discovery to
   `basix_file_explorer`, preferably before discovery begins, while implementation
   and final code analysis remain with Root;
