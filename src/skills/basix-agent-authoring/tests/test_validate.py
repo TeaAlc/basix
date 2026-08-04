@@ -40,6 +40,9 @@ tools exposed through tool discovery. Do not infer that Scrapling is unavailable
 from MCP resources or resource templates. Scrapling access is explicitly authorized for read-only research.
 If unavailable, immediately report an `issue` with status `blocked` and finish with a
 `failed` final result.
+In both reports, tell `/root` to install Scrapling with
+the Basix installer `install-scrapling-codex.sh`. Also explain that Basix
+Scrapling requires Podman and routes all web requests through the Tor network.
 """
 
 

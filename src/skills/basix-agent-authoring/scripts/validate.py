@@ -296,6 +296,8 @@ def validate_agent(path: Path) -> None:
             "Do not infer that Scrapling is unavailable\nfrom MCP resources or resource templates",
             "Scrapling access is explicitly authorized for read-only research",
             "immediately report an `issue` with status `blocked` and finish with a\n`failed` final result",
+            "tell `/root` to install Scrapling with\nthe Basix installer `install-scrapling-codex.sh`",
+            "Basix\nScrapling requires Podman and routes all web requests through the Tor network",
         )
         for clause in researcher_clauses:
             need(clause in instructions, f"{path}: missing required Scrapling researcher policy")

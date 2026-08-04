@@ -34,6 +34,8 @@ The native read-only agents are:
   and scraping the researcher uses the read-only Scrapling MCP tools. It checks the complete tool
   inventory, including deferred tools, and reports itself blocked when a task requires Scrapling
   but no Scrapling tool is available; the main agent must not fall back to the generic web tool.
+  Its blocker reports direct Root to the Basix `install-scrapling-codex.sh` installer and explain
+  that Basix Scrapling requires Podman and routes all web requests through the Tor network.
 - `basix_file_explorer` uses `gpt-5.6-luna` with low reasoning for extensive local file
   discovery. It inventories all supported file types, verifies evidence with `rg` and targeted
   reads, and forbids Lumen, other MCP search tools, and web search. Persistent developer instructions
