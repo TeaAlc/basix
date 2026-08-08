@@ -30,3 +30,8 @@ date = "2026-08-08"
 category = "Subagent Insight"
 subagent_type = "basix_file_explorer"
 insight = "Contract compression and wording-dependent assertions must change atomically; validator, setup, smoke, documentation, and role defaults independently encode the effort taxonomy."
+
+[[entries]]
+date = "2026-08-08"
+category = "Verification"
+insight = "Basix skill descriptions containing the required prefix colon need YAML quotes; metadata checks must strip matching quotes before testing the Basix-Skill prefix."

@@ -1,0 +1,112 @@
+---
+name: review-session-experience
+description: "Basix-Skill: Write an evidence-based Markdown review of the current session. Use when the user requests session feedback, skill feedback, subagent feedback, token analysis, token-efficiency advice, or a review of the experience working with the available tools and agents."
+---
+
+# Review Session Experience
+
+Write a concise retrospective about the current conversation and its visible
+execution evidence. Follow the language used by the user in the session; localize
+headings, prose, satisfaction labels, and unavailable-value labels. Do not infer
+hidden activity, reconstruct unavailable telemetry, or claim exhaustive coverage.
+
+## Evidence rules
+
+- Review only completed or attempted work visible in the conversation, tool
+  results, or structured telemetry supplied to the session.
+- Treat a skill or subagent as used only when its use is explicitly visible. Do
+  not count a skill merely because it was available or mentioned.
+- Exclude `review-session-experience` itself from Skill feedback, including when
+  its loading or invocation is visible.
+- Identify a subagent by its visible task or agent name and its visible native
+  role. Do not invent either value.
+- Distinguish an explicit numeric zero from an unknown value everywhere.
+- Never estimate exact token values or cache metrics from prose, message length,
+  context size, tool output, elapsed time, or model behavior.
+
+## Satisfaction scale
+
+Choose one level for every evidenced skill and subagent. Translate the selected
+label into the session language while preserving its meaning.
+
+| Canonical level | Use when |
+| --- | --- |
+| `not at all satisfied` | It failed its purpose or caused serious harm, and produced no meaningful usable value. |
+| `dissatisfied` | Material shortcomings outweighed its usable contribution or required substantial recovery. |
+| `satisfied` | It met the core need, with ordinary limitations or some correctable friction. |
+| `very satisfied` | It met the need reliably and efficiently, with only minor limitations. |
+| `extremely satisfied` | It was exceptionally effective, materially improved the result, and showed no meaningful weakness in this session. |
+
+Do not default to the highest level. Tie the rating to one to three concrete,
+visible reasons.
+
+## Report format
+
+Return only a Markdown report with the following four top-level sections in this
+order. Translate their displayed headings into the session language while keeping
+the canonical meanings: **Task overview**, **Skill feedback**, **Subagent
+feedback**, and **Token usage**.
+
+### Task overview
+
+Briefly summarize the session's material tasks and outcomes. Separate completed,
+partial, and blocked outcomes when that distinction matters.
+
+### Skill feedback
+
+Cover every evidenced skill except this skill, once each. For every entry:
+
+1. Start with a localized sentence equivalent to: `With skill <name>, I was
+   <satisfaction>.`
+2. Give one to three evidence-based reasons.
+3. Emphasize exactly one most important strength or improvement, for example with
+   bold text.
+
+If no eligible skill is evidenced, state that no prior skill use is evidenced.
+Optionally add one separate skill idea only when it would clearly help similar
+future sessions. Keep the complete idea to at most 32 words; omit it otherwise.
+
+### Subagent feedback
+
+Cover every evidenced subagent once each. For every entry:
+
+1. Start with a localized sentence equivalent to: `With agent <name> (<agent
+   type>), I was <satisfaction>.`
+2. Give one to three evidence-based reasons.
+3. Emphasize exactly one most important strength or improvement.
+
+If no subagent is evidenced, state that no subagent use is evidenced. Optionally
+add one separate agent idea only when it would clearly help similar future
+sessions. Keep the complete idea to at most 32 words; omit it otherwise.
+
+### Token usage
+
+Create a table with rows for input tokens, reasoning tokens, output tokens, and
+cache hit rate. Use exact numbers only from structured telemetry supplied to the
+session. Render every absent or partial metric as a localized equivalent of `not
+available`; never render an absent metric as zero.
+
+Treat "thin tokens" as reasoning tokens only when that terminology is present in
+the supplied telemetry or request. If both are present, do not combine them unless
+the telemetry explicitly defines them as identical.
+
+When `cached_tokens` and `input_tokens` are both available and input tokens are
+greater than zero, derive the cache hit rate as
+`cached_tokens / input_tokens × 100`, round to one decimal place, and label the
+value as derived. When input tokens are exactly zero, report the rate as not
+available and explain that division by zero prevents derivation. Preserve an
+explicit zero for any other numeric metric.
+
+Describe the largest token drivers qualitatively and only from visible evidence
+unless step-level telemetry is supplied. Clearly label qualitative judgments as
+such; do not assign token counts or percentages to individual steps without
+structured step-level data.
+
+Then add a table with exactly five concrete saving opportunities. Give each row a
+unique rank from 1 through 5 and columns equivalent to **Cause**, **Action**, and
+**Expected effect**. Base each opportunity on visible session evidence and use
+qualitative effects unless telemetry supports exact values.
+
+Finish with one prioritized improvement recommendation identifying the single
+best next change for a similar session. Keep it evidence-based and do not repeat
+all five table rows.

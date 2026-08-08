@@ -41,7 +41,9 @@ for text in ('immutable', 'inconclusive', 'fork_turns="none"', 'spawning parent'
 for text in ('cycle_revision', 'followup_task', 'send exactly one `final_result`'):
     assert text not in verifier['developer_instructions'], text
 for path in (r/'skills').glob('*/SKILL.md'):
-    assert re.search(r'(?m)^description: Basix-Skill: ', path.read_text()), path
+    match = re.search(r'(?m)^description:\s*(.+)$', path.read_text())
+    description = match.group(1).strip().strip('"\'') if match else ''
+    assert description.startswith('Basix-Skill: '), path
     ui=path.parent/'agents/openai.yaml'
     if ui.exists(): assert re.search(r'(?m)^\s*short_description: "Basix-Skill: ', ui.read_text()), ui
 assert not (r/'agents/exec').exists()

@@ -18,11 +18,118 @@ assert skill_paths
 for path in skill_paths:
     text = path.read_text()
     match = re.search(r"(?m)^description:\s*(.+)$", text)
-    assert match and match.group(1).startswith("Basix-Skill: "), path
+    description = match.group(1).strip().strip('"\'') if match else ""
+    assert description.startswith("Basix-Skill: "), path
     ui = path.parent / "agents/openai.yaml"
     if ui.exists():
         match = re.search(r'(?m)^\s*short_description:\s*["\']?(Basix-Skill: .+?)["\']?\s*$', ui.read_text())
         assert match, ui
+review_path = root / "skills/review-session-experience"
+review = (review_path / "SKILL.md").read_text()
+review_flat = " ".join(review.split())
+review_ui = (review_path / "agents/openai.yaml").read_text()
+assert re.search(r'\A---\nname: review-session-experience\ndescription: ["\']Basix-Skill: ', review)
+assert 'allow_implicit_invocation: true' in review_ui
+assert 'display_name: "Review Session Experience"' in review_ui
+assert 'default_prompt: "Use $review-session-experience ' in review_ui
+for heading in ("Task overview", "Skill feedback", "Subagent feedback", "Token usage"):
+    assert heading in review_flat, heading
+for rating in (
+    "not at all satisfied", "dissatisfied", "satisfied", "very satisfied",
+    "extremely satisfied",
+):
+    assert f"`{rating}`" in review, rating
+for phrase in (
+    "one to three concrete", "at most 32 words", "Exclude `review-session-experience` itself",
+    "no prior skill use is evidenced", "no subagent use is evidenced",
+    "structured telemetry", "input tokens", "reasoning tokens", "output tokens",
+    "cached_tokens / input_tokens × 100", "round to one decimal place", "label the value as derived",
+    "input tokens are exactly zero", "division by zero", "qualitatively",
+    "exactly five concrete saving opportunities", "unique rank from 1 through 5",
+    "single best next change", "Follow the language used by the user",
+):
+    assert phrase in review_flat, phrase
+assert review.count("at most 32 words") == 2
+assert "Do not infer hidden activity" in review_flat and "Do not count a skill merely because it was available" in review_flat
+assert "Treat \"thin tokens\" as reasoning tokens" in review_flat
+
+# Exercise the report contract with deterministic, localized scenario fixtures.
+ratings = {
+    "en": {"satisfied", "very satisfied", "extremely satisfied", "dissatisfied", "not at all satisfied"},
+    "de": {"zufrieden", "sehr zufrieden", "überaus zufrieden", "nicht zufrieden", "gar nicht zufrieden"},
+}
+labels = {
+    "en": {"unavailable": "not available", "derived": "derived"},
+    "de": {"unavailable": "nicht verfügbar", "derived": "abgeleitet"},
+}
+
+def visible_skills(names):
+    return [name for name in names if name != "review-session-experience"]
+
+def token_values(telemetry, language):
+    unavailable = labels[language]["unavailable"]
+    values = {
+        "input": telemetry.get("input_tokens", unavailable),
+        "reasoning": telemetry.get("reasoning_tokens", unavailable),
+        "output": telemetry.get("output_tokens", unavailable),
+    }
+    cached = telemetry.get("cached_tokens")
+    input_tokens = telemetry.get("input_tokens")
+    if cached is None or input_tokens is None or input_tokens == 0:
+        values["cache"] = unavailable
+    else:
+        values["cache"] = f"{cached / input_tokens * 100:.1f}% ({labels[language]['derived']})"
+    return values
+
+def recommendation_allowed(words, clear_value):
+    return clear_value and len(words.split()) <= 32
+
+scenarios = {
+    "full_en": {
+        "language": "en", "skills": ["basix", "skill-creator"],
+        "agents": [("research_docs", "basix_researcher"), ("verify_result", "basix_verifier")],
+        "telemetry": {"input_tokens": 200, "reasoning_tokens": 0, "output_tokens": 80, "cached_tokens": 50},
+    },
+    "partial_de": {
+        "language": "de", "skills": ["basix"], "agents": [],
+        "telemetry": {"input_tokens": 100, "cached_tokens": 25},
+    },
+    "none_en": {"language": "en", "skills": [], "agents": [], "telemetry": {}},
+    "self_only_de": {
+        "language": "de", "skills": ["review-session-experience"], "agents": [], "telemetry": {},
+    },
+    "zero_input_en": {
+        "language": "en", "skills": [], "agents": [],
+        "telemetry": {"input_tokens": 0, "reasoning_tokens": 0, "output_tokens": 0, "cached_tokens": 0},
+    },
+}
+
+full = scenarios["full_en"]
+assert visible_skills(full["skills"]) == ["basix", "skill-creator"]
+assert full["agents"] == [("research_docs", "basix_researcher"), ("verify_result", "basix_verifier")]
+assert token_values(full["telemetry"], "en") == {
+    "input": 200, "reasoning": 0, "output": 80, "cache": "25.0% (derived)",
+}
+partial = token_values(scenarios["partial_de"]["telemetry"], "de")
+assert partial == {"input": 100, "reasoning": "nicht verfügbar", "output": "nicht verfügbar", "cache": "25.0% (abgeleitet)"}
+assert visible_skills(scenarios["none_en"]["skills"]) == [] and scenarios["none_en"]["agents"] == []
+assert visible_skills(scenarios["self_only_de"]["skills"]) == []
+assert token_values(scenarios["zero_input_en"]["telemetry"], "en") == {
+    "input": 0, "reasoning": 0, "output": 0, "cache": "not available",
+}
+assert ratings["en"] == {"satisfied", "very satisfied", "extremely satisfied", "dissatisfied", "not at all satisfied"}
+assert ratings["de"] == {"zufrieden", "sehr zufrieden", "überaus zufrieden", "nicht zufrieden", "gar nicht zufrieden"}
+assert recommendation_allowed("Add a focused telemetry collector for future session reviews.", True)
+assert not recommendation_allowed("Omit this idea because no additional skill would clearly improve the next comparable session.", False)
+assert not recommendation_allowed(" ".join(["word"] * 33), True)
+for language, headings in {
+    "en": ("Task overview", "Skill feedback", "Subagent feedback", "Token usage"),
+    "de": ("Aufgabenübersicht", "Skill-Feedback", "Subagenten-Feedback", "Token-Nutzung"),
+}.items():
+    fixture = "\n".join(f"# {heading}" for heading in headings)
+    assert [line.removeprefix("# ") for line in fixture.splitlines()] == list(headings), language
+savings_fixture = [(rank, "cause", "action", "effect") for rank in range(1, 6)]
+assert len(savings_fixture) == 5 and [row[0] for row in savings_fixture] == [1, 2, 3, 4, 5]
 router = (root / "skills/basix/SKILL.md").read_text()
 assert "Follow all active instructions inside the managed" in router
 assert "`basix:developer-instructions` block" in router
