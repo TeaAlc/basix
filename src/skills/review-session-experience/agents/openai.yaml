@@ -1,6 +1,0 @@
-interface:
-  display_name: "Review Session Experience"
-  short_description: "Basix-Skill: Review session tools and tokens"
-  default_prompt: "Use $review-session-experience to write an evidence-based review of this session."
-policy:
-  allow_implicit_invocation: true

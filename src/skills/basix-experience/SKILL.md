@@ -1,9 +1,9 @@
 ---
-name: review-session-experience
+name: basix-experience
 description: "Basix-Skill: Write an evidence-based Markdown review of the current session. Use when the user requests session feedback, skill feedback, subagent feedback, token analysis, token-efficiency advice, or a review of the experience working with the available tools and agents."
 ---
 
-# Review Session Experience
+# Basix Experience
 
 Write a concise retrospective about the current conversation and its visible
 execution evidence. Follow the language used by the user in the session; localize
@@ -16,7 +16,7 @@ hidden activity, reconstruct unavailable telemetry, or claim exhaustive coverage
   results, or structured telemetry supplied to the session.
 - Treat a skill or subagent as used only when its use is explicitly visible. Do
   not count a skill merely because it was available or mentioned.
-- Exclude `review-session-experience` itself from Skill feedback, including when
+- Exclude `basix-experience` itself from Skill feedback, including when
   its loading or invocation is visible.
 - Identify a subagent by its visible task or agent name and its visible native
   role. Do not invent either value.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Basix Experience"
+  short_description: "Basix-Skill: Review session tools and tokens"
+  default_prompt: "Use $basix-experience to write an evidence-based review of this session."
+policy:
+  allow_implicit_invocation: true

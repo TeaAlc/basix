@@ -24,14 +24,14 @@ for path in skill_paths:
     if ui.exists():
         match = re.search(r'(?m)^\s*short_description:\s*["\']?(Basix-Skill: .+?)["\']?\s*$', ui.read_text())
         assert match, ui
-review_path = root / "skills/review-session-experience"
+review_path = root / "skills/basix-experience"
 review = (review_path / "SKILL.md").read_text()
 review_flat = " ".join(review.split())
 review_ui = (review_path / "agents/openai.yaml").read_text()
-assert re.search(r'\A---\nname: review-session-experience\ndescription: ["\']Basix-Skill: ', review)
+assert re.search(r'\A---\nname: basix-experience\ndescription: ["\']Basix-Skill: ', review)
 assert 'allow_implicit_invocation: true' in review_ui
-assert 'display_name: "Review Session Experience"' in review_ui
-assert 'default_prompt: "Use $review-session-experience ' in review_ui
+assert 'display_name: "Basix Experience"' in review_ui
+assert 'default_prompt: "Use $basix-experience ' in review_ui
 for heading in ("Task overview", "Skill feedback", "Subagent feedback", "Token usage"):
     assert heading in review_flat, heading
 for rating in (
@@ -40,7 +40,7 @@ for rating in (
 ):
     assert f"`{rating}`" in review, rating
 for phrase in (
-    "one to three concrete", "at most 32 words", "Exclude `review-session-experience` itself",
+    "one to three concrete", "at most 32 words", "Exclude `basix-experience` itself",
     "no prior skill use is evidenced", "no subagent use is evidenced",
     "structured telemetry", "input tokens", "reasoning tokens", "output tokens",
     "cached_tokens / input_tokens × 100", "round to one decimal place", "label the value as derived",
@@ -64,7 +64,7 @@ labels = {
 }
 
 def visible_skills(names):
-    return [name for name in names if name != "review-session-experience"]
+    return [name for name in names if name != "basix-experience"]
 
 def token_values(telemetry, language):
     unavailable = labels[language]["unavailable"]
@@ -96,7 +96,7 @@ scenarios = {
     },
     "none_en": {"language": "en", "skills": [], "agents": [], "telemetry": {}},
     "self_only_de": {
-        "language": "de", "skills": ["review-session-experience"], "agents": [], "telemetry": {},
+        "language": "de", "skills": ["basix-experience"], "agents": [], "telemetry": {},
     },
     "zero_input_en": {
         "language": "en", "skills": [], "agents": [],
