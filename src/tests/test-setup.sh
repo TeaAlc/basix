@@ -28,13 +28,13 @@ assert market['plugins'][0]['source']['path']=='./'
 native=list((r/'agents/native').glob('*.toml')); assert native
 for path in native: assert tomllib.loads(path.read_text())['description'].startswith('Basix-Agent: ')
 pager=tomllib.loads((r/'agents/native/basix-pager.toml').read_text())
-assert pager['name']=='basix_pager' and pager['model']=='gpt-5.6-luna' and pager['model_reasoning_effort']=='max'
+assert pager['name']=='basix_pager' and pager['model']=='gpt-5.6-luna' and pager['model_reasoning_effort']=='xhigh'
 assert pager['sandbox_mode']=='workspace-write'
 for profile in ('ui_ux','frontend','backend_web','fullstack','integration'): assert f'`{profile}`' in pager['developer_instructions']
 assert 'fork_turns="none"' in pager['developer_instructions']
 assert '.basix/contracts/<chain-id>.md' in pager['developer_instructions']
 verifier=tomllib.loads((r/'agents/native/basix-verifier.toml').read_text())
-assert verifier['name']=='basix_verifier' and verifier['model']=='gpt-5.6-luna' and verifier['model_reasoning_effort']=='max'
+assert verifier['name']=='basix_verifier' and verifier['model']=='gpt-5.6-luna' and verifier['model_reasoning_effort']=='xhigh'
 assert verifier['sandbox_mode']=='read-only'
 for text in ('immutable', 'inconclusive', 'fork_turns="none"', 'spawning parent'):
     assert text in verifier['developer_instructions'], text
@@ -178,8 +178,9 @@ for name, phrases in description_requirements.items():
     for phrase in phrases:
         assert phrase in description.lower(), (name, phrase)
 classification = (root / 'skills/basix-agent-authoring/references/model-classification.md').read_text()
-for text in ('Highly complex reference roles', '| Highly complex | `gpt-5.6-luna`, `max` |',
-             'gpt-5.6-luna` with `max` reasoning', 'bug hunting plus bug fixing', 'coordinating subagents',
+for text in ('Highly complex reference roles', '| Highly complex | `gpt-5.6-luna`, `xhigh` |',
+             '| Exceptional | `gpt-5.6-luna`, `max` |',
+             'gpt-5.6-luna` with `xhigh` reasoning', 'bug hunting plus bug fixing', 'coordinating subagents',
              'workspace-write', 'explicit-sandbox-override', 'Every other native Basix', 'agent remains `read-only`',
              '`basix_verifier` performs difficult source-code'):
     assert text in classification, text
@@ -193,11 +194,13 @@ contract = (root / 'skills/basix/references/agent-communication-contract.md').re
 assert 'version=1.4' in contract and 'cycle_revision' in contract
 assert '`Report start delivered to parent.`' in contract
 assert 'communicates exclusively with its direct spawning parent' in contract
-assert 'Escalation is never automatic forwarding' in contract
-assert 'creates its own `issue` or `permission_request`' in contract
-assert 'automatically resume the interrupted task' in contract
+assert 'Escalation is a newly authored parent `issue` or `permission_request`' in contract
+assert '`cycle_revision + 1`' in contract
+assert 'afterward resume\nautomatically' in contract
 assert 'subagent_insights' in contract and 'at most 24 words' in contract
-assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', contract)
+assert re.search(r'first status 120 seconds after the plan, then every 120 seconds', contract)
+assert 'Plan delivered to parent.' in contract and 'Delivery failed: <short reason>.' in contract
+assert len(re.findall(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", contract)) <= 1050
 bootstrap_reference = (root / 'skills/basix-agent-authoring/references/native-agent-bootstrap.md').read_text()
 bootstrap_start = '<!-- basix-agent-authoring:bootstrap:start -->'
 bootstrap_end = '<!-- basix-agent-authoring:bootstrap:end -->'
@@ -344,7 +347,7 @@ for removed in ('task_profile', 'intermediate_result', 'followup_task',
                 'generic subagent', 'communicate directly with `/root`',
                 'relay child bootstrap failures'):
     assert removed not in policy, removed
-assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', (root / 'skills/basix/references/agent-communication-contract.md').read_text())
+assert re.search(r'first status 120 seconds after the plan, then every 120 seconds', (root / 'skills/basix/references/agent-communication-contract.md').read_text())
 PY
 then ok 'installed global policy keeps cost-aware delegation and compact lifecycle rules'; else not_ok 'installed global policy keeps cost-aware delegation and compact lifecycle rules'; fi
 before_config=$(sha256sum "$home/config.toml")
@@ -572,7 +575,7 @@ for profile in ('ui_ux', 'frontend', 'backend_web', 'fullstack', 'integration'):
     values = [item.decode() for item in (root / f'pager-{profile}.args').read_bytes().split(b'\0')[:-1]]
     for value in ('exec', '--ephemeral', '--ignore-user-config', '--ignore-rules',
                   '--skip-git-repo-check', '--sandbox', 'workspace-write', '--model',
-                  'gpt-5.6-luna', '-c', 'model_reasoning_effort="max"', '--json'):
+                  'gpt-5.6-luna', '-c', 'model_reasoning_effort="xhigh"', '--json'):
         assert value in values, (profile, value)
     assert any(item.startswith('developer_instructions=') for item in values)
     assert any(f'task_profile={profile}' in item for item in values)

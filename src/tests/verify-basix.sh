@@ -38,7 +38,7 @@ for path in sorted((root / "agents/native").glob("*.toml")):
 pager_path = root / "agents/native/basix-pager.toml"
 pager = tomllib.loads(pager_path.read_text())
 assert pager["name"] == "basix_pager"
-assert pager["model"] == "gpt-5.6-luna" and pager["model_reasoning_effort"] == "max"
+assert pager["model"] == "gpt-5.6-luna" and pager["model_reasoning_effort"] == "xhigh"
 assert pager["sandbox_mode"] == "workspace-write"
 assert "task_profile" in pager["developer_instructions"]
 for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
@@ -48,7 +48,7 @@ assert ".basix/contracts/<chain-id>.md" in pager["developer_instructions"]
 verifier_path = root / "agents/native/basix-verifier.toml"
 verifier = tomllib.loads(verifier_path.read_text())
 assert verifier["name"] == "basix_verifier"
-assert verifier["model"] == "gpt-5.6-luna" and verifier["model_reasoning_effort"] == "max"
+assert verifier["model"] == "gpt-5.6-luna" and verifier["model_reasoning_effort"] == "xhigh"
 assert verifier["sandbox_mode"] == "read-only"
 for phrase in ("immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent"):
     assert phrase in verifier["developer_instructions"], phrase
@@ -216,8 +216,9 @@ for name, phrases in description_requirements.items():
 classification = (root / "skills/basix-agent-authoring/references/model-classification.md").read_text()
 for phrase in (
     "Highly complex reference roles",
-    "| Highly complex | `gpt-5.6-luna`, `max` |",
-    "gpt-5.6-luna` with `max` reasoning",
+    "| Highly complex | `gpt-5.6-luna`, `xhigh` |",
+    "| Exceptional | `gpt-5.6-luna`, `max` |",
+    "gpt-5.6-luna` with `xhigh` reasoning",
     "bug hunting plus bug fixing",
     "coordinating subagents",
     "workspace-write",
@@ -225,7 +226,7 @@ for phrase in (
     "Every other native Basix",
     "agent remains `read-only`",
     "`basix_verifier` performs difficult source-code",
-    "max` reasoning",
+    "Choose `max` only for rare Exceptional assignments",
 ):
     assert phrase in classification, phrase
 
@@ -252,11 +253,13 @@ assert "version=1.4" in heartbeat
 assert "cycle_revision" in heartbeat
 assert "`Report start delivered to parent.`" in heartbeat
 assert "communicates exclusively with its direct spawning parent" in heartbeat
-assert "Escalation is never automatic forwarding" in heartbeat
-assert "creates its own `issue` or `permission_request`" in heartbeat
-assert "automatically resume the interrupted task" in heartbeat
+assert "Escalation is a newly authored parent `issue` or `permission_request`" in heartbeat
+assert "`cycle_revision + 1`" in heartbeat
+assert "afterward resume\nautomatically" in heartbeat
 assert "subagent_insights" in heartbeat and "at most 24 words" in heartbeat
-assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", heartbeat)
+assert re.search(r"first status 120 seconds after the plan, then every 120 seconds", heartbeat)
+assert "Plan delivered to parent." in heartbeat and "Delivery failed: <short reason>." in heartbeat
+assert len(re.findall(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", heartbeat)) <= 1050
 bootstrap_reference = (root / "skills/basix-agent-authoring/references/native-agent-bootstrap.md").read_text()
 bootstrap_start = "<!-- basix-agent-authoring:bootstrap:start -->"
 bootstrap_end = "<!-- basix-agent-authoring:bootstrap:end -->"

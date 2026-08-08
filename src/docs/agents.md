@@ -26,7 +26,7 @@ Updated memory is committed with task changes unless `.basix` is ignored.
 The native agents are discovered from every TOML under `src/agents/native/`:
 
 - `basix_pager` is a Highly complex reference role using `gpt-5.6-luna` with
-  `max` reasoning and is the sole native agent with `workspace-write`. It
+  `xhigh` reasoning and is the sole native agent with `workspace-write`. It
   is a fresh, single-assignment nontrivial web principal selected by its spawning parent with exactly one
   profile: `ui_ux`, `frontend`, `backend_web`, `fullstack`, or `integration`.
   the spawning parent owns the architecture, scope, acceptance gates, and any shared contract;
@@ -35,7 +35,7 @@ The native agents are discovered from every TOML under `src/agents/native/`:
 The native read-only agents are:
 
 - `basix_verifier` is a Highly complex reference role using `gpt-5.6-luna` with
-  `max` reasoning. It receives one immutable, bounded result in fresh context,
+  `xhigh` reasoning. It receives one immutable, bounded result in fresh context,
   fingerprints relevant state before and after inspection, and reports
   `pass`, `pass_with_findings`, `remediation_required`, or `inconclusive` without
   modifying the target. A continued cycle is allowed only for the same unchanged

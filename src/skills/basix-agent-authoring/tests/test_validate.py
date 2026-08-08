@@ -305,7 +305,7 @@ class AgentTests(unittest.TestCase):
         agent = tomllib.loads(PAGER_NATIVE.read_text())
         self.assertEqual(agent["name"], "basix_pager")
         self.assertEqual(agent["model"], "gpt-5.6-luna")
-        self.assertEqual(agent["model_reasoning_effort"], "max")
+        self.assertEqual(agent["model_reasoning_effort"], "xhigh")
         self.assertEqual(agent["sandbox_mode"], "workspace-write")
         instructions = agent["developer_instructions"]
         for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
@@ -320,7 +320,7 @@ class AgentTests(unittest.TestCase):
         agent = tomllib.loads(VERIFIER_NATIVE.read_text())
         self.assertEqual(agent["name"], "basix_verifier")
         self.assertEqual(agent["model"], "gpt-5.6-luna")
-        self.assertEqual(agent["model_reasoning_effort"], "max")
+        self.assertEqual(agent["model_reasoning_effort"], "xhigh")
         self.assertEqual(agent["sandbox_mode"], "read-only")
         instructions = agent["developer_instructions"]
         for phrase in ("immutable", "inconclusive", "remediation", "fork_turns=\"none\"",
@@ -401,10 +401,11 @@ class AgentTests(unittest.TestCase):
             with self.assertRaisesRegex(validator.Invalid, "full communication contract"):
                 validator.validate_agent(path)
 
-    def test_highly_complex_agent_uses_luna_max_without_override(self):
-        directory, path = self.write_agent(effort="max")
-        with directory:
-            validator.validate_agent(path)
+    def test_xhigh_and_exceptional_max_are_valid_without_override(self):
+        for effort in ("xhigh", "max"):
+            directory, path = self.write_agent(effort=effort)
+            with directory:
+                validator.validate_agent(path)
 
     def test_description_requires_prefix_at_start(self):
         for description in ("Test agent", "Test Basix-Agent: agent"):
@@ -447,43 +448,48 @@ class AgentTests(unittest.TestCase):
             with directory, self.assertRaisesRegex(validator.Invalid, "sandbox_mode|workspace-write"):
                 validator.validate_agent(path)
 
-    def test_pager_max_is_classified_and_workspace_write_needs_marker(self):
-        directory, path = self.write_agent(name="basix_pager", effort="max", sandbox="workspace-write")
+    def test_pager_xhigh_is_classified_and_workspace_write_needs_marker(self):
+        directory, path = self.write_agent(name="basix_pager", effort="xhigh", sandbox="workspace-write")
         with directory, self.assertRaisesRegex(validator.Invalid, "sandbox override"):
             validator.validate_agent(path)
 
         directory, path = self.write_agent(
-            name="basix_pager", effort="max", sandbox="workspace-write",
+            name="basix_pager", effort="xhigh", sandbox="workspace-write",
             sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
         )
         with directory:
             validator.validate_agent(path)
 
         directory, path = self.write_agent(
-            name="basix_pager", effort="max", marker=validator.OVERRIDE + "\n",
+            name="basix_pager", effort="xhigh", marker=validator.OVERRIDE + "\n",
             sandbox="workspace-write", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
         )
         with directory, self.assertRaisesRegex(validator.Invalid, "without an override"):
             validator.validate_agent(path)
 
-        directory, path = self.write_agent(
-            name="basix_pager", effort="high", sandbox="workspace-write",
-            sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
-        )
-        with directory, self.assertRaisesRegex(validator.Invalid, "max reasoning"):
-            validator.validate_agent(path)
+        for effort in ("high", "max"):
+            directory, path = self.write_agent(
+                name="basix_pager", effort=effort, sandbox="workspace-write",
+                sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+            )
+            with directory, self.assertRaisesRegex(validator.Invalid, "xhigh reasoning"):
+                validator.validate_agent(path)
 
-    def test_verifier_uses_classified_max_without_override_and_read_only(self):
-        directory, path = self.write_agent(name="basix_verifier", effort="max")
+    def test_verifier_uses_classified_xhigh_without_override_and_read_only(self):
+        directory, path = self.write_agent(name="basix_verifier", effort="xhigh")
         with directory:
             validator.validate_agent(path)
-        directory, path = self.write_agent(name="basix_verifier", effort="max", sandbox="workspace-write")
+        directory, path = self.write_agent(name="basix_verifier", effort="xhigh", sandbox="workspace-write")
         with directory, self.assertRaisesRegex(validator.Invalid, "reserved for basix_pager|read-only"):
             validator.validate_agent(path)
 
-        directory, path = self.write_agent(name="basix_verifier", effort="max", marker=validator.OVERRIDE + "\n")
+        directory, path = self.write_agent(name="basix_verifier", effort="xhigh", marker=validator.OVERRIDE + "\n")
         with directory, self.assertRaisesRegex(validator.Invalid, "without an override"):
             validator.validate_agent(path)
+        for effort in ("high", "max"):
+            directory, path = self.write_agent(name="basix_verifier", effort=effort)
+            with directory, self.assertRaisesRegex(validator.Invalid, "xhigh reasoning"):
+                validator.validate_agent(path)
 
     def test_sandbox_override_is_reserved_for_pager(self):
         directory, path = self.write_agent(

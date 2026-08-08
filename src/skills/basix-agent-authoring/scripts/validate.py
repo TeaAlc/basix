@@ -13,7 +13,7 @@ from typing import Any
 
 TYPES = {"plan", "status", "issue", "permission_request", "report_started", "intermediate_result", "final_result"}
 STATUSES = {"planned", "in_progress", "blocked", "completed", "completed_with_errors", "failed"}
-EFFORTS = {"low", "medium", "high", "max"}
+EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 OVERRIDE = "# basix-agent-authoring: explicit-model-override"
 SANDBOX_OVERRIDE = "# basix-agent-authoring: explicit-sandbox-override"
 BOOTSTRAP_START = "<!-- basix-agent-authoring:bootstrap:start -->"
@@ -264,7 +264,8 @@ def validate_agent(path: Path) -> None:
     override = index > 0 and lines[index - 1].strip() == OVERRIDE
     if not override:
         need(parsed["model"] == "gpt-5.6-luna", f"{path}: non-Luna model requires explicit override marker")
-        need(parsed["model_reasoning_effort"] in EFFORTS, f"{path}: effort must be low, medium, high, or max")
+        need(parsed["model_reasoning_effort"] in EFFORTS,
+             f"{path}: effort must be low, medium, high, xhigh, or max")
     sandbox_lines = [i for i, line in enumerate(lines) if re.match(r"^\s*sandbox_mode\s*=", line)]
     need(len(sandbox_lines) == 1, f"{path}: expected exactly one sandbox_mode field")
     sandbox_index = sandbox_lines[0]
@@ -291,13 +292,13 @@ def validate_agent(path: Path) -> None:
     if parsed["name"] == "basix_pager":
         need(not override and parsed["model"] == "gpt-5.6-luna",
              f"{path}: basix_pager must use classified gpt-5.6-luna without an override")
-        need(parsed["model_reasoning_effort"] == "max",
-             f"{path}: basix_pager must use max reasoning effort")
+        need(parsed["model_reasoning_effort"] == "xhigh",
+             f"{path}: basix_pager must use xhigh reasoning effort")
     if parsed["name"] == "basix_verifier":
         need(not override and parsed["model"] == "gpt-5.6-luna",
              f"{path}: basix_verifier must use classified gpt-5.6-luna without an override")
-        need(parsed["model_reasoning_effort"] == "max",
-             f"{path}: basix_verifier must use max reasoning effort")
+        need(parsed["model_reasoning_effort"] == "xhigh",
+             f"{path}: basix_verifier must use xhigh reasoning effort")
         need(parsed["sandbox_mode"] == "read-only",
              f"{path}: basix_verifier must remain read-only")
     instructions = parsed["developer_instructions"]

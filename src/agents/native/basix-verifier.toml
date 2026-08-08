@@ -2,7 +2,7 @@ name = "basix_verifier"
 description = "Basix-Agent: Read-only verifier for independent inspection of one frozen result; provide immutable targets, acceptance criteria, and permitted checks."
 
 model = "gpt-5.6-luna"
-model_reasoning_effort = "max"
+model_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 
 developer_instructions = """

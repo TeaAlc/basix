@@ -19,12 +19,12 @@ skill-local links and scripts. Do not orchestrate running agents.
 3. Preserve unrelated TOML fields. Insert or replace the marked bootstrap block in
    `developer_instructions`; never duplicate or embed the full contract. Every native agent TOML description
    must begin exactly with `Basix-Agent: `.
-4. Use `gpt-5.6-luna` with `low`, `medium`, `high`, or `max` according to the
+4. Use `gpt-5.6-luna` with `low`, `medium`, `high`, `xhigh`, or `max` according to the
    classification reference, unless the user explicitly overrides it. Put
    `# basix-agent-authoring: explicit-model-override` immediately before
-   `model =` only for an explicit override. `max` is the standard Luna level for
+   `model =` only for an explicit override. `xhigh` is the standard Luna level for
    the documented Highly complex class; `basix_pager` and `basix_verifier` are
-   canonical examples.
+   canonical examples. Reserve `max` for Exceptional work.
 5. Keep every native agent read-only. The canonical `basix_pager` is the sole
    exception: `workspace-write` requires
    `# basix-agent-authoring: explicit-sandbox-override` immediately before
