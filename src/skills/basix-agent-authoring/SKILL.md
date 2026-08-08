@@ -1,6 +1,6 @@
 ---
 name: basix-agent-authoring
-description: Basix-Skill: Use when planning, creating, validating, or updating native Basix agent TOMLs, including model classification and structured communication with /root.
+description: Basix-Skill: Use when planning, creating, validating, or updating native Basix agent TOMLs, including model classification and hierarchical communication with their spawning parent.
 ---
 
 # Basix Agent Authoring
@@ -53,7 +53,6 @@ Embed the short bootstrap in `developer_instructions` between these exact marker
 The block must require the complete router, active persistent developer instructions,
 and the router-owned contract to be read before planning, messages, tools, or domain
 work. It also defines once-per-context loading, continuation reloads only after an
-explicit change notice, and fail-closed behavior when either source is unreadable.
-Re-running authoring replaces this block idempotently. Contract 1.3 and its JSON
-Schema remain unchanged; the authoring skill owns the schema and validator but not a
-second runtime copy of the contract text.
+explicit parent change notice, and fail-closed behavior when either source is unreadable.
+Re-running authoring replaces this block idempotently. The authoring skill owns the
+schema and validator but not a second runtime copy of the contract text.

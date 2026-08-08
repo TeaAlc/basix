@@ -13,7 +13,7 @@ Before any plan, contract message, substantive tool call, or domain work:
 4. Only then begin planning, contract messages, tool use, or domain work.
 
 Read the router and its contract once per fresh agent context. During an explicitly
-authorized continuation, reread either only when `/root` explicitly says it changed.
+authorized continuation, reread either only when the spawning parent explicitly says it changed.
 If the router or contract cannot be read, do not perform domain work and do not
 invent a message format; report the bootstrap failure visibly to the spawning parent.
 <!-- basix-agent-authoring:bootstrap:end -->

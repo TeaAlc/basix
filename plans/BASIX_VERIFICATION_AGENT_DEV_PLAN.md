@@ -1,5 +1,8 @@
 # Basix Verification Agent
 
+> Historical design record. Communication recipients, message lifecycle, and
+> escalation details below are superseded by canonical Contract 1.4.
+
 ## Summary
 
 Create a native `basix_verifier` that independently verifies one bounded subagent result and reports defects, missing evidence, and concrete remediation guidance to `/root`.

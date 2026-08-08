@@ -1,5 +1,8 @@
 # Basix Verification Agent
 
+> Historical design record. Communication recipients, message lifecycle, and
+> escalation details below are superseded by canonical Contract 1.4.
+
 ## Objective
 
 Add a native `basix_verifier` agent that independently checks the result of one

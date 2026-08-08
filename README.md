@@ -39,8 +39,9 @@ unchanged.
 
 - Add a focused workflow under `src/skills/<name>/SKILL.md`; keep its supporting
   scripts and references inside that skill directory.
-- Change native agents only in `src/agents/native/`. The
-  `basix-agent-authoring` skill owns their communication contract and validator.
+- Change native agents only in `src/agents/native/`. The `basix` router owns the
+  runtime communication contract; `basix-agent-authoring` owns the native
+  bootstrap, JSON Schema, and validator tooling.
 - Put only genuinely shared launchers in `src/scripts/`.
 - Keep installers idempotent, preserve user-modified files, and support
   non-mutating `--dry-run` behavior where exposed.
@@ -268,75 +269,30 @@ and persistent instructions are loaded. Basix then supplies:
 ```mermaid
 sequenceDiagram
     participant Root as /root
-    participant Native as Native agent
-    participant Generic as Generic agent
-    participant Child as Nested specialized agent
+    participant Parent as Native parent
+    participant Child as Native child
 
-    Root->>Native: fresh spawn, fork_turns="none"
-    Native->>Native: TOML bootstrap: read router, persistent instructions, contract
-    Root->>Generic: fresh spawn with exact router-read sentence
-    Generic->>Generic: read router and referenced contract
-    Native->>Child: permitted fresh specialized spawn
+    Root->>Parent: fresh spawn, fork_turns="none"
+    Parent->>Parent: read router, persistent instructions, contract
+    Parent->>Child: permitted fresh spawn, fork_turns="none"
     Child->>Child: read router and referenced contract
-    Note over Native,Child: Bootstrap completes before plans, tools, or domain work
-    Note over Root,Child: Contract 1.3 · JSON-only via send_message<br/>globally increasing sequence · positive cycle_revision
-    Native->>Root: plan (before substantive tool use)
-    loop While work in the current cycle continues
-        Native->>Root: status (after 120 s, then every 120 s)
-        opt Material error
-            Native->>Root: issue
-        end
-        opt Permission required
-            Native->>Root: permission_request
-            Root-->>Native: permission decision
-        end
-        opt Root explicitly requests an intermediate report
-            Root-->>Native: report request
-            Native->>Root: report_started
-            Native->>Root: intermediate_result
-        end
-    end
-    opt Root explicitly requests the final report
-        Root-->>Native: report request
-        Native->>Root: report_started
-    end
-    Native->>Root: final_result (exactly once; optional subagent_insights)
-    opt final_result proposes subagent insights
-        Root->>Root: review each proposal for strong evidence and future usefulness
-        alt proposal accepted
-            Root->>Root: persist separate Subagent Insight entry with subagent_type
-        else proposal rejected
-            Root->>Root: do not persist it
-        end
-    end
-    alt Same task and unchanged target; retained context is required
-        Root-->>Native: followup_task with continuation justification
-        Native->>Root: plan (cycle_revision + 1; reread only if changed)
-    else Changed files, scope, criteria, or remediation verification
-        Root->>Native: start a fresh agent with fork_turns="none"
-    end
-    alt Router or contract unreadable
-        Child->>Root: bootstrap failure (parent relays when needed)
-        Root->>Root: tell user which fresh agent gets inline contract and why
-        Root->>Native: fresh task name with exact canonical contract inline
-    else Root cannot reliably read canonical contract
-        Root->>Root: delegation remains blocked
+    Note over Root,Child: Contract 1.4 · each child communicates only with its direct parent
+    Child->>Parent: plan, status, result, issue, or permission request
+    alt Parent resolves or instructs
+        Parent-->>Child: followup_task
+    else Parent must escalate
+        Parent->>Root: new parent-authored issue or permission request
     end
 ```
 
-The router-owned Contract 1.3 gives `/root` predictable,
-machine-validatable handoffs from every native Basix agent. Each message carries
-the contract version, agent and task identity, a lifetime-monotonic sequence,
-cycle state, structured data, and errors; visible agent output is limited to a
-short transmission confirmation. A `final_result` closes its cycle and makes
-the agent idle. Its data may propose independently discretionary, strongly evidenced
-`subagent_insights` of at most 24 words each. Root reviews each proposal and may
-rewrite and retain useful ones as separate memory entries of at most 32 words,
-recording the exact delegated role as `subagent_type`. Only an explicitly justified
-continuation of the same unchanged task and target may reuse that agent; changed
-work requires a fresh agent. Native TOMLs contain only a validated bootstrap;
-generic assignments carry an exact router-read sentence, and nested specialized
-agents bootstrap independently before communicating directly with Root.
+The router-owned Contract 1.4 is the sole source for message envelopes, cycles,
+status cadence, issues, permissions, reports, continuations, waiting, and visible
+confirmations. Every child sends only to its direct spawning parent. That parent
+resolves the report, instructs the child, or authors a new escalation in its own
+task cycle to its own parent; child messages are never forwarded automatically.
+Developer instructions and the router define only role selection, fresh spawning,
+assignment boundaries, and mandatory contract loading. Native TOMLs contain only
+the validated bootstrap plus role-specific behavior.
 
 ### Coordinating pager work
 
@@ -346,28 +302,23 @@ verification commands. The full assignment also states user impact,
 authoritative requirements, allowed ownership extensions, non-goals, known
 worktree changes, required skills, allowed delegations, and any contract
 revision. A pager reports scope or ownership changes before editing shared
-files and finishes its own review/fix loop before sending one terminal
-`final_result`.
+files and follows the communication contract for review, fixes, and terminal results.
 
 For dependent frontend/backend chains, Root owns the target project's
 `.basix/contracts/<chain-id>.md`; pagers update only their assigned sections,
 ledger entries, and proposals. Use sequential fresh pagers by default. Safe
 parallel work requires a frozen interface, disjoint ownership, separate
 contract sections, no shared generated outputs, and a planned Root integration
-step. Root may explicitly authorize an `intermediate_result` review handoff and
-send an assignment-specific fix; after `final_result`, that pager identity and
-task name are terminal and never reused.
+step. Review handoffs, fixes, terminal results, and continuations follow Contract 1.4.
 
 ### Coordinating verification
 
 Start `basix_verifier` with `fork_turns="none"`, a unique task name, a complete
 assignment, and a mutation-free verification window. Include the original
 requirements, worker report, owned targets, known pre-existing changes, allowed
-checks, and constraints. A verifier sends one plan and one final result per
-`cycle_revision`; Root may continue the same context only for additional checks of
-the same unchanged result when retained context is materially necessary and the
-`followup_task` records that justification. Target drift, remediation validation,
-changed acceptance criteria, or a new result always gets a fresh verifier.
+checks, and constraints. Contract 1.4 governs its messages and continuation cycle;
+target drift, remediation validation, changed acceptance criteria, or a new result
+always gets a fresh verifier.
 
 Invoke the relevant skill or agent naturally in Codex, or mention Basix when the
 task concerns maintaining its installable standards and structure.

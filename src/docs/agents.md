@@ -6,8 +6,8 @@ Basix skill or Basix agent. Instructions are reread only when changed or explici
 requested. Root completes tightly bounded,
 compact work directly and delegates concrete assignments expected to require more
 than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or
-specialized expertise. Root does not duplicate delegated work, but may continue
-clearly non-overlapping coordination and integration. User-facing text avoids
+specialized expertise. Communication and parent coordination follow the contract.
+User-facing text avoids
 gender-inclusive forms unless the user explicitly requests them. After Root's changes
 and all running verification and tests complete successfully, Root commits only the
 task's changes with a Conventional Commits message when working in a Git repository.
@@ -27,9 +27,9 @@ The native agents are discovered from every TOML under `src/agents/native/`:
 
 - `basix_pager` is a Highly complex reference role using `gpt-5.6-luna` with
   `max` reasoning and is the sole native agent with `workspace-write`. It
-  is a fresh, single-assignment nontrivial web principal selected by Root with exactly one
+  is a fresh, single-assignment nontrivial web principal selected by its spawning parent with exactly one
   profile: `ui_ux`, `frontend`, `backend_web`, `fullstack`, or `integration`.
-  Root owns the architecture, scope, acceptance gates, and any shared contract;
+  the spawning parent owns the architecture, scope, acceptance gates, and any shared contract;
   the pager owns only its assigned files and may not expand its profile.
 
 The native read-only agents are:
@@ -39,7 +39,7 @@ The native read-only agents are:
   fingerprints relevant state before and after inspection, and reports
   `pass`, `pass_with_findings`, `remediation_required`, or `inconclusive` without
   modifying the target. A continued cycle is allowed only for the same unchanged
-  result when Root documents why retained context is materially required; changed
+  result when the spawning parent documents why retained context is materially required; changed
   files, criteria, scope, or remediation always require a fresh verifier.
 - `basix_researcher` uses `gpt-5.6-luna` with medium reasoning for general research. Persistent
   developer instructions require the main agent to delegate all external research, website
@@ -48,7 +48,7 @@ The native read-only agents are:
   and scraping the researcher uses the read-only Scrapling MCP tools. It checks the complete tool
   inventory, including deferred tools, and reports itself blocked when a task requires Scrapling
   but no Scrapling tool is available; the main agent must not fall back to the generic web tool.
-  Its blocker reports direct Root to the Basix `install-scrapling-codex.sh` installer and explain
+  Its blocker tells the spawning parent to use the Basix `install-scrapling-codex.sh` installer and explains
   that Basix Scrapling requires Podman and routes all web requests through the Tor network.
 - `basix_file_explorer` uses `gpt-5.6-luna` with low reasoning for extensive local file
   discovery. It inventories all supported file types, verifies evidence with `rg` and targeted
@@ -59,10 +59,8 @@ The native read-only agents are:
 
 Every native TOML contains one exact managed bootstrap rather than the complete
 contract. It loads the router, persistent developer instructions, and the router-owned
-Contract 1.3 before any plan, contract message, tool call, or domain work. Router and
-contract are read once in fresh context and during continuation only after Root
-explicitly reports a change. An unreadable source fails closed without an invented
-message format, and the spawning parent relays a nested bootstrap failure to Root.
+Contract 1.4 before any plan, contract message, tool call, or domain work. An
+unreadable source fails closed without an invented message format.
 
 Technical content and handoff payloads use English, while visible chat confirmations and errors use the
 current conversation's language. Global setup exposes the complete native-agent
@@ -71,38 +69,26 @@ payload at `$CODEX_HOME/basix/agents/`; project setup exposes it at
 managed absolute `[agents.<name>].config_file` entry. Basix never writes its
 TOMLs into the shared global or project `agents/` directories.
 
-Contract 1.3 retains `report_started` for reports requested by Root. A requested
-intermediate or explicit final report is announced first with its exact report
-type; status, issue, and permission messages may still occur while it is being
-prepared. An intermediate result resumes interrupted work automatically at the
-next safe transition unless Root directs otherwise. Autonomous final results need
-no announcement, and every final result remains terminal. A final result may also
-propose `data.subagent_insights`: independently discretionary, strongly evidenced,
-future-useful strings of at most 24 words each. The field is invalid on other message
-types. Root evaluates proposals independently; agents do not write memory directly.
+Contract 1.4 is the sole source for runtime communication. Every native child sends
+only to its direct spawning parent. The parent decides whether to resolve, instruct
+the child, or author a new escalation to its own parent; it never forwards a child
+message automatically. The contract also owns cycles, plans, status cadence, issues,
+permissions, reports, continuations, waiting, visible confirmations, and terminality.
 
-## Generic and nested agent bootstrap
+## Native child spawning
 
-Only Root starts generic subagents. Their fresh, self-contained assignment must
-contain the router's exact mandatory sentence requiring the complete router and its
-referenced contract before any tool call or domain work; inherited context is never
-accepted as a substitute. Native agents may start only the specialized children their
-role definition permits. Every direct and nested spawn uses `fork_turns="none"`, loads
-the sources independently, and communicates directly with Root.
-
-When an agent cannot read either source, only Root may make one fail-safe retry with a
-fresh task name and the exact canonical contract inline. Root first tells the user
-which agent receives the inline contract and why. If Root cannot reliably read the
-canonical contract, delegation remains blocked.
+Native agents may start only the specialized children their role definition permits.
+Every direct and nested spawn uses `fork_turns="none"`, a fresh unique task name, a
+self-contained assignment, and its own router-and-contract bootstrap.
 
 ## Verification assignment and lifecycle
 
-Root starts every verifier with `fork_turns="none"` and a unique name such as
+The spawning parent starts every verifier with `fork_turns="none"` and a unique name such as
 `verify_<result-kind>_<target>_<date>_<run>`. The assignment must include the
 verification ID, original assignment and user outcome, authoritative requirements,
 worker report or exact result location, owned targets, allowed and forbidden side
 effects, known pre-existing changes, required checks, applicable instructions or
-contracts, report strictness, and constraints that may block a check. Root freezes
+contracts, report strictness, and constraints that may block a check. The parent freezes
 workspace mutation for the verification window; unrelated read-only agents may run,
 but no concurrent writer may alter the target.
 
@@ -112,7 +98,7 @@ must not be attributed without evidence. A final report contains scoped checks,
 evidence-backed findings, unverified checks, worker-claim mismatches, concrete
 actions, and whether fresh re-verification is required.
 
-Use this complete Root start-assignment shape (fill every field before spawning):
+Use this complete verifier start-assignment shape (fill every field before spawning):
 
 ```text
 verification_id: verify_<result-kind>_<target>_<date>_<run>
@@ -136,21 +122,16 @@ required_checks:
 applicable_instructions: <repository rules, skills, contracts, or design docs>
 report_strictness: normal | safety-critical
 constraints: <missing tools, permissions, network, or generated-file limits>
-mutation_window: Root freezes concurrent workspace writers
+mutation_window: spawning parent freezes concurrent workspace writers
 ```
 
-Each cycle starts with a plan and ends with exactly one `final_result`. After that
-result the verifier is idle. Root may reactivate the same verifier only when retained
-context is materially necessary for additional examination of the same unchanged
-result; the `followup_task` must state the continuation reason, retained-context
-justification, unchanged objective/target confirmation, and requested work. A new
-cycle increments `cycle_revision` and starts with a new plan. Remediation checks,
-target drift, changed acceptance criteria, expanded scope, or a new result require a
-new fresh-context verifier rather than continuation.
+Contract 1.4 governs verifier cycles and continuations. Remediation checks, target
+drift, changed acceptance criteria, expanded scope, or a new result require a new
+fresh-context verifier rather than continuation.
 
 ## Pager selection and start assignment
 
-Root selects one profile per pager:
+The spawning parent selects one profile per pager:
 
 | Profile | Use when |
 | --- | --- |
@@ -169,8 +150,8 @@ The recommended name shape is `pager_<profile>_<target>_<date>_<run>`.
 
 The pager routes current or external facts to a fresh `basix_researcher` and
 extensive local discovery to a fresh `basix_file_explorer`; child names are
-unique, bounded, and read-only. Root relays complete child results back before
-the pager relies on them. The pager must report an ownership extension before
+unique, bounded, and read-only. The pager receives their messages directly and
+decides whether to resolve, instruct, or escalate. It must request an ownership extension before
 editing shared files and may not broaden its profile or assignment.
 
 ## Manual pager smoke scenarios
@@ -188,14 +169,10 @@ for profile in ui_ux frontend backend_web fullstack integration; do
 done
 ```
 
-Expected observations are a profile-scoped plan, repository evidence before
-edits, applicable quality gates, a `report_started` announcement followed by the
-explicitly authorized single `intermediate_result` review handoff, automatic
-resumption at the next safe transition, any Root-directed fix loop, and exactly
-one terminal `final_result` with no later message. The launcher and automated
-tests verify configuration and argument routing only: real 120-second
-heartbeat cadence, live web/Scrapling capability, and end-to-end review/fix
-behavior are manual checks and are intentionally not automated.
+Expected observations are a profile-scoped plan, repository evidence before edits,
+applicable quality gates, and Contract 1.4-compliant communication with the direct
+parent. The launcher and automated tests verify configuration and argument routing
+only; live web/Scrapling capability and end-to-end review behavior are manual checks.
 
 ## Interface contracts and execution chains
 
@@ -211,27 +188,14 @@ finishes with a fresh integration pager. Parallel work is safe only when the
 interface is frozen, ownership is disjoint, contract sections are separate,
 shared generated outputs are untouched, and Root has planned integration.
 
-Before finalization, Root explicitly authorizes an `intermediate_result` review
-handoff. The pager announces it with `report_started`, delivers it, and resumes
-remaining planned work at the next safe transition unless Root directs otherwise;
-the handoff alone does not imply acceptance. Root may send an assignment-specific
-`followup_task` for fixes; the
-pager reopens a plan item with a new revision, reruns relevant gates, and stays
-within the same ownership. After Root sends `finalize`, the pager sends exactly
-one complete `final_result` and no later messages. The identity and task name
-are terminal and cannot be reused; new work gets a new fresh pager.
+Review, fixes, finalization, and terminal behavior follow Contract 1.4. The pager
+stays within assigned ownership, and new work gets a fresh pager.
 
-## Root wait coordination
+## Parent coordination
 
-The Basix skill requires every root `wait_agent` call—initial, repeated, or mailbox-wide—to use
-exactly `timeout_ms: 120000` while at least one Basix subagent is active. This rule takes
-precedence over generic shorter-wait guidance and matches the agents' contractual 120-second
-status heartbeat. Only an explicit user instruction in the current conversation may authorize
-another timeout; repository instructions do not override system or genuine platform rules.
-Prefer useful independent work to passive waiting; incoming `send_message` messages need no
-preceding wait, and `list_agents` polling or artificial sleep must not substitute for the wait
-or heartbeat. Role-specific native-agent behavior remains unchanged outside the
-managed communication block.
+Contract 1.4 defines wait timing, status cadence, escalation, result handling, and
+continuations for every parent-child level. Role-specific native-agent behavior
+remains outside the managed communication block.
 
 For isolated explorer benchmarks, run:
 

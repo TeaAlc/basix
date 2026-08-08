@@ -9,3 +9,18 @@ insight = "Persist durable project knowledge in .basix/memory.toml using dated, 
 date = "2026-08-04"
 category = "User Instruction"
 insight = "Allow strongly evidenced subagent insights to be proposed in final results, reviewed by Root, and selectively retained with the originating subagent type."
+
+[[entries]]
+date = "2026-08-08"
+category = "User Instruction"
+insight = "Native Basix agents communicate only with their direct spawning parent; parents independently resolve, instruct, or escalate new messages upward, never automatically forwarding child reports."
+
+[[entries]]
+date = "2026-08-08"
+category = "Tooling"
+insight = "Multi-file apply_patch calls can leave earlier hunks applied when a later file fails verification; use smaller patches and inspect affected files after failures."
+
+[[entries]]
+date = "2026-08-08"
+category = "User Instruction"
+insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."

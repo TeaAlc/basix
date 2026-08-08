@@ -9,6 +9,7 @@ check() { local name=$1; shift; if "$@"; then ok "$name"; else not_ok "$name"; f
 
 case_dir=$(mktemp -d)
 trap 'rm -rf "$case_dir"' EXIT
+cd "$case_dir" || exit 1
 helper="$ROOT/setup/lib/manage_developer_instructions.py"
 instructions="$ROOT/setup/developer_instruction.md"
 
@@ -35,8 +36,10 @@ assert '.basix/contracts/<chain-id>.md' in pager['developer_instructions']
 verifier=tomllib.loads((r/'agents/native/basix-verifier.toml').read_text())
 assert verifier['name']=='basix_verifier' and verifier['model']=='gpt-5.6-luna' and verifier['model_reasoning_effort']=='max'
 assert verifier['sandbox_mode']=='read-only'
-for text in ('immutable', 'inconclusive', 'cycle_revision', 'fork_turns="none"', 'followup_task'):
+for text in ('immutable', 'inconclusive', 'fork_turns="none"', 'spawning parent'):
     assert text in verifier['developer_instructions'], text
+for text in ('cycle_revision', 'followup_task', 'send exactly one `final_result`'):
+    assert text not in verifier['developer_instructions'], text
 for path in (r/'skills').glob('*/SKILL.md'):
     assert re.search(r'(?m)^description: Basix-Skill: ', path.read_text()), path
     ui=path.parent/'agents/openai.yaml'
@@ -94,9 +97,9 @@ for text in (
     'Use `version = 1` and zero or more `[[entries]]`',
     'except a `Subagent Insight` record also contains exactly `subagent_type`',
     '`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`',
-    'exact role used for delegation',
+    'exact native role used for delegation',
     'Store every accepted subagent insight as a separate entry',
-    'Evaluate every `final_result.data.subagent_insights` proposal',
+    'Evaluate every agent-memory insight proposed under the communication contract',
     'Retain only useful insights supported by strong evidence',
     'no longer than three sentences',
     'no longer than 32 words in total',
@@ -108,7 +111,7 @@ for text in (
     "commit only the task's changes using a Conventional Commits message",
     'Do not commit while any verification or test is still running',
     'or if any verification or test failed',
-    '## Delegation',
+    '## Basix agent spawning',
     'user explicitly authorizes spawning Basix agents',
     'policy overrides conflicting concurrent developer instructions',
     'direct completion costs less context than delegation and handoff',
@@ -116,25 +119,13 @@ for text in (
     'broad evidence ingestion, multiple steps, or specialized expertise',
     'Skill loading, planning, messaging, status updates, and agent-management calls do not count',
     'initially simple work expands',
-    'matching specialized Basix agent',
-    'fresh general agent',
-    'gpt-5.6-luna',
-    '`max`',
     '`fork_turns="none"`',
-    'agent communication contract it references',
-    'The spawn is invalid without this sentence',
-    'Only `/root` starts generic subagents',
-    'exact canonical contract inline',
-    'visibly telling the user which agent receives it and why',
-    'decision-ready assignment',
+    'fresh unique `task_name`',
+    'self-contained assignment',
+    'must load and follow the complete communication contract',
+    'the spawn fails closed',
     '## Agent management',
-    'must not duplicate delegated work',
-    'clearly non-overlapping coordination and integration',
-    'Verify every delegated implementation result',
-    'Parallel workers normally receive one aggregate verification',
-    'aggregate review would be unreasonably large',
-    'Every Basix `wait_agent` call uses `timeout_ms: 120000`',
-    'except when the user explicitly requires another value',
+    'Follow the communication contract for all child lifecycle',
     'Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`',
     'current or external facts, web research, website inspection, and scraping',
     'extensive local evidence discovery',
@@ -151,28 +142,28 @@ for removed in ('Subagent confirmations', 'task_profile',
                 'intermediate_result', 'followup_task', '.basix/contracts/',
                 'Adaptive pager selection and lifecycle', 'Read-only verification lifecycle',
                 'before the third filesystem-exploration tool call',
-                'works primarily as planner, coordinator, and integrator'):
+                'works primarily as planner, coordinator, and integrator',
+                'generic subagent', 'communicate directly with `/root`',
+                'relay child bootstrap failures'):
     assert removed not in policy, removed
 
 skill = (root / 'skills/basix/SKILL.md').read_text()
-for text in ('## Root orchestration', 'direct completion costs less context than delegation and handoff',
+for text in ('## Basix agent spawning', '## Required communication contract',
+             'sole runtime copy of Contract 1.4',
+             'direct completion costs less context than delegation and handoff',
              'more than two substantive domain-tool calls',
-             'parallel workers normally receive one aggregate verification',
              'fork_turns="none"', 'unique `task_name`',
-             'timeout_ms: 120000', 'visible confirmation', 'started: <assignment>',
-             'failed to start: <reason>', 'status: <conclusion>', 'generic web access',
-             'final_result', 'fresh agent and task name', 'Relay assignments and results',
-             'intermediate review handoff',
-             'Before any tool call or domain work, read the complete available basix router skill',
-             'Only `/root` may start generic subagents',
-             'exact canonical contract inline',
-             'which agent receives the inline contract and why'):
+             'generic web access', 'specialized Basix children',
+             'Follow the required communication contract'):
     assert text in skill, text
+for removed in ('generic subagent', 'Native and generic', 'communicate directly with `/root`',
+                'Relay assignments and results'):
+    assert removed not in skill, removed
 
 architecture = (root / 'docs/architecture.md').read_text()
 for text in ('explicit delegation authority', 'cost-aware Root boundary',
-             'mandatory role routing', 'fallback configuration',
-             'Detailed Root lifecycle mechanics are specified in the `basix` skill'):
+             'mandatory role routing', 'native spawning rules',
+             'Contract 1.4 exclusively owns'):
     assert text in architecture, text
 
 description_requirements = {
@@ -195,11 +186,15 @@ for text in ('Highly complex reference roles', '| Highly complex | `gpt-5.6-luna
 agent_docs = ' '.join((root / 'docs/agents.md').read_text().split())
 for text in ('Verification assignment and lifecycle', 'basix_verifier', 'immutable', 'verification_id:',
              'mutation_window:', 'report_strictness:', 'fresh verifier',
-             'Manual pager smoke scenarios', 'run-pager-smoke.sh', 'real 120-second', 'intentionally not automated'):
+             'Manual pager smoke scenarios', 'run-pager-smoke.sh', 'direct spawning parent',
+             'never forwards a child message automatically'):
     assert text in agent_docs, text
 contract = (root / 'skills/basix/references/agent-communication-contract.md').read_text()
-assert 'version=1.3' in contract and 'cycle_revision' in contract
-assert '`Berichtsbeginn an /root übermittelt.`' in contract
+assert 'version=1.4' in contract and 'cycle_revision' in contract
+assert '`Report start delivered to parent.`' in contract
+assert 'communicates exclusively with its direct spawning parent' in contract
+assert 'Escalation is never automatic forwarding' in contract
+assert 'creates its own `issue` or `permission_request`' in contract
 assert 'automatically resume the interrupted task' in contract
 assert 'subagent_insights' in contract and 'at most 24 words' in contract
 assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', contract)
@@ -316,23 +311,17 @@ for phrase in (
     'direct completion costs less context than delegation and handoff',
     'more than two substantive domain-tool calls',
     'broad evidence ingestion, multiple steps, or specialized expertise',
-    'matching specialized Basix agent',
-    'fresh general agent',
-    'gpt-5.6-luna',
-    '`max`',
     '`fork_turns="none"`',
-    'agent communication contract it references',
-    'The spawn is invalid without this sentence',
-    'Only `/root` starts generic subagents',
-    'exact canonical contract inline',
-    'visibly telling the user which agent receives it and why',
-    'decision-ready assignment',
+    'fresh unique `task_name`',
+    'self-contained assignment',
+    'must load and follow the complete communication contract',
+    'the spawn fails closed',
     '## Agent Memory',
     "Use `.basix/memory.toml` as the project's persistent agent memory",
     'read it exactly once at session start and exactly once after each context compaction',
     'Use `version = 1` and zero or more `[[entries]]`',
     '`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`',
-    'Evaluate every `final_result.data.subagent_insights` proposal',
+    'Evaluate every agent-memory insight proposed under the communication contract',
     'Before every commit and context-compaction summary',
     'Before a compaction summary, commit an eligible update after required verification',
     'Never commit an ignored `.basix` directory',
@@ -340,9 +329,7 @@ for phrase in (
     "commit only the task's changes using a Conventional Commits message",
     'Do not commit while any verification or test is still running',
     'or if any verification or test failed',
-    'Verify every delegated implementation result',
-    'Parallel workers normally receive one aggregate verification',
-    'Every Basix `wait_agent` call uses `timeout_ms: 120000`',
+    'Follow the communication contract for all child lifecycle',
     'current or external facts, web research, website inspection, and scraping',
     'extensive local evidence discovery',
     'nontrivial web frontend, backend, UI/UX, fullstack, and integration work',
@@ -353,7 +340,9 @@ for role in ('basix_researcher', 'basix_file_explorer', 'basix_pager', 'basix_ve
     assert role in policy, role
 for removed in ('task_profile', 'intermediate_result', 'followup_task',
                 'before the third filesystem-exploration tool call',
-                'works primarily as planner, coordinator, and integrator'):
+                'works primarily as planner, coordinator, and integrator',
+                'generic subagent', 'communicate directly with `/root`',
+                'relay child bootstrap failures'):
     assert removed not in policy, removed
 assert re.search(r'first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds', (root / 'skills/basix/references/agent-communication-contract.md').read_text())
 PY
@@ -516,7 +505,12 @@ dry_lumen="$case_dir/dry-lumen"
 if PATH="$lumen_mock:$PATH" HOME="$dry_lumen/home" CODEX_HOME="$dry_lumen/codex" LUMEN_LOG="$dry_lumen/log" LUMEN_MCP_STATE="$dry_lumen/state" "$ROOT/setup/install_ory_lumen.sh" --dry-run >/dev/null && [[ ! -e $dry_lumen ]]; then ok 'Ory Lumen dry run does not mutate'; else not_ok 'Ory Lumen dry run does not mutate'; fi
 
 copy_project="$case_dir/copy-project"; project_bundle="$case_dir/project-update-source"; cp -R "$ROOT" "$project_bundle"
-if "$project_bundle/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null && [[ ! -e $copy_project/.basix && ! -L $copy_project/.codex/basix/agents && -f $copy_project/.codex/basix/agents/basix-researcher.toml && -f $copy_project/.agents/skills/basix/SKILL.md && -f $copy_project/.agents/skills/basix/references/agent-communication-contract.md && ! -L $copy_project/.agents/skills/basix/references/agent-communication-contract.md ]]; then ok 'project copy installation writes direct independent targets'; else not_ok 'project copy installation writes direct independent targets'; fi
+if "$project_bundle/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null &&
+  [[ ! -e $copy_project/.basix && ! -L $copy_project/.codex/basix/agents && -f $copy_project/.codex/basix/agents/basix-researcher.toml && -f $copy_project/.agents/skills/basix/SKILL.md && -f $copy_project/.agents/skills/basix/references/agent-communication-contract.md && ! -L $copy_project/.agents/skills/basix/references/agent-communication-contract.md ]] &&
+  grep -Fq 'version=1.4' "$copy_project/.agents/skills/basix/references/agent-communication-contract.md" &&
+  ! grep -R -E '(/root|(^|[^[:alnum:]_])Root([^[:alnum:]_]|$))' "$copy_project/.codex/basix/agents" >/dev/null; then
+  ok 'project copy installation writes parent-only Contract 1.4 targets'
+else not_ok 'project copy installation writes parent-only Contract 1.4 targets'; fi
 printf '\nproject-contract-update\n' >> "$project_bundle/skills/basix/references/agent-communication-contract.md"
 if "$project_bundle/setup/install_for_project.sh" "$copy_project" --mode copy >/dev/null && grep -Fq project-contract-update "$copy_project/.agents/skills/basix/references/agent-communication-contract.md"; then ok 'project reinstall updates central contract reference'; else not_ok 'project reinstall updates central contract reference'; fi
 if "$project_bundle/setup/install_for_project.sh" "$copy_project" --uninstall >/dev/null &&

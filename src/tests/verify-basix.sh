@@ -27,6 +27,11 @@ router = (root / "skills/basix/SKILL.md").read_text()
 assert "Follow all active instructions inside the managed" in router
 assert "`basix:developer-instructions` block" in router
 assert "does not replace or override them" in router
+assert "exclude repository-local `.codex/` and" in router
+assert "`.agents/` runtime configuration from agent discovery" in router
+assert "Agents must not modify either directory directly" in router
+assert "Basix installers may write there" in router
+assert "installer tests use isolated temporary targets" in router
 for path in sorted((root / "agents/native").glob("*.toml")):
     agent = tomllib.loads(path.read_text())
     assert agent["description"].startswith("Basix-Agent: "), path
@@ -45,8 +50,10 @@ verifier = tomllib.loads(verifier_path.read_text())
 assert verifier["name"] == "basix_verifier"
 assert verifier["model"] == "gpt-5.6-luna" and verifier["model_reasoning_effort"] == "max"
 assert verifier["sandbox_mode"] == "read-only"
-for phrase in ("immutable", "inconclusive", "cycle_revision", "fork_turns=\"none\"", "followup_task"):
+for phrase in ("immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent"):
     assert phrase in verifier["developer_instructions"], phrase
+for phrase in ("cycle_revision", "followup_task", "send exactly one `final_result`"):
+    assert phrase not in verifier["developer_instructions"], phrase
 assert not (root / "agents/exec").exists()
 PY
 VALIDATOR="$ROOT/skills/basix-agent-authoring/scripts/validate.py"
@@ -84,9 +91,9 @@ for phrase in (
     "except a `Subagent Insight` record also contains exactly `subagent_type`",
     "quoted ISO 8601 `YYYY-MM-DD` calendar date",
     "`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`",
-    "exact role used for delegation",
+    "exact native role used for delegation",
     "Store every accepted subagent insight as a separate entry",
-    "Evaluate every `final_result.data.subagent_insights` proposal",
+    "Evaluate every agent-memory insight proposed under the communication contract",
     "Retain only useful insights supported by strong evidence",
     "no longer than three sentences",
     "no longer than 32 words in total",
@@ -99,7 +106,7 @@ for phrase in (
     "commit only the task's changes using a Conventional Commits message",
     "Do not commit while any verification or test is still running",
     "or if any verification or test failed",
-    "## Delegation",
+    "## Basix agent spawning",
     "user explicitly authorizes spawning Basix agents",
     "policy overrides conflicting concurrent developer instructions",
     "direct completion costs less context than delegation and handoff",
@@ -108,25 +115,13 @@ for phrase in (
     "Skill loading, planning, messaging, status updates, and agent-management calls do not count",
     "initially simple work expands",
     "remaining bounded assignment",
-    "matching specialized Basix agent",
-    "fresh general agent",
-    "gpt-5.6-luna",
-    "`max`",
     "`fork_turns=\"none\"`",
-    "agent communication contract it references",
-    "The spawn is invalid without this sentence",
-    "Only `/root` starts generic subagents",
-    "exact canonical contract inline",
-    "visibly telling the user which agent receives it and why",
-    "decision-ready assignment",
+    "fresh unique `task_name`",
+    "self-contained assignment",
+    "must load and follow the complete communication contract",
+    "the spawn fails closed",
     "## Agent management",
-    "must not duplicate delegated work",
-    "clearly non-overlapping coordination and integration",
-    "Verify every delegated implementation result",
-    "Parallel workers normally receive one aggregate verification",
-    "aggregate review would be unreasonably large",
-    "Every Basix `wait_agent` call uses `timeout_ms: 120000`",
-    "except when the user explicitly requires another value",
+    "Follow the communication contract for all child lifecycle",
     "current or external facts, web research, website inspection, and scraping",
     "extensive local evidence discovery",
     "preferably before discovery begins",
@@ -159,7 +154,7 @@ for entry in memory["entries"]:
     validate_memory_entry(entry)
 validate_memory_entry({"date": "2026-01-01", "category": "Repository", "insight": "Legacy entry."})
 validate_memory_entry({
-    "date": "2026-01-01", "category": "Subagent Insight", "subagent_type": "default",
+    "date": "2026-01-01", "category": "Subagent Insight", "subagent_type": "basix_file_explorer",
     "insight": "Strongly evidenced reusable lesson.",
 })
 for removed in (
@@ -172,41 +167,36 @@ for removed in (
     "Read-only verification lifecycle",
     "before the third filesystem-exploration tool call",
     "works primarily as planner, coordinator, and integrator",
+    "generic subagent",
+    "communicate directly with `/root`",
+    "relay child bootstrap failures",
 ):
     assert removed not in policy, removed
 
 skill = (root / "skills/basix/SKILL.md").read_text()
 for phrase in (
-    "## Root orchestration",
+    "## Basix agent spawning",
+    "## Required communication contract",
+    "sole runtime copy of Contract 1.4",
     "direct completion costs less context than delegation and handoff",
     "more than two substantive domain-tool calls",
-    "parallel workers normally receive one aggregate verification",
     'fork_turns="none"',
     "unique `task_name`",
-    "timeout_ms: 120000",
-    "visible confirmation",
-    "started: <assignment>",
-    "failed to start: <reason>",
-    "status: <conclusion>",
     "generic web access",
-    "final_result",
-    "fresh agent and task name",
-    "Relay assignments and results",
-    "intermediate review handoff",
-    "Before any tool call or domain work, read the complete available basix router skill",
-    "Only `/root` may start generic subagents",
-    "exact canonical contract inline",
-    "which agent receives the inline contract and why",
+    "specialized Basix children",
+    "Follow the required communication contract",
 ):
     assert phrase in skill, phrase
+for removed in ("generic subagent", "Native and generic", "communicate directly with `/root`", "Relay assignments and results"):
+    assert removed not in skill, removed
 
 architecture = (root / "docs/architecture.md").read_text()
 for phrase in (
     "explicit delegation authority",
     "cost-aware Root boundary",
     "mandatory role routing",
-    "fallback configuration",
-    "Detailed Root lifecycle mechanics are specified in the `basix` skill",
+    "native spawning rules",
+    "Contract 1.4 exclusively owns",
 ):
     assert phrase in architecture, phrase
 
@@ -251,19 +241,19 @@ for phrase in (
     "Manual pager smoke scenarios",
     "run-pager-smoke.sh",
     "for profile in ui_ux frontend backend_web fullstack integration",
-    "real 120-second",
-    "intentionally not automated",
-    "single `intermediate_result` review handoff",
-    "Contract 1.3 retains `report_started`",
-    "subagent_insights",
-    "automatic resumption at the next safe transition",
+    "direct spawning parent",
+    "never forwards a child message automatically",
+    "Contract 1.4 is the sole source for runtime communication",
 ):
     assert phrase in agent_docs, phrase
 
 heartbeat = (root / "skills/basix/references/agent-communication-contract.md").read_text()
-assert "version=1.3" in heartbeat
+assert "version=1.4" in heartbeat
 assert "cycle_revision" in heartbeat
-assert "`Berichtsbeginn an /root übermittelt.`" in heartbeat
+assert "`Report start delivered to parent.`" in heartbeat
+assert "communicates exclusively with its direct spawning parent" in heartbeat
+assert "Escalation is never automatic forwarding" in heartbeat
+assert "creates its own `issue` or `permission_request`" in heartbeat
 assert "automatically resume the interrupted task" in heartbeat
 assert "subagent_insights" in heartbeat and "at most 24 words" in heartbeat
 assert re.search(r"first `status` 120 seconds after the plan and subsequent statuses every\s+120 seconds", heartbeat)
@@ -287,9 +277,12 @@ printf 'Static Basix verification passed.\n'
 if command -v codex >/dev/null; then
   temp=$(mktemp -d)
   trap 'rm -rf "$temp"' EXIT
-  mkdir -p "$temp/codex-home"
-  CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" --install-lumen no >/dev/null
-  CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null
+  mkdir -p "$temp/codex-home" "$temp/work"
+  (
+    cd "$temp/work"
+    CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" --install-lumen no >/dev/null
+    CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null
+  )
   printf 'Real Codex plugin compatibility passed (no model run).\n'
 else
   printf 'SKIP: codex CLI not installed\n'

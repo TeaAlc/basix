@@ -23,7 +23,7 @@ SPEC.loader.exec_module(validator)
 
 def plan(sequence=1, revision=1, checklist=None, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.3", "message_type": "plan", "agent_name": agent,
+        "contract_version": "1.4", "message_type": "plan", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "planned",
         "summary": "Inspect and report.",
         "data": {"plan_revision": revision, "checklist": checklist or [
@@ -39,17 +39,16 @@ RESEARCHER_PREAMBLE = """For web research, expect and use the Scrapling
 MCP server (spelled `scrapling`) when it is needed. Before work, inspect the complete available tool inventory, including deferred
 tools exposed through tool discovery. Do not infer that Scrapling is unavailable
 from MCP resources or resource templates. Scrapling access is explicitly authorized for read-only research.
-If unavailable, immediately report an `issue` with status `blocked` and finish with a
-`failed` final result.
-In both reports, tell `/root` to install Scrapling with
-the Basix installer `install-scrapling-codex.sh`. Also explain that Basix
+If unavailable, treat the assignment as blocked and unsuccessful under the communication
+contract. Tell the spawning parent to install Scrapling with the Basix installer
+`install-scrapling-codex.sh`. Also explain that Basix
 Scrapling requires Podman and routes all web requests through the Tor network.
 """
 
 
 def final(sequence=2, status="completed", errors=None, data=UNSET, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.3", "message_type": "final_result", "agent_name": agent,
+        "contract_version": "1.4", "message_type": "final_result", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": status,
         "summary": "Work finished.", "data": {} if data is UNSET else data,
         "errors": [] if errors is None else errors,
@@ -58,7 +57,7 @@ def final(sequence=2, status="completed", errors=None, data=UNSET, cycle=1, agen
 
 def report_started(sequence, report_type, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.3", "message_type": "report_started", "agent_name": agent,
+        "contract_version": "1.4", "message_type": "report_started", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "in_progress",
         "summary": "Preparing requested report.", "data": {"report_type": report_type}, "errors": [],
     }
@@ -145,7 +144,7 @@ class MessageTests(unittest.TestCase):
             "evidence": ["verified"],
             "subagent_insights": [
                 "Repository contract blocks must remain byte-for-byte synchronized.",
-                "Root should independently verify every delegated implementation result.",
+                "Parents should independently verify every delegated implementation result.",
             ],
         }))
 
@@ -311,8 +310,10 @@ class AgentTests(unittest.TestCase):
         instructions = agent["developer_instructions"]
         for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
             self.assertIn(f"`{profile}`", instructions)
-        for phrase in ("fork_turns=\"none\"", ".basix/contracts/<chain-id>.md", "intermediate_result", "final_result"):
+        for phrase in ("fork_turns=\"none\"", ".basix/contracts/<chain-id>.md", "spawning parent", "Contract 1.4"):
             self.assertIn(phrase, instructions)
+        for phrase in ("intermediate_result", "final_result", "send `/root`"):
+            self.assertNotIn(phrase, instructions)
 
     def test_canonical_verifier_definition(self):
         validator.validate_agent(VERIFIER_NATIVE)
@@ -323,8 +324,23 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(agent["sandbox_mode"], "read-only")
         instructions = agent["developer_instructions"]
         for phrase in ("immutable", "inconclusive", "remediation", "fork_turns=\"none\"",
-                       "Fingerprint", "followup_task", "cycle_revision"):
+                       "Fingerprint", "spawning parent"):
             self.assertIn(phrase, instructions)
+        for phrase in ("followup_task", "cycle_revision", "send one concise `final_result`"):
+            self.assertNotIn(phrase, instructions)
+
+    def test_all_native_roles_forbid_direct_root_recipient(self):
+        repository = Path(__file__).resolve().parents[4]
+        for path in sorted((repository / "src/agents/native").glob("*.toml")):
+            agent = tomllib.loads(path.read_text())
+            combined = agent["description"] + "\n" + agent["developer_instructions"]
+            self.assertNotIn("/root", combined, path)
+            self.assertIsNone(re.search(r"\bRoot\b", agent["developer_instructions"]), path)
+
+    def test_rejects_direct_root_recipient_in_any_native_role(self):
+        directory, path = self.write_agent(preamble="Send every result directly to /root.")
+        with directory, self.assertRaisesRegex(validator.Invalid, "spawning parent"):
+            validator.validate_agent(path)
 
     def write_agent(self, model="gpt-5.6-luna", effort="medium", marker="", block=True,
                     description="Basix-Agent: Test agent", name="agent", sandbox="read-only",
@@ -543,12 +559,12 @@ class RepositoryPolicyTests(unittest.TestCase):
         contract = (repository / "src/skills/basix/references/agent-communication-contract.md").read_text()
         versions = re.findall(r"(?i)\bcontract(?:\s+version)?\s+(\d+\.\d+)\b", contract)
         self.assertTrue(versions)
-        self.assertEqual(set(versions), {"1.3"})
+        self.assertEqual(set(versions), {"1.4"})
 
-    def test_schema_uses_contract_1_3_and_models_subagent_insights(self):
+    def test_schema_uses_contract_1_4_and_models_subagent_insights(self):
         schema = json.loads((ROOT / "references" / "message.schema.json").read_text())
-        self.assertTrue(schema["$id"].endswith("agent-message-1.3.json"))
-        self.assertEqual(schema["properties"]["contract_version"]["const"], "1.3")
+        self.assertTrue(schema["$id"].endswith("agent-message-1.4.json"))
+        self.assertEqual(schema["properties"]["contract_version"]["const"], "1.4")
         insights = schema["$defs"]["final_data"]["then"]["properties"]["subagent_insights"]
         self.assertEqual(insights["type"], "array")
         self.assertEqual(insights["minItems"], 1)

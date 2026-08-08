@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://basix.local/schemas/agent-message-1.3.json",
+  "$id": "https://basix.local/schemas/agent-message-1.4.json",
   "title": "Basix agent communication message",
   "type": "object",
   "additionalProperties": false,
   "required": ["contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"],
   "properties": {
-    "contract_version": {"const": "1.3"},
+    "contract_version": {"const": "1.4"},
     "message_type": {"enum": ["plan", "status", "issue", "permission_request", "report_started", "intermediate_result", "final_result"]},
     "agent_name": {"type": "string", "minLength": 1},
     "task_name": {"type": "string", "minLength": 1},

@@ -18,7 +18,7 @@ OVERRIDE = "# basix-agent-authoring: explicit-model-override"
 SANDBOX_OVERRIDE = "# basix-agent-authoring: explicit-sandbox-override"
 BOOTSTRAP_START = "<!-- basix-agent-authoring:bootstrap:start -->"
 BOOTSTRAP_END = "<!-- basix-agent-authoring:bootstrap:end -->"
-CONTRACT_START = "<!-- basix-agent-authoring:contract:start version=1.3 -->"
+CONTRACT_START = "<!-- basix-agent-authoring:contract:start version=1.4 -->"
 CONTRACT_END = "<!-- basix-agent-authoring:contract:end -->"
 WORD_RE = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", re.UNICODE)
 
@@ -74,7 +74,7 @@ def validate_plan_data(value: Any) -> dict[str, Any]:
 def validate_message(value: Any) -> dict[str, Any]:
     required = {"contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"}
     msg = object_exact(value, required)
-    need(msg["contract_version"] == "1.3", "contract_version must be 1.3")
+    need(msg["contract_version"] == "1.4", "contract_version must be 1.4")
     kind = msg["message_type"]
     need(kind in TYPES, "invalid message_type")
     for key in ("agent_name", "task_name", "summary"):
@@ -307,8 +307,8 @@ def validate_agent(path: Path) -> None:
             "inspect the complete available tool inventory, including deferred\ntools exposed through tool discovery",
             "Do not infer that Scrapling is unavailable\nfrom MCP resources or resource templates",
             "Scrapling access is explicitly authorized for read-only research",
-            "immediately report an `issue` with status `blocked` and finish with a\n`failed` final result",
-            "tell `/root` to install Scrapling with\nthe Basix installer `install-scrapling-codex.sh`",
+            "treat the assignment as blocked and unsuccessful under the communication\ncontract",
+            "Tell the spawning parent to install Scrapling with the Basix installer",
             "Basix\nScrapling requires Podman and routes all web requests through the Tor network",
         )
         for clause in researcher_clauses:
@@ -319,6 +319,10 @@ def validate_agent(path: Path) -> None:
          f"{path}: bootstrap markers are reversed")
     need(CONTRACT_START not in instructions and CONTRACT_END not in instructions,
          f"{path}: full communication contract copies are forbidden")
+    need("/root" not in parsed["description"] and "/root" not in instructions,
+         f"{path}: native roles must address only their spawning parent, never /root")
+    need(not re.search(r"\bRoot\b", instructions),
+         f"{path}: native role instructions must use spawning-parent terminology, not Root")
     block = instructions[
         instructions.index(BOOTSTRAP_START):instructions.index(BOOTSTRAP_END) + len(BOOTSTRAP_END)
     ]
