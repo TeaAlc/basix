@@ -29,7 +29,7 @@ The source of truth for agent behavior is `src/agents/native/`; setup scripts on
 bind those definitions into supported Codex locations. Persistent shared
 instructions come from `src/setup/developer_instruction.md`. Installer state is
 used to ensure that uninstall operations preserve foreign or locally modified
-files. Copy-mode state inventories every installed file, so uninstall can remove
+  files. Copy state inventories every installed file, so uninstall can remove
 unchanged Basix files from a mixed tree without deleting changed files, foreign
 siblings, symlinks, special files, or nonempty parent directories. Configuration
 markers define the Basix-owned spans; content outside them remains byte-for-byte
@@ -87,26 +87,17 @@ plugin compatibility checks where the required programs are available.
 - Linux or another environment capable of running the Bash installers
 - Python 3.11 or newer
 - A current Codex CLI
-- Git when the optional Ory Lumen integration must be installed
+- Git when installing the optional Ory Lumen integration separately
 - Podman or Docker only when installing the optional Tor-only Scrapling MCP
 
-Run all commands below from a Basix repository checkout. Unless `--mode link` or
-`--mode copy` is supplied, an interactive installer asks for the mode. Global
-installs and ordinary project targets default dynamically to `link`; a project
-target that is the canonical parent of this checkout's runtime `src/` defaults
-to `copy` for self-hosting. Interactive and noninteractive invocations use the
-same computed default. Link mode links each complete skill directory and the
-private native-agent directory directly to `src/`; copy mode writes independent
-complete trees. Native agents are registered with managed `[agents.<name>]`
+Run all commands below from a Basix repository checkout. Both installers always
+copy complete skill trees and the complete private native-agent directory. They
+never create symlinks. Native agents are registered with managed `[agents.<name>]`
 `config_file` entries instead of being written into shared agent directories.
-In global plugin mode, skill payload links/copies follow the selected mode while
-generated metadata remains copied.
-On reinstall, recorded links and copies converge back to the current
-`src` payload even when locally changed or redirected; obsolete managed agent
-and skill files are removed. Exact current-manifest file targets also converge
-when their prior state is absent; only unrecorded foreign directories or
-parents, out-of-manifest targets, and physical aliases recorded as `same` remain
-protected. Uninstall is intentionally more conservative: it removes only state-
+In global plugin mode, generated metadata is copied as well. On reinstall,
+recorded copies synchronize with `src`; obsolete unchanged managed files are
+removed. Foreign directories, directory symlinks, and physical source aliases
+are rejected before mutation. Uninstall is intentionally conservative: it removes only state-
 and hash-confirmed Basix content, including unchanged files inside otherwise
 mixed copy trees, and keeps locally modified or foreign targets.
 
@@ -132,12 +123,6 @@ Common variants:
 # Preview without changing files or Codex configuration
 ./src/setup/install_as_plugin.sh --dry-run
 
-# Install independent copies instead of links
-./src/setup/install_as_plugin.sh --mode copy
-
-# Do not install Ory Lumen automatically
-./src/setup/install_as_plugin.sh --install-lumen no
-
 # Remove installer-managed Basix state, preserving local changes
 ./src/setup/install_as_plugin.sh --uninstall
 ```
@@ -152,7 +137,7 @@ cd /path/to/project
 /path/to/basix/src/setup/install_for_project.sh
 ```
 
-The installer installs complete skill directory links or copies under
+The installer copies complete skill directories under
 `.agents/skills/`, stores native agents privately under `.codex/basix/agents/`,
 and registers them with managed `[agents.<name>].config_file` entries in
 `.codex/config.toml`. It never writes Basix TOMLs into the shared
@@ -166,16 +151,6 @@ Useful variants:
 # Preview changes to the current project
 /path/to/basix/src/setup/install_for_project.sh --dry-run
 
-# Store independent copies in the project target paths
-/path/to/basix/src/setup/install_for_project.sh --mode copy
-
-# Install Lumen if needed and index the current project non-interactively
-/path/to/basix/src/setup/install_for_project.sh --lumen-index yes
-
-# Skip both automatic Lumen installation and indexing
-/path/to/basix/src/setup/install_for_project.sh \
-  --install-lumen no --lumen-index no
-
 # Remove installer-managed project files, preserving local changes
 /path/to/basix/src/setup/install_for_project.sh --uninstall
 
@@ -183,25 +158,20 @@ Useful variants:
 ./src/setup/install_for_project.sh /path/to/project
 ```
 
-Known current-manifest targets converge without `--force`; foreign parents,
-directories, and canonical sources remain protected. See the full [installation reference](src/docs/installation.md)
-for upgrade, state-preservation, and Lumen indexing details.
+Foreign parents, directories, symlinks, and canonical sources remain protected.
+See the full [installation reference](src/docs/installation.md).
 
 ### Optional: Ory Lumen semantic search
 
-Both primary installers install Ory Lumen by default when no enabled `lumen` MCP
-registration exists. Lumen is installed globally under `$CODEX_HOME/lumen`, so a
-Basix uninstall deliberately leaves it in place for other projects.
-
-It can also be installed directly:
+The Basix installers never install or invoke Lumen. Install it explicitly when
+semantic search is wanted:
 
 ```bash
 ./src/setup/install_ory_lumen.sh
 ```
 
-After installation, project setup can run or offer the equivalent of
-`lumen index .`. The configured embedding backend and model—normally provided by
-Ollama—must be available for indexing and semantic search.
+Run indexing separately afterward. The configured embedding backend and
+model—normally provided by Ollama—must be available.
 
 ### Optional: Tor-only Scrapling MCP
 

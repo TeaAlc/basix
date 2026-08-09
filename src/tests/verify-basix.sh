@@ -390,7 +390,7 @@ if command -v codex >/dev/null; then
   mkdir -p "$temp/codex-home" "$temp/work"
   (
     cd "$temp/work"
-    CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" --install-lumen no >/dev/null
+    CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" >/dev/null
     CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null
   )
   printf 'Real Codex plugin compatibility passed (no model run).\n'

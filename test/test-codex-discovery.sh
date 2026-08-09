@@ -17,8 +17,7 @@ last="$case_dir/last.json"
 mkdir -p "$project"
 git -C "$project" init -q
 
-"$ROOT/src/setup/install_for_project.sh" "$project" \
-  --mode link --install-lumen no --lumen-index no >/dev/null
+"$ROOT/src/setup/install_for_project.sh" "$project" >/dev/null
 
 cat >"$schema" <<'JSON'
 {

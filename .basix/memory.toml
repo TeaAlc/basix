@@ -35,3 +35,8 @@ insight = "Contract compression and wording-dependent assertions must change ato
 date = "2026-08-08"
 category = "Verification"
 insight = "Basix skill descriptions containing the required prefix colon need YAML quotes; metadata checks must strip matching quotes before testing the Basix-Skill prefix."
+
+[[entries]]
+date = "2026-08-09"
+category = "Verification"
+insight = "Copy-tree uninstall must prune only inventory-derived directories; blanket empty-directory deletion can remove foreign directories. Preflight all manifest files before any payload mutation."
