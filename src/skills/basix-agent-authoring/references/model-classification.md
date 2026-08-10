@@ -3,6 +3,18 @@
 Always choose the lowest level that can reliably complete the assignment. File count
 alone is not complexity. For mixed assignments, use the hardest material component.
 
+This complexity classification selects model reasoning effort, not agent level.
+Agent level separately controls coordination and spawn authority: juniors handle
+bounded work without children, seniors coordinate complex work and may spawn only
+the native junior explorer and researcher, and principals may spawn juniors and
+seniors. A non-root principal may not spawn another principal. Junior roles
+normally use `low` or `medium`; senior roles should use complexity-appropriate
+`high`, `xhigh`, or `max`.
+
+A persistent native principal may be authored only after an explicit user request.
+Its leading metadata block must include level `principal` and the standardized
+`explicit-principal-level` marker; update its prompt permissions in the same change.
+
 | Class | Default | Use when |
 |---|---|---|
 | Simple | `gpt-5.6-luna`, `low` | Bounded search, extraction, formatting, inventory, or short summary needs no material interpretation. |

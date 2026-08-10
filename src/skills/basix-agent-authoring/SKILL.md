@@ -16,7 +16,12 @@ skill-local links and scripts. Do not orchestrate running agents.
    [agent-communication-contract.md](../basix/references/agent-communication-contract.md)
    completely and read
    [native-agent-bootstrap.md](references/native-agent-bootstrap.md).
-3. Preserve unrelated TOML fields. Insert or replace the marked bootstrap block in
+3. Preserve unrelated TOML fields. Begin every native TOML with exactly one
+   commented metadata block containing non-empty `author` and `level` (`junior`,
+   `senior`, or `principal`). A principal additionally requires the
+   `# basix-agent-authoring: explicit-principal-level` marker inside that block;
+   add it only after an explicit user request for a persistent native principal.
+   Insert or replace the marked bootstrap block in
    `developer_instructions`; never duplicate or embed the full contract. Every native agent TOML description
    must begin exactly with `Basix-Agent: `.
 4. Use `gpt-5.6-luna` with `low`, `medium`, `high`, `xhigh`, or `max` according to the
@@ -32,6 +37,12 @@ skill-local links and scripts. Do not orchestrate running agents.
 6. Validate changed agents with the skill-local `scripts/validate.py`. From
    `<Basix-Repo>`, run
    `PYTHONDONTWRITEBYTECODE=1 python3 src/skills/basix-agent-authoring/scripts/validate.py agent src/agents/native/PATH [src/agents/native/PATH ...]`.
+
+Agent level and assignment complexity are independent axes. Junior roles normally
+use `low` or `medium`; senior roles use complexity-appropriate `high` through
+`max`. Update metadata and prompt spawn permissions together: juniors spawn no
+children, seniors only `basix_file_explorer` and `basix_researcher`, and non-root
+principals never principals.
 
 The canonical JSON contract is [message.schema.json](references/message.schema.json).
 Validate one message with `message --stdin` and a JSON-lines stream with

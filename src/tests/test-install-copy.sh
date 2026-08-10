@@ -19,6 +19,9 @@ if "$ROOT/setup/install_for_project.sh" "$project" >/dev/null &&
    [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix/references/agent-communication-contract.md && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
    ! find "$project/.agents/skills" "$project/.codex/basix" -type l -print -quit | grep -q . &&
    ! cut -f1 "$project/.codex/.basix-install-state" | grep -Ev '^(copy|dircopy|dirfile)$' | grep -q .; then ok 'fresh project install copies complete trees'; else bad 'fresh project install copies complete trees'; fi
+for agent in "$ROOT"/agents/native/*.toml; do
+  check "project install preserves $(basename "$agent") bytes" cmp -s "$agent" "$project/.codex/basix/agents/$(basename "$agent")"
+done
 before=$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml")
 "$ROOT/setup/install_for_project.sh" "$project" >/dev/null
 check 'project reinstall is idempotent' test "$before" = "$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml")"
@@ -28,6 +31,9 @@ source_copy="$case_dir/source"; cp -R "$ROOT" "$source_copy"; update="$case_dir/
 printf '\ncopy-update\n' >>"$source_copy/skills/basix/SKILL.md"
 "$source_copy/setup/install_for_project.sh" "$update" >/dev/null
 check 'reinstall synchronizes source updates' grep -Fq copy-update "$update/.agents/skills/basix/SKILL.md"
+for agent in "$source_copy"/agents/native/*.toml; do
+  check "project reinstall preserves $(basename "$agent") bytes" cmp -s "$agent" "$update/.codex/basix/agents/$(basename "$agent")"
+done
 stale_source="$source_copy/skills/basix/references/agent-communication-contract.md"
 stale_target="$update/.agents/skills/basix/references/agent-communication-contract.md"
 rm -- "$stale_source"; "$source_copy/setup/install_for_project.sh" "$update" >/dev/null
@@ -58,6 +64,9 @@ done
 
 global="$case_dir/global"; CODEX_HOME="$global" "$ROOT/setup/install_as_plugin.sh" >/dev/null
 if [[ -f $global/basix-plugin-root/skills/basix/SKILL.md && -f $global/basix/agents/basix-researcher.toml ]] && ! find "$global/basix-plugin-root" "$global/basix" -type l -print -quit | grep -q .; then ok 'fresh global install uses copies only'; else bad 'fresh global install uses copies only'; fi
+for agent in "$ROOT"/agents/native/*.toml; do
+  check "global install preserves $(basename "$agent") bytes" cmp -s "$agent" "$global/basix/agents/$(basename "$agent")"
+done
 alias_home="$case_dir/global-alias"; mkdir -p "$alias_home/basix-plugin-root/.codex-plugin"; ln "$source_copy/plugin/plugin.json" "$alias_home/basix-plugin-root/.codex-plugin/plugin.json"
 if CODEX_HOME="$alias_home" "$source_copy/setup/install_as_plugin.sh" >/dev/null 2>&1; then bad 'global alias is rejected before mutation'; elif [[ ! -e $alias_home/basix ]]; then ok 'global alias is rejected before mutation'; else bad 'global alias is rejected before mutation'; fi
 

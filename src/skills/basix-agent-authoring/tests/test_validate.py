@@ -344,7 +344,8 @@ class AgentTests(unittest.TestCase):
 
     def write_agent(self, model="gpt-5.6-luna", effort="medium", marker="", block=True,
                     description="Basix-Agent: Test agent", name="agent", sandbox="read-only",
-                    sandbox_marker="", preamble=None):
+                    sandbox_marker="", preamble=None, level=None, author="Basix",
+                    principal_marker=False):
         reference = BOOTSTRAP_REFERENCE.read_text()
         contract = reference[
             reference.index(validator.BOOTSTRAP_START):
@@ -354,7 +355,20 @@ class AgentTests(unittest.TestCase):
             contract = "Instructions without a managed communication contract."
         if preamble is None:
             preamble = RESEARCHER_PREAMBLE if name == "basix_researcher" else ""
-        text = f'''name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\n{sandbox_marker}sandbox_mode = "{sandbox}"\ndeveloper_instructions = """{preamble}{contract}"""\n'''
+        level = level or validator.CANONICAL_LEVELS.get(name, "junior")
+        permissions = (
+            "You are a junior Basix agent. Do not spawn subagents.\n"
+            if level == "junior" else
+            "You may spawn only `basix_file_explorer` and `basix_researcher`.\n"
+            "Do not spawn generic agents, senior agents, or principals.\n"
+            if level == "senior" else
+            "You are a non-root principal. Do not spawn principals.\n"
+        )
+        principal = f"{validator.PRINCIPAL_MARKER}\n" if principal_marker else ""
+        metadata = (f'{validator.METADATA_START}\n{principal}'
+                    f'# metadata = {{ author = "{author}", level = "{level}" }}\n'
+                    f'{validator.METADATA_END}\n')
+        text = f'''{metadata}name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\n{sandbox_marker}sandbox_mode = "{sandbox}"\ndeveloper_instructions = """{permissions}{preamble}{contract}"""\n'''
         directory = tempfile.TemporaryDirectory()
         path = Path(directory.name) / "agent.toml"
         path.write_text(text)
@@ -364,6 +378,74 @@ class AgentTests(unittest.TestCase):
         directory, path = self.write_agent()
         with directory:
             validator.validate_agent(path)
+
+    def test_metadata_levels_and_principal_marker(self):
+        for level in ("junior", "senior"):
+            directory, path = self.write_agent(level=level)
+            with directory:
+                validator.validate_agent(path)
+        directory, path = self.write_agent(level="principal", principal_marker=True)
+        with directory:
+            validator.validate_agent(path)
+
+        for level, marker in (("principal", False), ("junior", True), ("unknown", False)):
+            directory, path = self.write_agent(level=level, principal_marker=marker)
+            with directory, self.assertRaises(validator.Invalid):
+                validator.validate_agent(path)
+
+    def test_rejects_missing_duplicate_misplaced_or_malformed_metadata(self):
+        mutations = (
+            lambda text: "\n".join(text.splitlines()[3:]) + "\n",
+            lambda text: text.replace(validator.METADATA_END,
+                                      validator.METADATA_END + "\n" + text.split(validator.METADATA_END, 1)[0] + validator.METADATA_END),
+            lambda text: "# displaced\n" + text,
+            lambda text: text.replace('author = "Basix"', 'author = '),
+            lambda text: text.replace('author = "Basix"', 'author = ""'),
+        )
+        for mutate in mutations:
+            directory, path = self.write_agent()
+            path.write_text(mutate(path.read_text()))
+            with directory, self.assertRaises(validator.Invalid):
+                validator.validate_agent(path)
+
+        for malformed in ('["junior"]', '{ value = "junior" }'):
+            directory, path = self.write_agent()
+            path.write_text(path.read_text().replace('level = "junior"', f"level = {malformed}"))
+            with directory, self.assertRaisesRegex(validator.Invalid, "metadata level"):
+                validator.validate_agent(path)
+
+    def test_canonical_levels_are_fixed(self):
+        for name, level in validator.CANONICAL_LEVELS.items():
+            wrong = "senior" if level == "junior" else "junior"
+            effort = {"basix_file_explorer": "low", "basix_researcher": "medium",
+                      "basix_pager": "xhigh", "basix_verifier": "xhigh"}[name]
+            sandbox = "workspace-write" if name == "basix_pager" else "read-only"
+            sandbox_marker = validator.SANDBOX_OVERRIDE + "\n" if name == "basix_pager" else ""
+            directory, path = self.write_agent(name=name, level=wrong, effort=effort,
+                                                sandbox=sandbox, sandbox_marker=sandbox_marker)
+            with directory, self.assertRaisesRegex(validator.Invalid, "must use"):
+                validator.validate_agent(path)
+
+    def test_level_spawn_permissions_are_enforced(self):
+        cases = (
+            ("junior", "Junior lacks prohibition."),
+            ("senior", "Senior may spawn generic agents."),
+            ("principal", "Principal may spawn principals."),
+        )
+        for level, preamble in cases:
+            directory, path = self.write_agent(level=level,
+                                                principal_marker=level == "principal",
+                                                preamble=preamble)
+            text = path.read_text()
+            if level == "junior":
+                text = text.replace("You are a junior Basix agent. Do not spawn subagents.\n", "")
+            elif level == "senior":
+                text = text.replace("You may spawn only `basix_file_explorer` and `basix_researcher`.\n", "")
+            else:
+                text = text.replace("You are a non-root principal. Do not spawn principals.\n", "")
+            path.write_text(text)
+            with directory, self.assertRaises(validator.Invalid):
+                validator.validate_agent(path)
 
     def test_rejects_missing_duplicate_or_changed_bootstrap(self):
         directory, path = self.write_agent(block=False)

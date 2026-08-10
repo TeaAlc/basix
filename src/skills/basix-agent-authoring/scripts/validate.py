@@ -16,6 +16,16 @@ STATUSES = {"planned", "in_progress", "blocked", "completed", "completed_with_er
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 OVERRIDE = "# basix-agent-authoring: explicit-model-override"
 SANDBOX_OVERRIDE = "# basix-agent-authoring: explicit-sandbox-override"
+METADATA_START = "# basix-agent-authoring:metadata:start"
+METADATA_END = "# basix-agent-authoring:metadata:end"
+PRINCIPAL_MARKER = "# basix-agent-authoring: explicit-principal-level"
+LEVELS = {"junior", "senior", "principal"}
+CANONICAL_LEVELS = {
+    "basix_file_explorer": "junior",
+    "basix_researcher": "junior",
+    "basix_pager": "senior",
+    "basix_verifier": "senior",
+}
 BOOTSTRAP_START = "<!-- basix-agent-authoring:bootstrap:start -->"
 BOOTSTRAP_END = "<!-- basix-agent-authoring:bootstrap:end -->"
 CONTRACT_START = "<!-- basix-agent-authoring:contract:start version=1.4 -->"
@@ -253,11 +263,43 @@ def validate_agent(path: Path) -> None:
         parsed = tomllib.loads(text)
     except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
         raise Invalid(str(exc)) from exc
+    lines = text.splitlines()
+    need(lines and lines[0] == METADATA_START,
+         f"{path}: metadata block must begin on the first line")
+    need(lines.count(METADATA_START) == 1 and lines.count(METADATA_END) == 1,
+         f"{path}: metadata markers must occur exactly once")
+    metadata_end = lines.index(METADATA_END)
+    need(metadata_end in {2, 3}, f"{path}: metadata block is malformed or misplaced")
+    metadata_lines = lines[1:metadata_end]
+    principal_marker = PRINCIPAL_MARKER in metadata_lines
+    need(metadata_lines.count(PRINCIPAL_MARKER) <= 1,
+         f"{path}: explicit principal marker must occur at most once")
+    payload = "\n".join(
+        line[2:] if line.startswith("# ") else ""
+        for line in metadata_lines if line != PRINCIPAL_MARKER
+    )
+    need(bool(payload) and all(line.startswith("# ") for line in metadata_lines),
+         f"{path}: metadata content must be commented TOML")
+    try:
+        metadata_doc = tomllib.loads(payload)
+    except tomllib.TOMLDecodeError as exc:
+        raise Invalid(f"{path}: invalid metadata TOML: {exc}") from exc
+    metadata = object_exact(metadata_doc, {"metadata"})["metadata"]
+    metadata = object_exact(metadata, {"author", "level"})
+    need(isinstance(metadata["author"], str) and bool(metadata["author"].strip()),
+         f"{path}: metadata author must be non-empty")
+    need(isinstance(metadata["level"], str) and metadata["level"] in LEVELS,
+         f"{path}: metadata level must be junior, senior, or principal")
+    need(principal_marker == (metadata["level"] == "principal"),
+         f"{path}: principal level requires the explicit-principal-level marker and other levels forbid it")
     for key in ("name", "description", "model", "model_reasoning_effort", "sandbox_mode", "developer_instructions"):
         need(isinstance(parsed.get(key), str) and bool(parsed[key].strip()), f"{path}: missing string field {key}")
     need(parsed["description"].startswith("Basix-Agent: "),
          f"{path}: description must begin with 'Basix-Agent: '")
-    lines = text.splitlines()
+    expected_level = CANONICAL_LEVELS.get(parsed["name"])
+    if expected_level:
+        need(metadata["level"] == expected_level,
+             f"{path}: {parsed['name']} must use {expected_level} level")
     model_lines = [i for i, line in enumerate(lines) if re.match(r"^\s*model\s*=", line)]
     need(len(model_lines) == 1, f"{path}: expected exactly one model field")
     index = model_lines[0]
@@ -302,6 +344,17 @@ def validate_agent(path: Path) -> None:
         need(parsed["sandbox_mode"] == "read-only",
              f"{path}: basix_verifier must remain read-only")
     instructions = parsed["developer_instructions"]
+    if metadata["level"] == "junior":
+        need("Do not spawn subagents." in instructions,
+             f"{path}: junior agents must explicitly forbid subagent spawning")
+    elif metadata["level"] == "senior":
+        need("You may spawn only `basix_file_explorer` and `basix_researcher`." in instructions,
+             f"{path}: senior agents may spawn only the two native junior roles")
+        need("Do not spawn generic agents, senior agents, or principals." in instructions,
+             f"{path}: senior agents must forbid generic, senior, and principal children")
+    else:
+        need("Do not spawn principals." in instructions,
+             f"{path}: non-root principals must forbid principal children")
     if parsed["name"] == "basix_researcher":
         researcher_clauses = (
             "expect and use the Scrapling\nMCP server (spelled `scrapling`) when it is needed",

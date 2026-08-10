@@ -46,3 +46,8 @@ insight = "Copy-tree uninstall must prune only inventory-derived directories; bl
 date = "2026-08-10"
 category = "Workflow"
 insight = "Run focused negative tests before freezing verifier targets. After corrections, rerun focused checks first, then run the full verification once."
+
+[[entries]]
+date = "2026-08-10"
+category = "Verification"
+insight = "Validate metadata types before set membership; malformed TOML arrays or tables otherwise raise uncaught TypeError instead of the validator's controlled Invalid diagnostic."

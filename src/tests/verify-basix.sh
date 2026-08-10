@@ -139,7 +139,15 @@ assert "`.agents/` runtime configuration from agent discovery" in router
 assert "Agents must not modify either directory directly" in router
 assert "Basix installers may write there" in router
 assert "installer tests use isolated temporary targets" in router
+for phrase in ("Agent level governs coordination", "`/root` | principal",
+               "`basix_pager` | senior", "`basix_verifier` | senior",
+               "`basix_file_explorer` | junior", "`basix_researcher` | junior",
+               "agent_level: junior", "non-root principal never"):
+    assert phrase in router, phrase
 for path in sorted((root / "agents/native").glob("*.toml")):
+    lines = path.read_text().splitlines()
+    assert lines[0] == "# basix-agent-authoring:metadata:start", path
+    assert lines[2] == "# basix-agent-authoring:metadata:end", path
     agent = tomllib.loads(path.read_text())
     assert agent["description"].startswith("Basix-Agent: "), path
 pager_path = root / "agents/native/basix-pager.toml"
@@ -180,6 +188,9 @@ assert instructions.count("<!-- basix:developer-instructions:end -->") == 1
 policy = instructions.split("<!-- basix:developer-instructions:start -->", 1)[1].split(
     "<!-- basix:developer-instructions:end -->", 1
 )[0]
+for phrase in ("`/root` is the fixed principal", "Set `agent_level`",
+               "omission means `junior`", "never spawns another principal"):
+    assert phrase in policy, phrase
 memory_section = re.search(r"(?ms)^## Agent Memory\n.*?(?=^## )", policy).group(0)
 assert len(memory_section) <= 2500, len(memory_section)
 assert "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`" in policy

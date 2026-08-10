@@ -46,10 +46,34 @@ When changing the collection, update the relevant documentation. From
 
 ## Basix agent spawning
 
+Agent level governs coordination and spawn authority; model and reasoning effort
+govern assignment complexity. Never infer one axis from the other.
+
+| Agent | Level | Children |
+|---|---|---|
+| `/root` | principal | native or generic juniors and seniors; directly spawned generic principals |
+| `basix_pager` | senior | `basix_file_explorer`, `basix_researcher` |
+| `basix_verifier` | senior | `basix_file_explorer`, `basix_researcher` |
+| `basix_file_explorer` | junior | none |
+| `basix_researcher` | junior | none |
+
+- Juniors perform bounded work without coordination and never spawn children.
+- Seniors may coordinate complex work but may spawn only the two native juniors
+  listed above. Their role, write, sandbox, and ownership boundaries still apply.
+- Principals may spawn juniors and seniors. A non-root principal never spawns
+  another principal.
+- A generic agent defaults to `agent_level: junior`. `/root` may explicitly set
+  `agent_level` to `junior`, `senior`, or `principal` for a direct generic spawn.
+  A generic principal's assignment must state its spawn framework and prohibit
+  principal children. Generic agents have no native TOML metadata.
+- All Basix-managed native and generic agents load this router and the complete
+  communication contract before work. Level changes spawn authorization only;
+  Contract 1.4 messages and direct-parent communication remain unchanged.
+
 - Keep tightly bounded work with `/root` when direct completion costs less context than delegation and handoff. Delegate a concrete, bounded assignment when work is expected to require more than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or specialized expertise. Skill loading, planning, messaging, status updates, and agent-management calls do not count.
 - If initially simple work expands, delegate the remaining bounded assignment instead of continuing extensive discovery.
 - Choose `basix_researcher` for current or external facts and website inspection, `basix_file_explorer` for extensive local evidence discovery, `basix_pager` for nontrivial web frontend, backend, UI/UX, fullstack, or integration work, and `basix_verifier` for independent read-only inspection of one frozen result.
 - Spawn every Basix agent with `fork_turns="none"`, a fresh and unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
 - Keep researchers and file explorers read-only. Do not substitute generic web access when required research fails, and do not continue extended local discovery when the required file explorer fails.
-- Native agents may start only the specialized Basix children their role definition explicitly permits.
+- Native agents may start only the specialized Basix children permitted by the level matrix and their role definition.
 - Follow the required communication contract for every spawned agent's lifecycle, messaging, blocker, permission, escalation, waiting, result, and continuation behavior.

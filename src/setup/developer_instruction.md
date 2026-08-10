@@ -18,7 +18,7 @@
   - Never store secrets, credentials, tokens, keys, private personal data, guesses, raw conversations, transient status, or documented facts. Without evidence, store nothing.
 - Do not run a memory-reflection round after every turn. Write collected insights only before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
   - Bundle updates with normal work; start no subagent, research, or tests solely for maintenance.
-  - Consider existing knowledge first. Update, merge, replace, or delete duplicates, contradictions, stale insights, and now-documented facts. Keep the strongest useful set of max. 32 insights.
+  - Consider existing knowledge first. Update, merge, replace, or delete duplicates, contradictions, stale insights, and now-documented facts. Keep the smallest useful set, not a fixed count.
   - Updating may also contain compaction and merging of existing entries.
 - Keep this TOML contract:
   - Use `version = 1` and zero or more `[[entries]]` records.
@@ -49,6 +49,11 @@
 - Spawn every Basix agent with `fork_turns="none"`, a fresh unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
 - Native agents start only the specialized Basix children their role definition explicitly permits.
 - Every spawned Basix agent must load and follow the complete communication contract referenced by the `basix` router before planning, messages, tools, or domain work. If the router or contract is unreadable, the spawn fails closed.
+- `/root` is the fixed principal. Agent level controls spawn authority and is independent of model and reasoning effort, which control task complexity.
+- A generic agent has no native TOML metadata. Set `agent_level` in its direct Root assignment; omission means `junior`.
+- `/root` may classify a directly spawned generic agent as `junior`, `senior`, or `principal` without asking again. A generic principal receives an explicit spawn framework and may spawn generic or native juniors and seniors, never principals.
+- Juniors never spawn subagents. Seniors may spawn only `basix_file_explorer` and `basix_researcher`. A non-root principal never spawns another principal.
+- Native and Basix-managed generic agents must read the complete router and communication contract before planning, messages, tools, or domain work.
 
 ## Agent management
 

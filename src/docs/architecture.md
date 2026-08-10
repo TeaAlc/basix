@@ -14,16 +14,22 @@ Persistent instructions come only from `setup/developer_instruction.md`. They re
 
 The `basix` router owns the sole runtime copy of Contract 1.4 at
 `skills/basix/references/agent-communication-contract.md`. Native agent TOMLs
-contain only the byte-for-byte canonical bootstrap that loads the router,
+begin with commented TOML metadata declaring `author` and agent `level`, then
+contain the byte-for-byte canonical bootstrap that loads the router,
 persistent instructions, and that contract before planning or domain work. The
 authoring skill owns the bootstrap template, JSON Schema, and read-only validator;
-it rejects missing, duplicate, modified bootstraps and embedded contract copies.
+it rejects missing, duplicate, misplaced, or malformed metadata and bootstraps,
+canonical level drift, unauthorized spawn permissions, and embedded contract copies.
 Installers discover every canonical `agents/native/*.toml` automatically and copy
 complete skill trees, so the router and contract are present before agent
 configuration is activated.
 
 Persistent instructions and the router regulate spawning and mandatory contract
-loading without duplicating runtime messaging rules. Contract 1.4 exclusively owns
+loading without duplicating runtime messaging rules. Agent level controls spawn
+authority while model and reasoning effort control task complexity. `/root` is
+principal, pager and verifier are senior, and explorer and researcher are junior;
+generic assignments default to junior unless Root supplies `agent_level`.
+Contract 1.4 exclusively owns
 the direct-parent hierarchy, parent-authored escalation, message envelope, cycles,
 status cadence, permissions, reports, waiting, visible confirmations, and terminal
 results. Native definitions retain role behavior and the canonical bootstrap only.

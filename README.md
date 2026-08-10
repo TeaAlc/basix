@@ -235,6 +235,13 @@ and persistent instructions are loaded. Basix then supplies:
 - Lumen semantic project search when the optional integration is installed and
   the project has been indexed.
 
+Agent hierarchy is separate from model complexity. `/root` is principal;
+`basix_pager` and `basix_verifier` are senior; `basix_file_explorer` and
+`basix_researcher` are junior. Juniors cannot spawn children, seniors may spawn
+only those two native juniors, and non-root principals cannot spawn principals.
+Generic agents default to `agent_level: junior`; Root may explicitly assign any
+level and must give a generic principal a principal-free spawn framework.
+
 ### Agent communication contract
 
 ```mermaid

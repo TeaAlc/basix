@@ -30,9 +30,17 @@ Updated memory is committed with task changes unless `.basix` is ignored.
 
 The native agents are discovered from every TOML under `src/agents/native/`:
 
+Agent level is independent of model and reasoning effort. `/root` is the fixed
+principal; `basix_pager` and `basix_verifier` are seniors; `basix_file_explorer`
+and `basix_researcher` are juniors. Every native TOML begins with commented,
+machine-readable `author` and `level` metadata. Juniors never spawn children;
+seniors may spawn only the two native juniors. A non-root principal never spawns
+another principal. Generic agents carry `agent_level` in their Root assignment,
+default to junior, and have no native TOML metadata.
+
 - `basix_pager` is a Highly complex reference role using `gpt-5.6-luna` with
   `xhigh` reasoning and is the sole native agent with `workspace-write`. It
-  is a fresh, single-assignment nontrivial web principal selected by its spawning parent with exactly one
+  is a fresh, single-assignment nontrivial web senior selected by its spawning parent with exactly one
   profile: `ui_ux`, `frontend`, `backend_web`, `fullstack`, or `integration`.
   the spawning parent owns the architecture, scope, acceptance gates, and any shared contract;
   the pager owns only its assigned files and may not expand its profile.
@@ -82,7 +90,9 @@ permissions, reports, continuations, waiting, visible confirmations, and termina
 
 ## Native child spawning
 
-Native agents may start only the specialized children their role definition permits.
+The router's level matrix is authoritative. Native juniors spawn nobody; native
+seniors may start only `basix_file_explorer` and `basix_researcher`. Role-specific
+read/write, sandbox, ownership, and domain boundaries remain in force.
 Every direct and nested spawn uses `fork_turns="none"`, a fresh unique task name, a
 self-contained assignment, and its own router-and-contract bootstrap.
 
@@ -181,7 +191,7 @@ only; live web/Scrapling capability and end-to-end review behavior are manual ch
 
 ## Interface contracts and execution chains
 
-For dependent frontend, backend, or integration work, Root owns the target
+For dependent frontend, backend, or integration work, `/root` owns the target
 project's `.basix/contracts/<chain-id>.md`. Root controls metadata, the binding
 interface, revision, status, proposals, ownership, and end-to-end acceptance.
 Pagers write only their assigned Frontend/Backend section, ledger entries, and
