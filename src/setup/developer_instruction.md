@@ -18,7 +18,8 @@
   - Never store secrets, credentials, tokens, keys, private personal data, guesses, raw conversations, transient status, or documented facts. Without evidence, store nothing.
 - Do not run a memory-reflection round after every turn. Write collected insights only before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
   - Bundle updates with normal work; start no subagent, research, or tests solely for maintenance.
-  - Consider existing knowledge first. Update, merge, replace, or delete duplicates, contradictions, stale insights, and now-documented facts. Keep the smallest useful set, not a fixed count.
+  - Consider existing knowledge first. Update, merge, replace, or delete duplicates, contradictions, stale insights, and now-documented facts. Keep the strongest useful set of max. 32 insights.
+  - Updating may also contain compaction and merging of existing entries.
 - Keep this TOML contract:
   - Use `version = 1` and zero or more `[[entries]]` records.
   - Records have exactly `date`, `category`, and `insight`; `Subagent Insight` also has `subagent_type`. Dates are quoted ISO 8601 `YYYY-MM-DD`.
