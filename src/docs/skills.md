@@ -6,4 +6,6 @@ The `basix-agent-authoring` skill plans, creates, and updates native agent TOMLs
 
 The `basix-experience` skill writes a localized, evidence-based Markdown retrospective when a user requests feedback about the current session, used skills, subagents, or token efficiency. It excludes itself from evaluation and reports only visibly evidenced use. Exact input, reasoning, output, and cache figures require supplied structured telemetry; missing values remain explicitly unavailable, while visible workflow costs receive qualitative analysis and five ranked saving opportunities.
 
+The `configure-tmux` skill diagnoses tmux before changing it, selects between tmux-managed mouse behavior, native terminal scrollback, and keyboard-only copy mode, and applies a confirmed deterministic fragment without replacing unrelated bindings or sessions. It supports Linux and Termux hosts, treats MobaXterm as a manually verified external client, and includes isolated and live read-only verification plus an opt-in clipboard helper.
+
 Add each future workflow under `skills/<name>/SKILL.md` with a specific trigger description. Put its scripts, references, and assets in that skill directory. Put only launchers shared by multiple skills or agents under top-level `scripts/`.

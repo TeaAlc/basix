@@ -2,7 +2,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-for script in "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh; do bash -n "$script"; done
+mapfile -t skill_scripts < <(find "$ROOT/skills" -path '*/scripts/*.sh' -type f -print | sort)
+for script in "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh "${skill_scripts[@]}"; do bash -n "$script"; done
+"$ROOT/tests/test-configure-tmux.sh"
 python3 - "$ROOT" <<'PY'
 import json, re, sys, tomllib
 from pathlib import Path
@@ -22,6 +24,9 @@ for path in skill_paths:
     assert description.startswith("Basix-Skill: "), path
     ui = path.parent / "agents/openai.yaml"
     if ui.exists():
+        if path.parent.name == "configure-tmux":
+            assert 'short_description: "Set up and troubleshoot tmux safely"' in ui.read_text(), ui
+            continue
         match = re.search(r'(?m)^\s*short_description:\s*["\']?(Basix-Skill: .+?)["\']?\s*$', ui.read_text())
         assert match, ui
 review_path = root / "skills/basix-experience"
@@ -403,7 +408,7 @@ for path in (root / "agents/native").glob("*.toml"):
     assert actual == bootstrap, path
     assert "basix-agent-authoring:contract:start" not in text, path
 PY
-if command -v shellcheck >/dev/null; then shellcheck --severity=warning "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh; else printf 'SKIP: shellcheck not installed\n'; fi
+if command -v shellcheck >/dev/null; then shellcheck --severity=warning "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh "${skill_scripts[@]}"; else printf 'SKIP: shellcheck not installed\n'; fi
 printf 'Static Basix verification passed.\n'
 
 if command -v codex >/dev/null; then

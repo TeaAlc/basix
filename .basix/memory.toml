@@ -51,3 +51,14 @@ insight = "Run focused negative tests before freezing verifier targets. After co
 date = "2026-08-10"
 category = "Verification"
 insight = "Validate metadata types before set membership; malformed TOML arrays or tables otherwise raise uncaught TypeError instead of the validator's controlled Invalid diagnostic."
+
+[[entries]]
+date = "2026-08-10"
+category = "Subagent Insight"
+subagent_type = "basix_verifier"
+insight = "Test configuration generators with control characters and shell-sensitive, quoted, and backslash paths; happy-path runtime coverage misses serialization and parser-boundary failures."
+
+[[entries]]
+date = "2026-08-10"
+category = "Verification"
+insight = "Compare live tmux bindings against same-version isolated list-keys output; hand-built config text differs after tmux normalization."

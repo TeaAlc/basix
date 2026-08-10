@@ -1,0 +1,4 @@
+interface:
+  display_name: "Configure tmux"
+  short_description: "Set up and troubleshoot tmux safely"
+  default_prompt: "Use $configure-tmux to diagnose this terminal session, propose the safest tmux mode, and verify it."
