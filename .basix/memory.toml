@@ -62,3 +62,8 @@ insight = "Test configuration generators with control characters and shell-sensi
 date = "2026-08-10"
 category = "Verification"
 insight = "Compare live tmux bindings against same-version isolated list-keys output; hand-built config text differs after tmux normalization."
+
+[[entries]]
+date = "2026-08-10"
+category = "Tooling"
+insight = "Codex rollouts under ~/.codex/sessions persist token_count totals; map CODEX_THREAD_ID and recursive sub_agent_activity agent_thread_id values to per-thread files without reading message content."
