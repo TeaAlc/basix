@@ -16,6 +16,9 @@ reach the affected session.
 | Pane in a mode | Copy/view mode or a foreground application changes routing | Exit the mode or test the application separately |
 | `smcup`/`rmcup` present | Alternate-screen applications may hide native scrollback | Use `native-terminal` only if outer-terminal scrollback is desired |
 | Missing `kmous` | TERM/terminfo cannot describe mouse input reliably | Correct TERM/terminfo outside this skill before enabling tmux mouse |
+| `extended-keys` off | tmux will not transport negotiated modified keys | Apply one mode, reconnect clients, and test the intended keys |
+| Client lacks `extkeys` | The attached client did not negotiate extended keys | Reconnect it; then inspect client support and the outer terminal |
+| Modified-key root binding present | tmux may intercept a Codex shortcut | Inspect it manually; never replace an unknown binding |
 | No clipboard transport | Display variables or helper program are unavailable | Keep helper disabled; use native paste or a tmux buffer |
 
 ## Configuration conflicts
@@ -25,10 +28,11 @@ It stops on incomplete or duplicate markers, symlinks, non-regular files, foreig
 fragment content, or a different installed helper. Resolve those conditions
 manually; do not broaden ownership or overwrite them.
 
-`terminal-overrides[1000]` is reserved only after both file and live-server checks
-show that Basix owns it. The script tests the array syntax against an isolated
-server instead of guessing support from the tmux version. A foreign value is a
-safety failure, not a merge opportunity.
+`terminal-overrides[1000]` and `terminal-features[1000]` are reserved only after
+both file and live-server checks show that Basix owns them. The script tests
+`extended-keys` and both required array syntaxes against an isolated server instead
+of guessing support from the tmux version. A foreign value is a safety failure,
+not a merge opportunity.
 
 ## Live changes
 
@@ -37,10 +41,11 @@ sources the whole entry config, detaches clients, or kills a real server. Before
 changing a managed mouse binding, it compares the effective live definition with
 the known Basix helper. A mismatch requires manual resolution.
 
-Mouse and history options take effect on source. Terminal capability changes do
-not fully affect existing clients; detach and reattach them. Re-test after SSH or
-terminal-client reconnects because TERM, display access, and socket selection can
-change.
+Mouse, history, and the server-side `extended-keys` option take effect on source.
+Terminal capability changes do not fully affect existing clients; detach and
+reattach them. Re-test after SSH or terminal-client reconnects because TERM,
+display access, key encoding, and socket selection can change. Configure Codex
+actions separately through `/keymap`; this skill never edits Codex configuration.
 
 ## Clipboard failures
 

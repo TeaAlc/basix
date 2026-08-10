@@ -11,11 +11,24 @@ Consult this reference when selecting a mode or defining manual acceptance check
 | Alternate-screen program | application may own mouse reports | `xterm*` alternate-screen switching is suppressed after reattach | normal alternate-screen behavior |
 | Clipboard paste | native client paste, tmux buffer, or opt-in helper | native client paste | native client paste or tmux buffer |
 | Remote reconnect | verify TERM, socket, config, and client again | detach/reattach after capability changes | verify key table after reconnect |
+| Modified keys | tmux transports negotiated extended-key sequences | tmux transports negotiated extended-key sequences | tmux transports negotiated extended-key sequences |
 
 tmux mouse support routes events according to the pane, status line, and active
 mode. Do not add generic wheel bindings: modern tmux already has context-aware
 mouse behavior, and custom root bindings often hide application or copy-mode
 state. See the [tmux mouse support section](https://man7.org/linux/man-pages/man1/tmux.1.html#MOUSE_SUPPORT).
+
+## Extended keys and Codex
+
+All three modes enable tmux's extended-key transport for `xterm*` clients. Detach
+and reattach every client after applying or reloading so the terminal capabilities
+are negotiated again. Then test the actual terminal: support remains dependent on
+the outer client and the complete connection path.
+
+tmux only transports the key sequence. Codex assigns the action. When requested,
+use Codex `/keymap` for `chat.interrupt_turn` with `Ctrl+C` or `Esc`, and for
+`editor.insert_newline` with `Ctrl+Enter`, `Ctrl+J`, or `Shift+Enter`. This skill
+does not write Codex configuration or create tmux root bindings for those keys.
 
 ## Shift and client bypass
 
@@ -51,3 +64,4 @@ After automated verification, ask the user to test only relevant items:
 4. A mouse-aware foreground application if one caused the problem.
 5. Native paste and, when enabled, the managed right-click helper.
 6. Detach/reattach and SSH reconnect behavior.
+7. `Ctrl+Enter`, `Ctrl+J`, and `Shift+Enter` after reconnecting the client.

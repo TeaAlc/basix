@@ -173,34 +173,44 @@ fi
 
 old_mode=
 old_binding=none
+old_schema=
+old_extkeys_owned=false
 if [[ -e $fragment ]]; then
   mapfile -t fragment_lines <"$fragment"
-  [[ ${fragment_lines[0]:-} == '# Basix configure-tmux schema=1' ]] || fail "managed fragment contains foreign or unsupported content"
+  case ${fragment_lines[0]:-} in
+    '# Basix configure-tmux schema=1') old_schema=1; mode_line=4 ;;
+    '# Basix configure-tmux schema=2') old_schema=2; mode_line=6; old_extkeys_owned=true ;;
+    *) fail "managed fragment contains foreign or unsupported content" ;;
+  esac
   old_mode=$(sed -n 's/^# mode=//p' "$fragment" | head -n1)
   old_binding=$(sed -n 's/^# managed-bindings=//p' "$fragment" | head -n1)
   case $old_mode in tmux-mouse|native-terminal|keyboard-only) ;; *) fail "managed fragment has invalid mode metadata" ;; esac
   case $old_binding in none|MouseDown3Pane) ;; *) fail "managed fragment has invalid binding metadata" ;; esac
   [[ ${fragment_lines[1]:-} == "# mode=$old_mode" && ${fragment_lines[2]:-} == "# managed-bindings=$old_binding" ]] || fail "managed fragment metadata is duplicated or out of order"
   [[ ${fragment_lines[3]:-} =~ ^set-option\ -g\ history-limit\ [1-9][0-9]*$ ]] || fail "managed fragment has a foreign history definition"
+  if [[ $old_schema == 2 ]]; then
+    [[ ${fragment_lines[5]:-} == 'set-option -s extended-keys on' ]] || fail "managed fragment has a foreign extended-keys definition"
+    [[ ${fragment_lines[6]:-} == "set-option -s 'terminal-features[1000]' 'xterm*:extkeys'" ]] || fail "managed fragment has a foreign terminal feature"
+  fi
   if [[ $old_mode == tmux-mouse ]]; then
     [[ ${fragment_lines[4]:-} == 'set-option -g mouse on' ]] || fail "managed fragment has a foreign mouse definition"
     if [[ $old_binding == none ]]; then
-      [[ ${#fragment_lines[@]} == 5 ]] || fail "managed fragment contains foreign trailing content"
+      [[ ${#fragment_lines[@]} == $((mode_line + 1)) ]] || fail "managed fragment contains foreign trailing content"
     else
-      [[ ${#fragment_lines[@]} == 6 ]] || fail "managed fragment contains foreign binding content"
+      [[ ${#fragment_lines[@]} == $((mode_line + 2)) ]] || fail "managed fragment contains foreign binding content"
       old_binding_valid=false
       helper_quoted=$(quote_tmux_double "$helper_destination")
       for candidate in auto wl-paste xclip xsel; do
         expected="bind-key -n MouseDown3Pane run-shell -b '\"$helper_quoted\" \"#{pane_id}\" \"$candidate\"'"
-        if [[ ${fragment_lines[5]} == "$expected" ]]; then old_binding_valid=true; break; fi
+        if [[ ${fragment_lines[mode_line + 1]} == "$expected" ]]; then old_binding_valid=true; break; fi
       done
       $old_binding_valid || fail "managed fragment contains a foreign MouseDown3Pane definition"
     fi
   elif [[ $old_mode == native-terminal ]]; then
-    [[ $old_binding == none && ${#fragment_lines[@]} == 6 ]] || fail "native fragment contains foreign binding or trailing content"
-    [[ ${fragment_lines[4]:-} == 'set-option -g mouse off' && ${fragment_lines[5]:-} == "set-option -g 'terminal-overrides[1000]' 'xterm*:smcup@:rmcup@'" ]] || fail "native fragment contains a foreign terminal override"
+    [[ $old_binding == none && ${#fragment_lines[@]} == $((mode_line + 2)) ]] || fail "native fragment contains foreign binding or trailing content"
+    [[ ${fragment_lines[4]:-} == 'set-option -g mouse off' && ${fragment_lines[mode_line + 1]:-} == "set-option -g 'terminal-overrides[1000]' 'xterm*:smcup@:rmcup@'" ]] || fail "native fragment contains a foreign terminal override"
   else
-    [[ $old_binding == none && ${#fragment_lines[@]} == 5 && ${fragment_lines[4]:-} == 'set-option -g mouse off' ]] || fail "keyboard fragment contains foreign content"
+    [[ $old_binding == none && ${#fragment_lines[@]} == $((mode_line + 1)) && ${fragment_lines[4]:-} == 'set-option -g mouse off' ]] || fail "keyboard fragment contains foreign content"
   fi
 fi
 
@@ -208,9 +218,9 @@ if [[ -e $entry_config ]]; then
   outside_index=$(awk -v begin="$begin_marker" -v end="$end_marker" '
     $0 == begin { managed=1; next }
     $0 == end { managed=0; next }
-    !managed && /terminal-overrides\[1000\]/ { print; exit }
+    !managed && /(terminal-overrides|terminal-features)\[1000\]/ { print; exit }
   ' "$entry_config")
-  [[ -z $outside_index ]] || fail "entry config uses reserved terminal-overrides[1000] outside the Basix block"
+  [[ -z $outside_index ]] || fail "entry config uses a Basix-reserved array index outside the Basix block"
 fi
 
 tmux_bin=${TMUX_BIN:-tmux}
@@ -258,6 +268,13 @@ if command -v "$tmux_bin" >/dev/null 2>&1 && { [[ -n $socket_name || -n $socket_
         fail "live terminal-overrides[1000] no longer matches the Basix definition"
       fi
     fi
+    live_features=$($tmux_bin "${server_args[@]}" show-options -sv 'terminal-features[1000]' 2>/dev/null || true)
+    if [[ -n $live_features && $old_extkeys_owned != true ]]; then
+      fail "live terminal-features[1000] is not known to be Basix-owned"
+    fi
+    if $old_extkeys_owned && [[ -n $live_features && $live_features != 'xterm*:extkeys' ]]; then
+      fail "live terminal-features[1000] no longer matches the Basix definition"
+    fi
     if $reload; then
       preflight_binding=$($tmux_bin "${server_args[@]}" list-keys -T root MouseDown3Pane 2>/dev/null || true)
       if [[ $managed_binding == MouseDown3Pane && -n $preflight_binding && $old_binding != MouseDown3Pane ]]; then
@@ -270,8 +287,8 @@ if command -v "$tmux_bin" >/dev/null 2>&1 && { [[ -n $socket_name || -n $socket_
   fi
 fi
 $reload && ! $live_reachable && fail "selected tmux server is not reachable; no files were changed" 1
-probe_array_syntax() {
-  command -v "$tmux_bin" >/dev/null 2>&1 || fail "tmux is required to validate terminal-overrides array syntax"
+probe_extended_keys_syntax() {
+  command -v "$tmux_bin" >/dev/null 2>&1 || fail "tmux is required to validate extended-keys support"
   local temp socket
   temp=$(mktemp -d "${TMPDIR:-/tmp}/basix-tmux-probe.XXXXXX") || fail "cannot create tmux probe directory"
   socket=basix-probe-$$
@@ -279,7 +296,18 @@ probe_array_syntax() {
     rm -rf -- "$temp"
     fail "cannot start isolated tmux syntax probe"
   fi
-  if ! TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" set-option -g 'terminal-overrides[1000]' 'xterm*:smcup@:rmcup@' 2>/dev/null; then
+  if ! TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" set-option -s extended-keys on 2>/dev/null; then
+    TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" kill-server >/dev/null 2>&1 || true
+    rm -rf -- "$temp"
+    fail "this tmux does not support extended-keys"
+  fi
+  if ! TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" set-option -s 'terminal-features[1000]' 'xterm*:extkeys' 2>/dev/null; then
+    TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" kill-server >/dev/null 2>&1 || true
+    rm -rf -- "$temp"
+    fail "this tmux does not support terminal-features array index 1000"
+  fi
+  if [[ $mode == native-terminal || $old_mode == native-terminal ]] && \
+     ! TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" set-option -g 'terminal-overrides[1000]' 'xterm*:smcup@:rmcup@' 2>/dev/null; then
     TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" kill-server >/dev/null 2>&1 || true
     rm -rf -- "$temp"
     fail "this tmux does not support terminal-overrides array index 1000"
@@ -287,9 +315,7 @@ probe_array_syntax() {
   TMUX='' TMUX_TMPDIR=$temp "$tmux_bin" -L "$socket" kill-server >/dev/null 2>&1 || true
   rm -rf -- "$temp"
 }
-if [[ $mode == native-terminal || $old_mode == native-terminal ]]; then
-  probe_array_syntax
-fi
+probe_extended_keys_syntax
 
 if [[ $clipboard_helper != disabled ]]; then
   case $clipboard_helper in
@@ -309,7 +335,7 @@ generated_fragment=$work/fragment
 generated_entry=$work/entry
 
 {
-  printf '%s\n' '# Basix configure-tmux schema=1'
+  printf '%s\n' '# Basix configure-tmux schema=2'
   printf '# mode=%s\n' "$mode"
   printf '# managed-bindings=%s\n' "$managed_binding"
   printf 'set-option -g history-limit %s\n' "$history_limit"
@@ -318,6 +344,8 @@ generated_entry=$work/entry
   else
     printf '%s\n' 'set-option -g mouse off'
   fi
+  printf '%s\n' 'set-option -s extended-keys on'
+  printf "%s\n" "set-option -s 'terminal-features[1000]' 'xterm*:extkeys'"
   if [[ $mode == native-terminal ]]; then
     printf "%s\n" "set-option -g 'terminal-overrides[1000]' 'xterm*:smcup@:rmcup@'"
   fi
@@ -383,7 +411,14 @@ if [[ ! -e $helper_destination ]]; then install_atomic "$helper_source" "$helper
 
 if $reload; then
   live_index=$($tmux_bin "${server_args[@]}" show-options -gv 'terminal-overrides[1000]' 2>/dev/null || true)
+  live_features=$($tmux_bin "${server_args[@]}" show-options -sv 'terminal-features[1000]' 2>/dev/null || true)
   live_binding=$($tmux_bin "${server_args[@]}" list-keys -T root MouseDown3Pane 2>/dev/null || true)
+  if [[ -n $live_features && $old_extkeys_owned != true ]]; then
+    fail "live terminal-features[1000] is not known to be Basix-owned; files were applied but not reloaded"
+  fi
+  if $old_extkeys_owned && [[ -n $live_features && $live_features != 'xterm*:extkeys' ]]; then
+    fail "live terminal-features[1000] no longer matches the Basix definition; files were applied but not reloaded"
+  fi
   if [[ $managed_binding == MouseDown3Pane && -n $live_binding && $old_binding != MouseDown3Pane ]]; then
     fail "live MouseDown3Pane binding is not known to be Basix-owned; files were applied but not reloaded"
   fi
@@ -398,8 +433,7 @@ if $reload; then
   if [[ $old_binding == MouseDown3Pane && $managed_binding != MouseDown3Pane ]]; then
     "$tmux_bin" "${server_args[@]}" unbind-key -n MouseDown3Pane || fail "could not remove the old Basix mouse binding"
   fi
-  if [[ $old_mode == native-terminal || $mode == native-terminal ]]; then
-    printf 'Note: detach and reattach clients for alternate-screen capability changes.\n'
-  fi
+  printf 'Note: detach and reattach clients so extended-key terminal capabilities are renegotiated.\n'
+  [[ $old_mode != native-terminal && $mode != native-terminal ]] || printf 'Note: detach and reattach clients for alternate-screen capability changes.\n'
 fi
 printf 'Configuration applied successfully.\n'

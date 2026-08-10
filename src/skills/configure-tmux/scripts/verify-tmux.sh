@@ -46,7 +46,7 @@ if $live; then
     grep -Fq "source-file \"$fragment\"" "$entry_config" || fail "explicit entry config does not source the managed fragment" 1
   fi
   IFS= read -r first <"$fragment" || true
-  [[ $first == '# Basix configure-tmux schema=1' ]] || fail "managed fragment has an unsupported header"
+  [[ $first == '# Basix configure-tmux schema=2' ]] || fail "managed fragment has an unsupported header"
   mode=$(sed -n 's/^# mode=//p' "$fragment" | head -n1)
   expected_history=$(sed -n 's/^set-option -g history-limit //p' "$fragment" | head -n1)
   server_args=()
@@ -56,13 +56,18 @@ if $live; then
   tmux "${server_args[@]}" list-clients >/dev/null 2>&1 || fail "selected live server is unreachable" 1
   actual_mouse=$(tmux "${server_args[@]}" show-options -gv mouse)
   actual_history=$(tmux "${server_args[@]}" show-options -gv history-limit)
+  actual_extended_keys=$(tmux "${server_args[@]}" show-options -sv extended-keys 2>/dev/null || true)
+  actual_extkeys_feature=$(tmux "${server_args[@]}" show-options -sv 'terminal-features[1000]' 2>/dev/null || true)
   [[ $actual_history == "$expected_history" ]] || fail "live history-limit differs from the managed fragment" 1
+  [[ $actual_extended_keys == on ]] || fail "live extended-keys option is not on" 1
+  [[ $actual_extkeys_feature == 'xterm*:extkeys' ]] || fail "live terminal feature differs" 1
   if [[ $mode == tmux-mouse ]]; then [[ $actual_mouse == on ]] || fail "live mouse option is off" 1
   else [[ $actual_mouse == off ]] || fail "live mouse option is on" 1; fi
   if [[ $mode == native-terminal ]]; then
     [[ $(tmux "${server_args[@]}" show-options -gv 'terminal-overrides[1000]' 2>/dev/null || true) == 'xterm*:smcup@:rmcup@' ]] || fail "live terminal override differs" 1
   fi
   printf 'Live tmux configuration verified read-only: mode=%s history-limit=%s.\n' "$mode" "$actual_history"
+  printf 'Manual check: detach and reattach clients, then confirm modified keys.\n'
   [[ $mode != native-terminal ]] || printf 'Manual check: detach and reattach, then confirm native terminal scrollback.\n'
   exit 0
 fi
@@ -94,7 +99,11 @@ for mode in tmux-mouse native-terminal keyboard-only; do
   [[ $after_root_keys == "$before_root_keys" ]] || fail "$mode changed an Up, Down, or wheel root binding"
   actual_mouse=$(TMUX='' TMUX_TMPDIR=$temp/socket tmux -L "$socket" show-options -gv mouse)
   actual_history=$(TMUX='' TMUX_TMPDIR=$temp/socket tmux -L "$socket" show-options -gv history-limit)
+  actual_extended_keys=$(TMUX='' TMUX_TMPDIR=$temp/socket tmux -L "$socket" show-options -sv extended-keys)
+  actual_extkeys_feature=$(TMUX='' TMUX_TMPDIR=$temp/socket tmux -L "$socket" show-options -sv 'terminal-features[1000]')
   [[ $actual_history == 50000 ]] || fail "$mode isolated history-limit mismatch"
+  [[ $actual_extended_keys == on ]] || fail "$mode isolated extended-keys mismatch"
+  [[ $actual_extkeys_feature == 'xterm*:extkeys' ]] || fail "$mode isolated terminal feature mismatch"
   if [[ $mode == tmux-mouse ]]; then [[ $actual_mouse == on ]] || fail "tmux-mouse isolated mouse mismatch"
   else [[ $actual_mouse == off ]] || fail "$mode isolated mouse mismatch"; fi
   if [[ $mode == native-terminal ]]; then

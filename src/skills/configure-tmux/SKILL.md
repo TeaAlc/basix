@@ -1,6 +1,6 @@
 ---
 name: configure-tmux
-description: "Basix-Skill: Safely diagnose, configure, and verify tmux mouse control, scrollback, copy mode, and clipboard paste behavior on Linux or Termux, including sessions reached from MobaXterm. Use for broken wheel scrolling, selection, right-click paste, alternate-screen behavior, tmux configuration conflicts, MobaXterm terminals, or Termux terminals."
+description: "Basix-Skill: Safely diagnose, configure, and verify tmux mouse control, scrollback, copy mode, clipboard paste, and extended-key transport on Linux or Termux, including sessions reached from MobaXterm. Use for broken wheel scrolling, selection, right-click paste, modified keys such as Ctrl+Enter, alternate-screen behavior, tmux configuration conflicts, MobaXterm terminals, or Termux terminals."
 ---
 
 # Configure tmux
@@ -58,10 +58,23 @@ its `overall_status` and individual checks.
   `[`, navigate with the active tmux key table, start/select text, and confirm to
   copy; paste the current tmux buffer with `C-b ]`.
 
-Never create root bindings for physical `Up` or `Down`. Diagnose existing wheel
-or `MouseDown3Pane` bindings instead of overwriting them. The configure script
-refuses foreign use of `terminal-overrides[1000]`, unsafe symlinks, incomplete
+Every mode enables tmux extended-key transport with `extended-keys on` and the
+reserved `terminal-features[1000]` value `xterm*:extkeys`. Clients must detach and
+reattach after this capability changes. Never create root bindings for physical
+`Up` or `Down`, `Ctrl+C`, `Ctrl+Enter`, `Ctrl+J`, or `Shift+Enter`. Diagnose
+existing relevant root bindings instead of overwriting them. The configure script
+refuses foreign use of either reserved array slot, unsafe symlinks, incomplete
 markers, or foreign managed-file contents.
+
+## tmux transport and Codex keymaps
+
+tmux transports modified key sequences; it does not decide which Codex action a
+sequence invokes. If Codex behavior needs adjustment, use Codex `/keymap` to map
+`chat.interrupt_turn` to `Ctrl+C` or `Esc`, and `editor.insert_newline` to
+`Ctrl+Enter`, `Ctrl+J`, or `Shift+Enter`. Keep those choices user-controlled.
+
+This skill writes only the tmux files listed below. It never changes global or
+project-local Codex configuration.
 
 See [references/client-behavior.md](references/client-behavior.md) before advising
 about Shift bypass, MobaXterm, SSH reconnects, alternate screens, or Termux touch.
