@@ -3,7 +3,7 @@ version = 1
 [[entries]]
 date = "2026-08-04"
 category = "User Instruction"
-insight = "Persist durable project knowledge in .basix/memory.toml using dated, categorized entries, and review it at session, compaction, and commit boundaries."
+insight = "Treat memory as agent-owned: curate it proactively and selectively to improve efficiency, inform decisions, and prevent repeated mistakes without requesting user approval."
 
 [[entries]]
 date = "2026-08-04"
@@ -38,5 +38,11 @@ insight = "Basix skill descriptions containing the required prefix colon need YA
 
 [[entries]]
 date = "2026-08-09"
-category = "Verification"
+category = "Subagent Insight"
+subagent_type = "basix_verifier"
 insight = "Copy-tree uninstall must prune only inventory-derived directories; blanket empty-directory deletion can remove foreign directories. Preflight all manifest files before any payload mutation."
+
+[[entries]]
+date = "2026-08-10"
+category = "Workflow"
+insight = "Run focused negative tests before freezing verifier targets. After corrections, rerun focused checks first, then run the full verification once."

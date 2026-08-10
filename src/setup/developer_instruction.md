@@ -10,25 +10,22 @@
 
 ## Agent Memory
 
-- Use `.basix/memory.toml` as the project's persistent agent memory.
-  - If it exists, read it exactly once at session start and exactly once after each context compaction.
-  - If absent, create it when the first qualifying insight must be recorded.
-- Record durable insights likely to improve future sessions.
-  - Include effective data-discovery methods; durable repository or project knowledge; tool and verification lessons; subagent communication problems, fixes, and prevention; strongly evidenced subagent insights; and user instructions or durable clarifications.
-  - Exclude secrets, credentials, personal data, transient task status, guesses, and information already clear in durable project documentation.
-  - Update or replace an existing entry rather than adding a duplicate or contradiction.
+- `.basix/memory.toml` is agent-owned memory, not a user log. Autonomously create, update, merge, or delete it; never request user approval for memory operations.
+- Read it exactly once at session start and after each context compaction. Create it for the first qualifying insight.
+- Apply entries to reduce effort and prevent repeated mistakes; reading alone is insufficient.
+- Retain evidenced failure prevention, efficiency methods, stable repository knowledge or user instructions, and guidance for future task or subagent decisions.
+  - Write failures as prevention rules. Do not omit the top insight because the task succeeded.
+  - Never store secrets, credentials, tokens, keys, private personal data, guesses, raw conversations, transient status, or documented facts. Without evidence, store nothing.
+- Do not run a memory-reflection round after every turn. Write collected insights only before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
+  - Bundle updates with normal work; start no subagent, research, or tests solely for maintenance.
+  - Consider existing knowledge first. Update, merge, replace, or delete duplicates, contradictions, stale insights, and now-documented facts. Keep the smallest useful set, not a fixed count.
 - Keep this TOML contract:
-  - Use `version = 1` and zero or more `[[entries]]` array-of-table records.
-  - Every record contains exactly `date`, `category`, and `insight`, except a `Subagent Insight` record also contains exactly `subagent_type`; `date` is a quoted ISO 8601 `YYYY-MM-DD` calendar date.
-  - `category` is exactly `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`; use `Other` only if none fits.
-  - `subagent_type` is required only for `Subagent Insight` and is the exact native role used for delegation, such as `basix_researcher` or `basix_file_explorer`.
-  - `insight` is concise, directly actionable or informative, no longer than three sentences, and no longer than 32 words in total.
-  - Store every accepted subagent insight as a separate entry.
-- Evaluate every agent-memory insight proposed under the communication contract for usefulness in future assignments, result evaluation, or status interpretation.
-  - Retain only useful insights supported by strong evidence. Root may rewrite an accepted insight while preserving its meaning and the 32-word stored limit.
-- Before every commit and context-compaction summary, decide whether to update the memory and do so before proceeding when warranted.
-  - In a Git repository where `.basix` is not ignored, include updates in the commit. Before a compaction summary, commit an eligible update after required verification; do not leave it only in the working tree.
-  - Never commit an ignored `.basix` directory or override repository ignore rules to include the memory file.
+  - Use `version = 1` and zero or more `[[entries]]` records.
+  - Records have exactly `date`, `category`, and `insight`; `Subagent Insight` also has `subagent_type`. Dates are quoted ISO 8601 `YYYY-MM-DD`.
+  - `category` is one of `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`; use `Other` only if none fits.
+  - `subagent_type` names the exact native role and is exclusive to `Subagent Insight`. `insight` is actionable, at most three sentences and 32 words.
+  - Evaluate proposals for evidence and future utility; Root may shorten them but stores accepted subagent insights separately.
+- Commit updates with task changes unless `.basix` is ignored. Before compaction, commit eligible updates after verification. Never override ignore rules.
 
 ## Completion and commits
 

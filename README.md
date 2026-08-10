@@ -216,11 +216,12 @@ and persistent instructions are loaded. Basix then supplies:
   expected to need more than two substantive domain-tool calls to a Basix agent;
 - automatic Conventional Commits for Root's task changes in Git repositories, but
   only after every running verification and test completes successfully;
-- persistent project memory in `.basix/memory.toml`, read once at session start and
-  after each context compaction, with concise dated insights grouped into fixed
-  English categories and committed with task changes unless `.basix` is ignored;
-  strongly evidenced subagent proposals are reviewed by Root and, when useful,
-  stored separately with category `Subagent Insight` and their originating role;
+- agent-owned persistent memory in `.basix/memory.toml`, read once at session start
+  and after each context compaction, actively applied to reduce work and prevent
+  repeated mistakes, and autonomously curated without user approval at natural
+  work checkpoints; concise dated insights use fixed English categories and are
+  committed with task changes unless `.basix` is ignored, while useful, strongly
+  evidenced subagent proposals retain their originating role;
 - mandatory routing of extensive local evidence discovery to
   `basix_file_explorer`, preferably before discovery begins, while implementation
   and final code analysis remain with Root;

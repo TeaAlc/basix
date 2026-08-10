@@ -11,11 +11,16 @@ User-facing text avoids
 gender-inclusive forms unless the user explicitly requests them. After Root's changes
 and all running verification and tests complete successfully, Root commits only the
 task's changes with a Conventional Commits message when working in a Git repository.
-The instructions also define `.basix/memory.toml` as optional persistent project
-memory. Root reads it once at session start and once after each context compaction,
-records only durable insights under the versioned entry contract, and checks it
-before commits and compaction summaries. Entries use an ISO date, one of the fixed
-English categories, and an insight limited to three sentences and 32 words. A
+The instructions define `.basix/memory.toml` as agent-owned persistent memory, not
+a user log or documentation substitute. Root reads it once at session start and
+once after each context compaction, then actively applies relevant entries during
+work. It autonomously curates the smallest useful set without user approval,
+favoring prevention rules and proven efficiency gains while removing duplicates,
+contradictions, stale knowledge, and facts now durably documented. Memory is
+written at natural work checkpoints rather than through a reflection round after
+every turn. Entries use an ISO date, one of the fixed English categories, and an
+insight limited to three sentences and 32 words. Secrets, private personal data,
+guesses, raw conversation history, and transient task status are excluded. A
 `Subagent Insight` entry additionally records the exact delegated role as
 `subagent_type`; other categories retain the legacy three-field shape. Root evaluates
 every final-result proposal for strong evidence and usefulness in future assignments,

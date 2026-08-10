@@ -180,6 +180,8 @@ assert instructions.count("<!-- basix:developer-instructions:end -->") == 1
 policy = instructions.split("<!-- basix:developer-instructions:start -->", 1)[1].split(
     "<!-- basix:developer-instructions:end -->", 1
 )[0]
+memory_section = re.search(r"(?ms)^## Agent Memory\n.*?(?=^## )", policy).group(0)
+assert len(memory_section) <= 2500, len(memory_section)
 assert "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`" in policy
 for phrase in (
     "## Basix conventions",
@@ -187,27 +189,28 @@ for phrase in (
     "available `basix` router skill",
     "Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it",
     "## Agent Memory",
-    "Use `.basix/memory.toml` as the project's persistent agent memory",
-    "read it exactly once at session start and exactly once after each context compaction",
-    "create it when the first qualifying insight must be recorded",
-    "Record durable insights likely to improve future sessions",
-    "user instructions or durable clarifications",
-    "Exclude secrets, credentials, personal data, transient task status, guesses",
-    "Update or replace an existing entry rather than adding a duplicate or contradiction",
+    "`.basix/memory.toml` is agent-owned memory",
+    "Autonomously create, update, merge, or delete it",
+    "never request user approval for memory operations",
+    "Read it exactly once at session start and after each context compaction",
+    "Apply entries to reduce effort and prevent repeated mistakes",
+    "reading alone is insufficient",
+    "Write failures as prevention rules",
+    "Never store secrets, credentials, tokens, keys, private personal data",
+    "Do not run a memory-reflection round after every turn",
+    "before a commit or compaction summary",
+    "at completion without a commit",
+    "after a strong finding at risk of context loss",
+    "Consider existing knowledge first",
+    "Keep the smallest useful set, not a fixed count",
     "Use `version = 1` and zero or more `[[entries]]`",
-    "except a `Subagent Insight` record also contains exactly `subagent_type`",
-    "quoted ISO 8601 `YYYY-MM-DD` calendar date",
-    "`User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`",
-    "exact native role used for delegation",
-    "Store every accepted subagent insight as a separate entry",
-    "Evaluate every agent-memory insight proposed under the communication contract",
-    "Retain only useful insights supported by strong evidence",
-    "no longer than three sentences",
-    "no longer than 32 words in total",
-    "Before every commit and context-compaction summary",
-    "In a Git repository where `.basix` is not ignored",
-    "Before a compaction summary, commit an eligible update after required verification",
-    "Never commit an ignored `.basix` directory",
+    "`Subagent Insight` also has `subagent_type`",
+    "quoted ISO 8601 `YYYY-MM-DD`",
+    "at most three sentences and 32 words",
+    "stores accepted subagent insights separately",
+    "Commit updates with task changes unless `.basix` is ignored",
+    "Before compaction, commit eligible updates after verification",
+    "Never override ignore rules",
     "## Completion and commits",
     "wait for every running verification and test to complete successfully",
     "commit only the task's changes using a Conventional Commits message",
@@ -259,6 +262,14 @@ def validate_memory_entry(entry):
     assert len(re.findall(r"[.!?]+(?:\s|$)", entry["insight"])) <= 3
 for entry in memory["entries"]:
     validate_memory_entry(entry)
+verifier_insights = [
+    entry for entry in memory["entries"]
+    if entry.get("subagent_type") == "basix_verifier"
+]
+assert len(verifier_insights) == 1
+assert "Copy-tree uninstall" in verifier_insights[0]["insight"]
+workflow_insights = [entry for entry in memory["entries"] if entry["category"] == "Workflow"]
+assert any("focused negative tests" in entry["insight"] for entry in workflow_insights)
 validate_memory_entry({"date": "2026-01-01", "category": "Repository", "insight": "Legacy entry."})
 validate_memory_entry({
     "date": "2026-01-01", "category": "Subagent Insight", "subagent_type": "basix_file_explorer",
