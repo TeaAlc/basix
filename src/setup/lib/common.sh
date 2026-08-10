@@ -22,16 +22,23 @@ die() { if [[ $REPORT_ACTIVE == true ]]; then report_point failed "$REPORT_POINT
 note() { printf '%s\n' "$*"; }
 orange_warning() { printf 'warning: %s\n' "$*" >&2; }
 
-lumen_mcp_installed() {
-  local metadata
+lumen_mcp_registration_status() {
+  local expected_command=$1 metadata
   command -v codex >/dev/null || return 1
-  metadata=$(codex mcp get lumen --json 2>/dev/null) || return 1
+  if ! metadata=$(codex mcp get lumen --json 2>/dev/null); then
+    printf 'absent\n'
+    return 0
+  fi
   python3 -c 'import json,sys
 try:
- value=json.load(sys.stdin); valid=value.get("name")=="lumen" and value.get("enabled",True) is True and value.get("disabled_reason") is None
-except (AttributeError,json.JSONDecodeError): valid=False
-raise SystemExit(0 if valid else 1)' <<<"$metadata"
+ value=json.load(sys.stdin)
+ transport=value.get("transport", {})
+ matching=(value.get("name")=="lumen" and value.get("enabled") is True and value.get("disabled_reason") is None and transport.get("command")==sys.argv[1] and transport.get("args")==["stdio"])
+except (AttributeError,json.JSONDecodeError): matching=False
+print("matching" if matching else "conflict")' "$expected_command" <<<"$metadata"
 }
+
+lumen_mcp_installed() { [[ $(lumen_mcp_registration_status "$1") == matching ]]; }
 
 codex_json_contains() { local needle=$1 value; shift; value=$("$@" 2>/dev/null) || return 1; python3 -c 'import json,sys
 try: data=json.load(sys.stdin)

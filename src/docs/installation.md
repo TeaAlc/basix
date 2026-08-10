@@ -49,6 +49,13 @@ Ory Lumen as a separate, explicit step when wanted:
 Use that installer's own options and run project indexing separately. A Basix
 uninstall does not change an independently installed Lumen integration.
 
+The installer verifies that an existing active `lumen` MCP registration uses the
+expected local runner and `stdio` argument. If that matching registration exists
+but the local runtime or skill link is missing, the installer restores the
+missing component without registering a duplicate server. A registration with a
+different command, arguments, or activation state is treated as a conflict and
+causes a safe exit before filesystem or MCP changes.
+
 ## Reports
 
 Both installers report the target and dry-run state, followed by grouped results.
