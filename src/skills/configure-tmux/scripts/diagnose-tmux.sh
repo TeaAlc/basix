@@ -126,7 +126,7 @@ if command -v tmux >/dev/null 2>&1; then
     history_limit=$(tmux "${server_args[@]}" show-options -gv history-limit 2>/dev/null || printf unknown)
     extended_keys=$(tmux "${server_args[@]}" show-options -sv extended-keys 2>/dev/null || printf unknown)
     [[ $mouse == on ]] && add_check mouse ok "tmux mouse mode is enabled" || add_check mouse warning "tmux mouse mode is not enabled"
-    [[ $extended_keys == on ]] && add_check extended_keys ok "tmux extended-keys transport is enabled" || add_check extended_keys warning "tmux extended-keys transport is not enabled"
+    [[ $extended_keys == on ]] && add_check extended_keys ok "tmux extended-keys transport is enabled without rewriting legacy control keys" || add_check extended_keys warning "tmux extended-keys transport is not safely enabled"
     mapfile -t client_feature_lines < <(tmux "${server_args[@]}" list-clients -F '#{client_tty}|#{client_termfeatures}' 2>/dev/null || true)
     enabled_clients=0
     disabled_clients=0

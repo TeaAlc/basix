@@ -109,7 +109,7 @@ for mode in tmux-mouse native-terminal keyboard-only; do
   if [[ $mode == native-terminal ]]; then
     [[ $(TMUX='' TMUX_TMPDIR=$temp/socket tmux -L "$socket" show-options -gv 'terminal-overrides[1000]') == 'xterm*:smcup@:rmcup@' ]] || fail "native-terminal isolated override mismatch"
   fi
-  if grep -Eq 'bind-key([^#]*(^|[[:space:]]))(Up|Down)([[:space:]]|$)' "$temp/home/.config/tmux/conf.d/basix-terminal.conf"; then fail "$mode creates a forbidden physical Up/Down root binding"; fi
+  if grep -Eq 'bind-key([^#]*(^|[[:space:]]))(Up|Down|C-c|C-Enter|C-j|S-Enter)([[:space:]]|$)' "$temp/home/.config/tmux/conf.d/basix-terminal.conf"; then fail "$mode creates a forbidden physical or modified-key root binding"; fi
   TMUX='' TMUX_TMPDIR=$temp/socket tmux -L "$socket" kill-server >/dev/null
 done
 printf 'Isolated tmux verification passed for all three modes.\n'

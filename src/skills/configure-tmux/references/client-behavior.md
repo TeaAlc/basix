@@ -20,15 +20,20 @@ state. See the [tmux mouse support section](https://man7.org/linux/man-pages/man
 
 ## Extended keys and Codex
 
-All three modes enable tmux's extended-key transport for `xterm*` clients. Detach
+All three modes enable negotiated tmux extended-key transport for `xterm*`
+clients. Keep `extended-keys on`: `always` can rewrite traditional control keys
+for applications that did not request extended input. Detach
 and reattach every client after applying or reloading so the terminal capabilities
 are negotiated again. Then test the actual terminal: support remains dependent on
-the outer client and the complete connection path.
+the outer client and the complete connection path. In particular, tmux cannot
+distinguish `Ctrl+Enter` from `Enter` if MobaXterm, Termux, or another outer
+terminal sends the same bytes for both.
 
-tmux only transports the key sequence. Codex assigns the action. When requested,
-use Codex `/keymap` for `chat.interrupt_turn` with `Ctrl+C` or `Esc`, and for
-`editor.insert_newline` with `Ctrl+Enter`, `Ctrl+J`, or `Shift+Enter`. This skill
-does not write Codex configuration or create tmux root bindings for those keys.
+tmux only transports the key sequence. Codex reserves `Ctrl+C` to close the
+session, so never add it to `chat.interrupt_turn` or any other application
+keymap. This skill neither recommends nor changes Codex or other application
+configuration and creates no tmux root bindings for these keys. Applied fixes
+belong exclusively to tmux and its managed configuration.
 
 ## Shift and client bypass
 

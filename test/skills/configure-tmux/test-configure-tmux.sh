@@ -38,6 +38,11 @@ for file in "$CONFIGURE" "$DIAGNOSE" "$VERIFY" "$CLIPBOARD"; do
 done
 ok 'skill scripts are executable and parse as Bash'
 
+skill_docs=$(printf '%s\n' "$SKILL/SKILL.md" "$SKILL/references/client-behavior.md" "$SKILL/references/troubleshooting.md")
+! xargs grep -Fq '`chat.interrupt_turn` to `Ctrl+C`' <<<"$skill_docs" || bad 'skill recommends binding reserved Ctrl+C to chat.interrupt_turn'
+! xargs grep -Eiq 'use Codex `/keymap`|Configure Codex actions' <<<"$skill_docs" || bad 'skill recommends changing Codex configuration'
+ok 'documentation preserves Ctrl+C and keeps every applied fix in tmux'
+
 home_space=$TEMP/'home with space'
 mkdir -p "$home_space"
 dry_output=$TEMP/dry.out

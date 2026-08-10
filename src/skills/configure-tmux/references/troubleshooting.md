@@ -17,6 +17,8 @@ reach the affected session.
 | `smcup`/`rmcup` present | Alternate-screen applications may hide native scrollback | Use `native-terminal` only if outer-terminal scrollback is desired |
 | Missing `kmous` | TERM/terminfo cannot describe mouse input reliably | Correct TERM/terminfo outside this skill before enabling tmux mouse |
 | `extended-keys` off | tmux will not transport negotiated modified keys | Apply one mode, reconnect clients, and test the intended keys |
+| `extended-keys` always | tmux may rewrite legacy control keys for unaware applications | Use the managed `on` value; never repair this with per-key root bindings |
+| `Ctrl+Enter` equals `Enter` before tmux | The outer client did not encode a modifier distinction | Report the client boundary; tmux cannot reconstruct the modifier and this skill does not change other applications |
 | Client lacks `extkeys` | The attached client did not negotiate extended keys | Reconnect it; then inspect client support and the outer terminal |
 | Modified-key root binding present | tmux may intercept a Codex shortcut | Inspect it manually; never replace an unknown binding |
 | No clipboard transport | Display variables or helper program are unavailable | Keep helper disabled; use native paste or a tmux buffer |
@@ -41,11 +43,12 @@ sources the whole entry config, detaches clients, or kills a real server. Before
 changing a managed mouse binding, it compares the effective live definition with
 the known Basix helper. A mismatch requires manual resolution.
 
-Mouse, history, and the server-side `extended-keys` option take effect on source.
+Mouse, history, and the server-side `extended-keys on` option take effect on source.
 Terminal capability changes do not fully affect existing clients; detach and
 reattach them. Re-test after SSH or terminal-client reconnects because TERM,
-display access, key encoding, and socket selection can change. Configure Codex
-actions separately through `/keymap`; this skill never edits Codex configuration.
+display access, key encoding, and socket selection can change. Never map the
+session-closing `Ctrl+C` key to `chat.interrupt_turn`. This skill never edits or
+recommends edits to Codex or other application configuration.
 
 ## Clipboard failures
 

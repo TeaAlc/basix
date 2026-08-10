@@ -66,6 +66,11 @@ insight = "Compare live tmux bindings against same-version isolated list-keys ou
 [[entries]]
 date = "2026-08-10"
 category = "Tooling"
+insight = "Keep tmux extended-keys negotiated with `on`; forcing `always` may rewrite legacy controls for unaware applications. Never compensate with application keymaps or per-key tmux bindings."
+
+[[entries]]
+date = "2026-08-10"
+category = "Tooling"
 insight = "Codex rollouts under ~/.codex/sessions persist token_count totals; map CODEX_THREAD_ID and recursive sub_agent_activity agent_thread_id values to per-thread files without reading message content."
 
 [[entries]]

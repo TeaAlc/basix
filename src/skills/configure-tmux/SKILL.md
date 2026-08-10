@@ -58,20 +58,29 @@ its `overall_status` and individual checks.
   `[`, navigate with the active tmux key table, start/select text, and confirm to
   copy; paste the current tmux buffer with `C-b ]`.
 
-Every mode enables tmux extended-key transport with `extended-keys on` and the
-reserved `terminal-features[1000]` value `xterm*:extkeys`. Clients must detach and
+Every mode enables negotiated tmux extended-key transport with `extended-keys on`
+and the reserved `terminal-features[1000]` value `xterm*:extkeys`. Do not use
+`extended-keys always`: it may rewrite traditional control keys for applications
+that did not request extended input. Clients must detach and
 reattach after this capability changes. Never create root bindings for physical
 `Up` or `Down`, `Ctrl+C`, `Ctrl+Enter`, `Ctrl+J`, or `Shift+Enter`. Diagnose
 existing relevant root bindings instead of overwriting them. The configure script
 refuses foreign use of either reserved array slot, unsafe symlinks, incomplete
 markers, or foreign managed-file contents.
 
-## tmux transport and Codex keymaps
+## Transparent key transport
 
-tmux transports modified key sequences; it does not decide which Codex action a
-sequence invokes. If Codex behavior needs adjustment, use Codex `/keymap` to map
-`chat.interrupt_turn` to `Ctrl+C` or `Esc`, and `editor.insert_newline` to
-`Ctrl+Enter`, `Ctrl+J`, or `Shift+Enter`. Keep those choices user-controlled.
+tmux transports key sequences; it cannot recover a distinction the outer client
+did not encode. Preserve traditional Linux control bytes such as `Ctrl+C` and do
+not add root bindings or force extended encoding. `Ctrl+Enter` works only when
+the outer terminal emits a distinct extended sequence and the foreground
+application negotiates that protocol. Diagnose and report either missing layer
+instead of claiming tmux alone can fix it.
+
+Codex reserves `Ctrl+C` to close the session. Never bind it to
+`chat.interrupt_turn` or any other action. Do not recommend or change Codex or
+other application keymaps as part of this skill; all applied fixes must remain in
+tmux and its managed configuration.
 
 This skill writes only the tmux files listed below. It never changes global or
 project-local Codex configuration.
