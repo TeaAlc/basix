@@ -16,9 +16,10 @@ chmod +x "$mock/codex"; export PATH="$mock:$PATH"
 
 project="$case_dir/project"
 if "$ROOT/setup/install_for_project.sh" "$project" >/dev/null &&
-   [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix/references/agent-communication-contract.md && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
+   [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix/references/agent-communication-contract.md && -f $project/.agents/skills/basix-experience/scripts/collect-token-usage.py && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
    ! find "$project/.agents/skills" "$project/.codex/basix" -type l -print -quit | grep -q . &&
    ! cut -f1 "$project/.codex/.basix-install-state" | grep -Ev '^(copy|dircopy|dirfile)$' | grep -q .; then ok 'fresh project install copies complete trees'; else bad 'fresh project install copies complete trees'; fi
+check 'project install preserves token collector bytes' cmp -s "$ROOT/skills/basix-experience/scripts/collect-token-usage.py" "$project/.agents/skills/basix-experience/scripts/collect-token-usage.py"
 for agent in "$ROOT"/agents/native/*.toml; do
   check "project install preserves $(basename "$agent") bytes" cmp -s "$agent" "$project/.codex/basix/agents/$(basename "$agent")"
 done
@@ -63,7 +64,8 @@ for option in --mode --force --install-lumen --lumen-index; do
 done
 
 global="$case_dir/global"; CODEX_HOME="$global" "$ROOT/setup/install_as_plugin.sh" >/dev/null
-if [[ -f $global/basix-plugin-root/skills/basix/SKILL.md && -f $global/basix/agents/basix-researcher.toml ]] && ! find "$global/basix-plugin-root" "$global/basix" -type l -print -quit | grep -q .; then ok 'fresh global install uses copies only'; else bad 'fresh global install uses copies only'; fi
+if [[ -f $global/basix-plugin-root/skills/basix/SKILL.md && -f $global/basix-plugin-root/skills/basix-experience/scripts/collect-token-usage.py && -f $global/basix/agents/basix-researcher.toml ]] && ! find "$global/basix-plugin-root" "$global/basix" -type l -print -quit | grep -q .; then ok 'fresh global install uses copies only'; else bad 'fresh global install uses copies only'; fi
+check 'global install preserves token collector bytes' cmp -s "$ROOT/skills/basix-experience/scripts/collect-token-usage.py" "$global/basix-plugin-root/skills/basix-experience/scripts/collect-token-usage.py"
 for agent in "$ROOT"/agents/native/*.toml; do
   check "global install preserves $(basename "$agent") bytes" cmp -s "$agent" "$global/basix/agents/$(basename "$agent")"
 done

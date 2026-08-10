@@ -5,6 +5,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 mapfile -t skill_scripts < <(find "$ROOT/skills" -path '*/scripts/*.sh' -type f -print | sort)
 for script in "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh "${skill_scripts[@]}"; do bash -n "$script"; done
 "$ROOT/tests/test-configure-tmux.sh"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/test-collect-token-usage.py"
 python3 - "$ROOT" <<'PY'
 import json, re, sys, tomllib
 from pathlib import Path
@@ -33,6 +34,8 @@ review_path = root / "skills/basix-experience"
 review = (review_path / "SKILL.md").read_text()
 review_flat = " ".join(review.split())
 review_ui = (review_path / "agents/openai.yaml").read_text()
+collector = review_path / "scripts/collect-token-usage.py"
+assert collector.is_file()
 assert re.search(r'\A---\nname: basix-experience\ndescription: ["\']Basix-Skill: ', review)
 assert 'allow_implicit_invocation: true' in review_ui
 assert 'display_name: "Basix Experience"' in review_ui
@@ -52,6 +55,11 @@ for phrase in (
     "input tokens are exactly zero", "division by zero", "qualitatively",
     "exactly five concrete saving opportunities", "unique rank from 1 through 5",
     "single best next change", "Follow the language used by the user",
+    "PYTHONDONTWRITEBYTECODE=1 python3", "collect-token-usage.py --format json",
+    "must never block or abort the report", "status` is `ok` or `partial`",
+    "aggregate metric only when that individual field is non-null",
+    "`reasoning_output_tokens` to reasoning tokens",
+    "`cached_input_tokens` to the cache counter", "never add, merge, or fill fields",
 ):
     assert phrase in review_flat, phrase
 assert review.count("at most 32 words") == 2
@@ -282,8 +290,7 @@ verifier_insights = [
     entry for entry in memory["entries"]
     if entry.get("subagent_type") == "basix_verifier"
 ]
-assert len(verifier_insights) == 1
-assert "Copy-tree uninstall" in verifier_insights[0]["insight"]
+assert any("Copy-tree uninstall" in entry["insight"] for entry in verifier_insights)
 workflow_insights = [entry for entry in memory["entries"] if entry["category"] == "Workflow"]
 assert any("focused negative tests" in entry["insight"] for entry in workflow_insights)
 validate_memory_entry({"date": "2026-01-01", "category": "Repository", "insight": "Legacy entry."})

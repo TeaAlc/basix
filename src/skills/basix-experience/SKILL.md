@@ -24,6 +24,26 @@ hidden activity, reconstruct unavailable telemetry, or claim exhaustive coverage
 - Never estimate exact token values or cache metrics from prose, message length,
   context size, tool output, elapsed time, or model behavior.
 
+## Collector-assisted telemetry
+
+Before writing **Token usage**, resolve this skill's directory and attempt to run
+its collector as:
+
+`PYTHONDONTWRITEBYTECODE=1 python3 <skill-directory>/scripts/collect-token-usage.py --format json`
+
+The collector is best-effort evidence and must never block or abort the report.
+For schema-valid output whose `status` is `ok` or `partial`, use an aggregate
+metric only when that individual field is non-null; such a value is complete
+across every discovered thread. Map `reasoning_output_tokens` to reasoning tokens,
+`output_tokens` to output tokens, `input_tokens` to input tokens, and
+`cached_input_tokens` to the cache counter used for the derived hit rate.
+
+Treat collector `error` output, invalid JSON, a missing Python interpreter, or an
+unreadable or missing collector as unavailable telemetry. Structured telemetry
+already supplied to the session remains a fallback. Select one complete source
+for each report attempt: never add, merge, or fill fields across collector and
+fallback sources. A failed collector does not change any other report section.
+
 ## Satisfaction scale
 
 Choose one level for every evidenced skill and subagent. Translate the selected
@@ -82,9 +102,9 @@ sessions. Keep the complete idea to at most 32 words; omit it otherwise.
 ### Token usage
 
 Create a table with rows for input tokens, reasoning tokens, output tokens, and
-cache hit rate. Use exact numbers only from structured telemetry supplied to the
-session. Render every absent or partial metric as a localized equivalent of `not
-available`; never render an absent metric as zero.
+cache hit rate. Use exact numbers only from accepted collector output or structured
+telemetry supplied to the session. Render every absent or partial metric as a
+localized equivalent of `not available`; never render an absent metric as zero.
 
 Treat "thin tokens" as reasoning tokens only when that terminology is present in
 the supplied telemetry or request. If both are present, do not combine them unless

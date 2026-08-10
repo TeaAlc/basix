@@ -67,3 +67,14 @@ insight = "Compare live tmux bindings against same-version isolated list-keys ou
 date = "2026-08-10"
 category = "Tooling"
 insight = "Codex rollouts under ~/.codex/sessions persist token_count totals; map CODEX_THREAD_ID and recursive sub_agent_activity agent_thread_id values to per-thread files without reading message content."
+
+[[entries]]
+date = "2026-08-10"
+category = "Verification"
+insight = "Memory validation must assert required entries by content, not exact category or subagent-type counts; durable memory legitimately grows across sessions."
+
+[[entries]]
+date = "2026-08-10"
+category = "Subagent Insight"
+subagent_type = "basix_verifier"
+insight = "Compare thread-path assignments before visited-cycle short-circuits; otherwise conflicting cyclic or later references bypass ambiguity errors."
