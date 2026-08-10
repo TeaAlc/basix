@@ -83,7 +83,7 @@ Tests must cover:
 - preservation of existing Pager, Explorer, Researcher, installer, and setup behavior;
 - `git diff --check`.
 
-Run the focused authoring tests, verifier smoke tests, installer-mode tests, `src/tests/verify-basix.sh`, and `src/tests/test-setup.sh`.
+Run the focused authoring tests, verifier smoke tests, installer-mode tests, `test/verify-basix.sh`, and `test/test-setup.sh`.
 
 ## Assumptions
 

@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-mapfile -t skill_scripts < <(find "$ROOT/skills" -path '*/scripts/*.sh' -type f -print | sort)
-for script in "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh "${skill_scripts[@]}"; do bash -n "$script"; done
-"$ROOT/tests/test-configure-tmux.sh"
-PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/test-collect-token-usage.py"
-python3 - "$ROOT" <<'PY'
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/src
+PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT" <<'PY'
 import json, re, sys, tomllib
 from pathlib import Path
 root = Path(sys.argv[1])
@@ -184,11 +180,7 @@ for phrase in ("cycle_revision", "followup_task", "send exactly one `final_resul
     assert phrase not in verifier["developer_instructions"], phrase
 assert not (root / "agents/exec").exists()
 PY
-VALIDATOR="$ROOT/skills/basix-agent-authoring/scripts/validate.py"
-PYTHONPYCACHEPREFIX=${TMPDIR:-/tmp}/basix-pycache python3 -m py_compile "$ROOT/setup/lib/manage_developer_instructions.py" "$VALIDATOR"
-python3 "$VALIDATOR" agent "$ROOT"/agents/native/*.toml
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$ROOT/skills/basix-agent-authoring/tests" -p 'test_*.py'
-python3 - "$ROOT" <<'PY'
+PYTHONDONTWRITEBYTECODE=1 python3 - "$ROOT" <<'PY'
 import re
 import sys
 import tomllib
@@ -415,19 +407,4 @@ for path in (root / "agents/native").glob("*.toml"):
     assert actual == bootstrap, path
     assert "basix-agent-authoring:contract:start" not in text, path
 PY
-if command -v shellcheck >/dev/null; then shellcheck --severity=warning "$ROOT"/scripts/*.sh "$ROOT"/setup/*.sh "$ROOT"/setup/lib/*.sh "$ROOT"/tests/*.sh "${skill_scripts[@]}"; else printf 'SKIP: shellcheck not installed\n'; fi
 printf 'Static Basix verification passed.\n'
-
-if command -v codex >/dev/null; then
-  temp=$(mktemp -d)
-  trap 'rm -rf "$temp"' EXIT
-  mkdir -p "$temp/codex-home" "$temp/work"
-  (
-    cd "$temp/work"
-    CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" >/dev/null
-    CODEX_HOME="$temp/codex-home" "$ROOT/setup/install_as_plugin.sh" --uninstall >/dev/null
-  )
-  printf 'Real Codex plugin compatibility passed (no model run).\n'
-else
-  printf 'SKIP: codex CLI not installed\n'
-fi

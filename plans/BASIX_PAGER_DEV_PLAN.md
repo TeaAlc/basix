@@ -301,7 +301,7 @@ conversation context and must be given its concrete assignment by `/root`.
 
 ### Tests
 
-- Extend `src/skills/basix-agent-authoring/tests/test_validate.py` for:
+- Extend `test/skills/basix-agent-authoring/test_validate.py` for:
   - valid Luna Max verifier with the explicit override marker;
   - rejection without the marker;
   - rejection of unsupported model, sandbox, or duplicate fields;
@@ -334,9 +334,9 @@ Run at minimum:
 python3 src/skills/basix-agent-authoring/scripts/validate.py agent \
   src/agents/native/basix-verifier.toml
 python3 -m unittest \
-  src/skills/basix-agent-authoring/tests/test_validate.py
-bash src/tests/verify-basix.sh
-bash src/tests/test-setup.sh
+  test/skills/basix-agent-authoring/test_validate.py
+bash test/verify-basix.sh
+bash test/test-setup.sh
 git diff --check
 ```
 

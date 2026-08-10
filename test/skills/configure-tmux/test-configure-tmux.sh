@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/src
 SKILL=$ROOT/skills/configure-tmux
 CONFIGURE=$SKILL/scripts/configure-tmux.sh
 DIAGNOSE=$SKILL/scripts/diagnose-tmux.sh

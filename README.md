@@ -22,8 +22,11 @@ All installable Basix sources live below `src/`:
 | `src/setup/` | Global, project, Lumen, and Tor-only Scrapling installers |
 | `src/scripts/` | Launchers shared across skills or agents |
 | `src/docs/` | Architecture and component documentation |
-| `src/tests/` | Basix bundle verification and setup tests |
-| `test/` | Repository-level tests, including the Scrapling installer and policy tests |
+| `test/agents/` | One directly executable deterministic suite per native agent |
+| `test/skills/` | One directly executable deterministic suite per skill |
+| `test/setup/` | Installer and setup-support suites |
+| `test/shared/` | Tests for shared scripts without a component owner |
+| `test/live/` | Explicit authenticated Codex/model tests, excluded from standard gates |
 
 The source of truth for agent behavior is `src/agents/native/`; setup scripts only
 bind those definitions into supported Codex locations. Persistent shared
@@ -55,11 +58,10 @@ More detail is available in the [architecture](src/docs/architecture.md),
 From the repository root, run:
 
 ```bash
-./src/tests/verify-basix.sh
-./src/tests/test-setup.sh
-bash test/test-installer.sh
-bash test/test-codex-integration.sh
-PYTHONPATH=src/scripts python3 test/test_system_cavify.py
+./test/verify-basix.sh
+./test/test-setup.sh
+bash test/setup/install-scrapling-codex/test-install-scrapling-codex.sh
+bash test/shared/test-system-cavify.sh
 ```
 
 The live discovery check is intentionally separate because it performs one real
@@ -67,18 +69,18 @@ model turn and therefore requires Codex authentication, network access, and
 available usage quota:
 
 ```bash
-bash test/test-codex-discovery.sh
+bash test/live/run-live-tests.sh
 ```
 
 For changes to shell scripts, also run ShellCheck when it is installed:
 
 ```bash
-shellcheck src/setup/*.sh src/setup/scrapling-tor/*.sh test/*.sh
+find src test -name '*.sh' -type f -print0 | xargs -0 shellcheck
 git diff --check
 ```
 
-`verify-basix.sh` includes static metadata, agent, Python, shell, and real Codex
-plugin compatibility checks where the required programs are available.
+Both standard aggregators run every suite after failures and report failed suite
+paths and timings. Live/model tests are only run through `test/live/run-live-tests.sh`.
 
 ## 2. Installing and using Basix in Codex projects
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/src
 
-bash -n "$ROOT/setup/install_as_plugin.sh" "$ROOT/setup/install_for_project.sh" "$ROOT/setup/install_ory_lumen.sh" "$ROOT/setup/lib/common.sh"
-"$ROOT/tests/test-install-copy.sh"
+bash -n "$ROOT/setup/install_ory_lumen.sh"
 
 case_dir=$(mktemp -d); trap 'rm -rf "$case_dir"' EXIT
 mock="$case_dir/bin"; home="$case_dir/home"; codex_home="$case_dir/codex"; mkdir -p "$mock" "$home"

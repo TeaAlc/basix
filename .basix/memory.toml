@@ -78,3 +78,8 @@ date = "2026-08-10"
 category = "Subagent Insight"
 subagent_type = "basix_verifier"
 insight = "Compare thread-path assignments before visited-cycle short-circuits; otherwise conflicting cyclic or later references bypass ambiguity errors."
+
+[[entries]]
+date = "2026-08-10"
+category = "Repository"
+insight = "All tests are component-owned under test/. verify-basix.sh aggregates deterministic agents, skills, and shared suites; test-setup.sh aggregates setup; live tests remain explicit."

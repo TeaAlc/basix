@@ -9,7 +9,7 @@ import tomllib
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3] / "src/skills/basix-agent-authoring"
 SCRIPT = ROOT / "scripts" / "validate.py"
 BOOTSTRAP_REFERENCE = ROOT / "references" / "native-agent-bootstrap.md"
 CONTRACT_REFERENCE = ROOT.parent / "basix" / "references" / "agent-communication-contract.md"
@@ -330,7 +330,7 @@ class AgentTests(unittest.TestCase):
             self.assertNotIn(phrase, instructions)
 
     def test_all_native_roles_forbid_direct_root_recipient(self):
-        repository = Path(__file__).resolve().parents[4]
+        repository = Path(__file__).resolve().parents[3]
         for path in sorted((repository / "src/agents/native").glob("*.toml")):
             agent = tomllib.loads(path.read_text())
             combined = agent["description"] + "\n" + agent["developer_instructions"]
@@ -634,7 +634,7 @@ class AgentTests(unittest.TestCase):
 
 class RepositoryPolicyTests(unittest.TestCase):
     def test_native_agents_use_only_canonical_bootstrap_and_validate(self):
-        repository = Path(__file__).resolve().parents[4]
+        repository = Path(__file__).resolve().parents[3]
         agents = sorted((repository / "src/agents/native").glob("*.toml"))
         self.assertTrue(agents)
         for path in agents:
@@ -659,12 +659,12 @@ class RepositoryPolicyTests(unittest.TestCase):
         self.assertEqual(insights["items"]["pattern"], "\\S")
 
     def test_documented_repository_test_paths_exist(self):
-        repository = Path(__file__).resolve().parents[4]
+        repository = Path(__file__).resolve().parents[3]
         skills = (
             repository / "src/skills/basix/SKILL.md",
             repository / "src/skills/basix-agent-authoring/SKILL.md",
         )
-        documented_paths = ("./src/tests/verify-basix.sh", "./src/tests/test-setup.sh")
+        documented_paths = ("./test/verify-basix.sh", "./test/test-setup.sh")
         for skill in skills:
             text = skill.read_text()
             for documented_path in documented_paths:

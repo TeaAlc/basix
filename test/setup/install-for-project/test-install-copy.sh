@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/src
 case_dir=$(mktemp -d); trap 'rm -rf "$case_dir"' EXIT
 passes=0 failures=0
 ok() { printf 'ok - %s\n' "$1"; passes=$((passes+1)); }
@@ -60,16 +60,7 @@ if "$ROOT/setup/install_for_project.sh" "$alias" >/dev/null 2>&1; then bad 'phys
 
 for option in --mode --force --install-lumen --lumen-index; do
   if "$ROOT/setup/install_for_project.sh" "$case_dir/reject" "$option" value >/dev/null 2>&1; then bad "project rejects $option"; else ok "project rejects $option"; fi
-  if CODEX_HOME="$case_dir/global-reject" "$ROOT/setup/install_as_plugin.sh" "$option" value >/dev/null 2>&1; then bad "global rejects $option"; else ok "global rejects $option"; fi
 done
 
-global="$case_dir/global"; CODEX_HOME="$global" "$ROOT/setup/install_as_plugin.sh" >/dev/null
-if [[ -f $global/basix-plugin-root/skills/basix/SKILL.md && -f $global/basix-plugin-root/skills/basix-experience/scripts/collect-token-usage.py && -f $global/basix/agents/basix-researcher.toml ]] && ! find "$global/basix-plugin-root" "$global/basix" -type l -print -quit | grep -q .; then ok 'fresh global install uses copies only'; else bad 'fresh global install uses copies only'; fi
-check 'global install preserves token collector bytes' cmp -s "$ROOT/skills/basix-experience/scripts/collect-token-usage.py" "$global/basix-plugin-root/skills/basix-experience/scripts/collect-token-usage.py"
-for agent in "$ROOT"/agents/native/*.toml; do
-  check "global install preserves $(basename "$agent") bytes" cmp -s "$agent" "$global/basix/agents/$(basename "$agent")"
-done
-alias_home="$case_dir/global-alias"; mkdir -p "$alias_home/basix-plugin-root/.codex-plugin"; ln "$source_copy/plugin/plugin.json" "$alias_home/basix-plugin-root/.codex-plugin/plugin.json"
-if CODEX_HOME="$alias_home" "$source_copy/setup/install_as_plugin.sh" >/dev/null 2>&1; then bad 'global alias is rejected before mutation'; elif [[ ! -e $alias_home/basix ]]; then ok 'global alias is rejected before mutation'; else bad 'global alias is rejected before mutation'; fi
 
 printf '%d passed, %d failed\n' "$passes" "$failures"; ((failures == 0))

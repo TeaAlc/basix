@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3] / "src"
 COLLECTOR = ROOT / "skills" / "basix-experience" / "scripts" / "collect-token-usage.py"
 ROOT_ID = "11111111-1111-4111-8111-111111111111"
 CHILD_ID = "22222222-2222-4222-8222-222222222222"

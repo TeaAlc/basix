@@ -33,3 +33,9 @@ Contract 1.4 exclusively owns
 the direct-parent hierarchy, parent-authored escalation, message envelope, cycles,
 status cadence, permissions, reports, waiting, visible confirmations, and terminal
 results. Native definitions retain role behavior and the canonical bootstrap only.
+
+All repository tests live under `test/` and are owned by an agent, skill, setup
+script, or shared helper. `test/verify-basix.sh` aggregates deterministic agent,
+skill, and shared suites; `test/test-setup.sh` aggregates deterministic installer
+suites. Both continue after failures. Authenticated discovery is opt-in through
+`test/live/run-live-tests.sh` and is never part of either standard gate.

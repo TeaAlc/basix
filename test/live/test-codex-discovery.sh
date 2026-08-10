@@ -2,7 +2,7 @@
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 command -v codex >/dev/null || {
   printf 'error: codex CLI is required for the live discovery test\n' >&2
   exit 1

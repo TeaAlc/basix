@@ -41,8 +41,8 @@ agent definitions contain only the validated bootstrap. If the contract cannot b
 loaded, the spawn fails closed.
 
 When changing the collection, update the relevant documentation. From
-`<Basix-Repo>`, run `./src/tests/verify-basix.sh` and
-`./src/tests/test-setup.sh`.
+`<Basix-Repo>`, run `./test/verify-basix.sh` and
+`./test/test-setup.sh`.
 
 ## Basix agent spawning
 
