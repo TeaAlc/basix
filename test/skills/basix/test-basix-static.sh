@@ -140,6 +140,8 @@ for language, headings in {
 savings_fixture = [(rank, "cause", "action", "effect") for rank in range(1, 6)]
 assert len(savings_fixture) == 5 and [row[0] for row in savings_fixture] == [1, 2, 3, 4, 5]
 router = (root / "skills/basix/SKILL.md").read_text()
+standard_aggregate = (root.parent / "test/verify-basix.sh").read_text()
+assert "test/skills/configure-tmux/test-configure-tmux-suite.sh" not in standard_aggregate
 assert "Follow all active instructions inside the managed" in router
 assert "`basix:developer-instructions` block" in router
 assert "does not replace or override them" in router
@@ -148,17 +150,45 @@ assert "`.agents/` runtime configuration from agent discovery" in router
 assert "Agents must not modify either directory directly" in router
 assert "Basix installers may write there" in router
 assert "installer tests use isolated temporary targets" in router
+assert "configure-tmux suite is excluded from" in router
+assert "only when an explicit plan changes the configure-tmux skill" in router
 for phrase in ("Agent level governs coordination", "`/root` | principal",
                "`basix_pager` | senior", "`basix_verifier` | senior",
                "`basix_file_explorer` | junior", "`basix_researcher` | junior",
-               "agent_level: junior", "non-root principal never"):
+               "agent_level: junior", "non-root principal", "never spawn generic agents"):
     assert phrase in router, phrase
+assert "| Agent | Level |" in router and "| Children |" not in router
+router_level_rows = re.findall(
+    r"(?m)^\| `([^`]+)` \| (junior|senior|principal) \|$", router
+)
+router_levels = dict(router_level_rows)
+assert len(router_level_rows) == len(router_levels), router_level_rows
+native_levels = {}
 for path in sorted((root / "agents/native").glob("*.toml")):
     lines = path.read_text().splitlines()
     assert lines[0] == "# basix-agent-authoring:metadata:start", path
-    assert lines[2] == "# basix-agent-authoring:metadata:end", path
+    metadata_end = lines.index("# basix-agent-authoring:metadata:end")
+    assert metadata_end in (2, 3), path
     agent = tomllib.loads(path.read_text())
+    metadata_text = "\n".join(
+        line.removeprefix("# ")
+        for line in lines[1:metadata_end]
+        if line.startswith("# metadata = ")
+    )
+    metadata = tomllib.loads(metadata_text)["metadata"]
+    native_levels[agent["name"]] = metadata["level"]
     assert agent["description"].startswith("Basix-Agent: "), path
+    assert agent["developer_instructions"].lstrip().startswith(
+        f"You are a {metadata['level']} Basix agent."
+    ), path
+    for legacy in (
+        "Do not spawn subagents.",
+        "You may spawn only `basix_file_explorer` and `basix_researcher`.",
+        "Do not spawn generic agents, senior agents, or principals.",
+        "Do not spawn principals.",
+    ):
+        assert legacy not in agent["developer_instructions"], (path, legacy)
+assert router_levels == {"/root": "principal", **native_levels}
 pager_path = root / "agents/native/basix-pager.toml"
 pager = tomllib.loads(pager_path.read_text())
 assert pager["name"] == "basix_pager"
@@ -193,7 +223,7 @@ assert instructions.count("<!-- basix:developer-instructions:end -->") == 1
 policy = instructions.split("<!-- basix:developer-instructions:start -->", 1)[1].split(
     "<!-- basix:developer-instructions:end -->", 1
 )[0]
-for phrase in ("`/root` is the fixed principal", "Set `agent_level`",
+for phrase in ("`/root` is the fixed principal", "sets `agent_level`",
                "omission means `junior`", "never spawns another principal"):
     assert phrase in policy, phrase
 memory_section = re.search(r"(?ms)^## Agent Memory\n.*?(?=^## )", policy).group(0)
@@ -316,7 +346,7 @@ for phrase in (
     'fork_turns="none"',
     "unique `task_name`",
     "generic web access",
-    "specialized Basix children",
+    "derive their spawn authority",
     "Follow the required communication contract",
 ):
     assert phrase in skill, phrase

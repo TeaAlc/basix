@@ -34,9 +34,11 @@ Agent level is independent of model and reasoning effort. `/root` is the fixed
 principal; `basix_pager` and `basix_verifier` are seniors; `basix_file_explorer`
 and `basix_researcher` are juniors. Every native TOML begins with commented,
 machine-readable `author` and `level` metadata. Juniors never spawn children;
-seniors may spawn only the two native juniors. A non-root principal never spawns
-another principal. Generic agents carry `agent_level` in their Root assignment,
-default to junior, and have no native TOML metadata.
+seniors may spawn every native type that the router table identifies as junior,
+but no generic agents. Principals may spawn native or generic juniors and seniors;
+only `/root` may directly spawn a generic principal. Generic agents carry
+`agent_level` in their Principal assignment, default to junior, and have no native
+TOML metadata.
 
 - `basix_pager` is a Highly complex reference role using `gpt-5.6-luna` with
   `xhigh` reasoning and is the sole native agent with `workspace-write`. It
@@ -90,9 +92,10 @@ permissions, reports, continuations, waiting, visible confirmations, and termina
 
 ## Native child spawning
 
-The router's level matrix is authoritative. Native juniors spawn nobody; native
-seniors may start only `basix_file_explorer` and `basix_researcher`. Role-specific
-read/write, sandbox, ownership, and domain boundaries remain in force.
+The router's complete `Agent | Level` table and level rules are authoritative.
+Native juniors spawn nobody; seniors may start every native type identified as
+junior in that table, but no generic agent. Role-specific read/write, sandbox,
+ownership, and domain boundaries remain in force.
 Every direct and nested spawn uses `fork_turns="none"`, a fresh unique task name, a
 self-contained assignment, and its own router-and-contract bootstrap.
 

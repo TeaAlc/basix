@@ -5,15 +5,15 @@ alone is not complexity. For mixed assignments, use the hardest material compone
 
 This complexity classification selects model reasoning effort, not agent level.
 Agent level separately controls coordination and spawn authority: juniors handle
-bounded work without children, seniors coordinate complex work and may spawn only
-the native junior explorer and researcher, and principals may spawn juniors and
-seniors. A non-root principal may not spawn another principal. Junior roles
+bounded work without children, seniors coordinate complex work and may spawn native
+juniors but no generic agents, and principals may spawn native or generic juniors
+and seniors. Only `/root` may directly spawn a generic principal. Junior roles
 normally use `low` or `medium`; senior roles should use complexity-appropriate
 `high`, `xhigh`, or `max`.
 
 A persistent native principal may be authored only after an explicit user request.
 Its leading metadata block must include level `principal` and the standardized
-`explicit-principal-level` marker; update its prompt permissions in the same change.
+`explicit-principal-level` marker; update its prompt level declaration in the same change.
 
 | Class | Default | Use when |
 |---|---|---|

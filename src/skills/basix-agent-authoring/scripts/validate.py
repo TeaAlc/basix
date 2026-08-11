@@ -26,6 +26,12 @@ CANONICAL_LEVELS = {
     "basix_pager": "senior",
     "basix_verifier": "senior",
 }
+LEGACY_SPAWN_CLAUSES = (
+    "Do not spawn subagents.",
+    "You may spawn only `basix_file_explorer` and `basix_researcher`.",
+    "Do not spawn generic agents, senior agents, or principals.",
+    "Do not spawn principals.",
+)
 BOOTSTRAP_START = "<!-- basix-agent-authoring:bootstrap:start -->"
 BOOTSTRAP_END = "<!-- basix-agent-authoring:bootstrap:end -->"
 CONTRACT_START = "<!-- basix-agent-authoring:contract:start version=1.4 -->"
@@ -344,17 +350,12 @@ def validate_agent(path: Path) -> None:
         need(parsed["sandbox_mode"] == "read-only",
              f"{path}: basix_verifier must remain read-only")
     instructions = parsed["developer_instructions"]
-    if metadata["level"] == "junior":
-        need("Do not spawn subagents." in instructions,
-             f"{path}: junior agents must explicitly forbid subagent spawning")
-    elif metadata["level"] == "senior":
-        need("You may spawn only `basix_file_explorer` and `basix_researcher`." in instructions,
-             f"{path}: senior agents may spawn only the two native junior roles")
-        need("Do not spawn generic agents, senior agents, or principals." in instructions,
-             f"{path}: senior agents must forbid generic, senior, and principal children")
-    else:
-        need("Do not spawn principals." in instructions,
-             f"{path}: non-root principals must forbid principal children")
+    level_declaration = f"You are a {metadata['level']} Basix agent."
+    need(instructions.lstrip().startswith(level_declaration),
+         f"{path}: developer_instructions must start with {level_declaration!r}")
+    for clause in LEGACY_SPAWN_CLAUSES:
+        need(clause not in instructions,
+             f"{path}: concrete spawn permissions belong only in the Basix router")
     if parsed["name"] == "basix_researcher":
         researcher_clauses = (
             "expect and use the Scrapling\nMCP server (spelled `scrapling`) when it is needed",

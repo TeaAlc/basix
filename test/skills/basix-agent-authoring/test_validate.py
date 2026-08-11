@@ -356,19 +356,12 @@ class AgentTests(unittest.TestCase):
         if preamble is None:
             preamble = RESEARCHER_PREAMBLE if name == "basix_researcher" else ""
         level = level or validator.CANONICAL_LEVELS.get(name, "junior")
-        permissions = (
-            "You are a junior Basix agent. Do not spawn subagents.\n"
-            if level == "junior" else
-            "You may spawn only `basix_file_explorer` and `basix_researcher`.\n"
-            "Do not spawn generic agents, senior agents, or principals.\n"
-            if level == "senior" else
-            "You are a non-root principal. Do not spawn principals.\n"
-        )
+        level_declaration = f"You are a {level} Basix agent.\n"
         principal = f"{validator.PRINCIPAL_MARKER}\n" if principal_marker else ""
         metadata = (f'{validator.METADATA_START}\n{principal}'
                     f'# metadata = {{ author = "{author}", level = "{level}" }}\n'
                     f'{validator.METADATA_END}\n')
-        text = f'''{metadata}name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\n{sandbox_marker}sandbox_mode = "{sandbox}"\ndeveloper_instructions = """{permissions}{preamble}{contract}"""\n'''
+        text = f'''{metadata}name = "{name}"\ndescription = "{description}"\n{marker}model = "{model}"\nmodel_reasoning_effort = "{effort}"\n{sandbox_marker}sandbox_mode = "{sandbox}"\ndeveloper_instructions = """{level_declaration}{preamble}{contract}"""\n'''
         directory = tempfile.TemporaryDirectory()
         path = Path(directory.name) / "agent.toml"
         path.write_text(text)
@@ -426,24 +419,19 @@ class AgentTests(unittest.TestCase):
             with directory, self.assertRaisesRegex(validator.Invalid, "must use"):
                 validator.validate_agent(path)
 
-    def test_level_spawn_permissions_are_enforced(self):
-        cases = (
-            ("junior", "Junior lacks prohibition."),
-            ("senior", "Senior may spawn generic agents."),
-            ("principal", "Principal may spawn principals."),
-        )
-        for level, preamble in cases:
+    def test_runtime_level_declaration_is_enforced(self):
+        for level in ("junior", "senior", "principal"):
             directory, path = self.write_agent(level=level,
-                                                principal_marker=level == "principal",
-                                                preamble=preamble)
+                                                principal_marker=level == "principal")
             text = path.read_text()
-            if level == "junior":
-                text = text.replace("You are a junior Basix agent. Do not spawn subagents.\n", "")
-            elif level == "senior":
-                text = text.replace("You may spawn only `basix_file_explorer` and `basix_researcher`.\n", "")
-            else:
-                text = text.replace("You are a non-root principal. Do not spawn principals.\n", "")
+            text = text.replace(f"You are a {level} Basix agent.\n", "")
             path.write_text(text)
+            with directory, self.assertRaises(validator.Invalid):
+                validator.validate_agent(path)
+
+    def test_concrete_spawn_permissions_are_rejected(self):
+        for clause in validator.LEGACY_SPAWN_CLAUSES:
+            directory, path = self.write_agent(preamble=f"{clause}\n")
             with directory, self.assertRaises(validator.Invalid):
                 validator.validate_agent(path)
 

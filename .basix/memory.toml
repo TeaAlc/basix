@@ -93,3 +93,8 @@ insight = "All tests are component-owned under test/. verify-basix.sh aggregates
 date = "2026-08-11"
 category = "Verification"
 insight = "Normalize whitespace before asserting prose across wrapped Markdown lines; exact substring assertions otherwise fail when formatting alone inserts line breaks."
+
+[[entries]]
+date = "2026-08-11"
+category = "User Instruction"
+insight = "Exclude the configure-tmux suite from standard test aggregators; run it only when an explicit plan changes the configure-tmux skill."

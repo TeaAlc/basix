@@ -47,12 +47,12 @@
 - Route nontrivial web frontend, backend, UI/UX, fullstack, and integration work to `basix_pager`. (This is for web development only)
 - Route independent inspection of a frozen result to the read-only `basix_verifier`.
 - Spawn every Basix agent with `fork_turns="none"`, a fresh unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
-- Native agents start only the specialized Basix children their role definition explicitly permits.
+- Native agents derive spawn authority only from the complete agent-level table and level rules in the `basix` router.
 - Every spawned Basix agent must load and follow the complete communication contract referenced by the `basix` router before planning, messages, tools, or domain work. If the router or contract is unreadable, the spawn fails closed.
 - `/root` is the fixed principal. Agent level controls spawn authority and is independent of model and reasoning effort, which control task complexity.
-- A generic agent has no native TOML metadata. Set `agent_level` in its direct Root assignment; omission means `junior`.
-- `/root` may classify a directly spawned generic agent as `junior`, `senior`, or `principal` without asking again. A generic principal receives an explicit spawn framework and may spawn generic or native juniors and seniors, never principals.
-- Juniors never spawn subagents. Seniors may spawn only `basix_file_explorer` and `basix_researcher`. A non-root principal never spawns another principal.
+- A generic agent has no native TOML metadata. Its spawning principal sets `agent_level` in the assignment; omission means `junior`.
+- A principal may classify a directly spawned generic agent as `junior` or `senior` without asking again. Only `/root` may directly classify one as `principal`. A generic principal receives an explicit spawn framework and may spawn generic or native juniors and seniors, never principals.
+- Juniors never spawn subagents. Seniors may spawn every native agent identified as junior by the router, but no generic agents. Principals may spawn native or generic juniors and seniors; a non-root principal never spawns another principal.
 - Native and Basix-managed generic agents must read the complete router and communication contract before planning, messages, tools, or domain work.
 
 ## Agent management

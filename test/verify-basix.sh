@@ -10,7 +10,6 @@ suites=(
   test/skills/basix/test-basix-static.sh
   test/skills/basix-agent-authoring/test-basix-agent-authoring.sh
   test/skills/basix-experience/test-basix-experience.sh
-  test/skills/configure-tmux/test-configure-tmux-suite.sh
   test/shared/test-system-cavify.sh
 )
 failed=()

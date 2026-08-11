@@ -21,6 +21,9 @@ skill-local links and scripts. Do not orchestrate running agents.
    `senior`, or `principal`). A principal additionally requires the
    `# basix-agent-authoring: explicit-principal-level` marker inside that block;
    add it only after an explicit user request for a persistent native principal.
+   Start `developer_instructions` with `You are a LEVEL Basix agent.`, using the
+   metadata level. The router owns all spawn authority; do not duplicate concrete
+   child permissions in native prompts.
    Insert or replace the marked bootstrap block in
    `developer_instructions`; never duplicate or embed the full contract. Every native agent TOML description
    must begin exactly with `Basix-Agent: `.
@@ -40,9 +43,10 @@ skill-local links and scripts. Do not orchestrate running agents.
 
 Agent level and assignment complexity are independent axes. Junior roles normally
 use `low` or `medium`; senior roles use complexity-appropriate `high` through
-`max`. Update metadata and prompt spawn permissions together: juniors spawn no
-children, seniors only `basix_file_explorer` and `basix_researcher`, and non-root
-principals never principals.
+`max`. The router maps every native agent to its level and is the sole source of
+spawn authority: juniors spawn no children, seniors spawn native juniors but no
+generic agents, and principals spawn native or generic juniors and seniors. Only
+`/root` may directly spawn a generic principal.
 
 The canonical JSON contract is [message.schema.json](references/message.schema.json).
 Validate one message with `message --stdin` and a JSON-lines stream with

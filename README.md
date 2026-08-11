@@ -23,7 +23,7 @@ All installable Basix sources live below `src/`:
 | `src/scripts/` | Launchers shared across skills or agents |
 | `src/docs/` | Architecture and component documentation |
 | `test/agents/` | One directly executable deterministic suite per native agent |
-| `test/skills/` | One directly executable deterministic suite per skill |
+| `test/skills/` | Directly executable deterministic skill suites; configure-tmux is explicit-only |
 | `test/setup/` | Installer and setup-support suites |
 | `test/shared/` | Tests for shared scripts without a component owner |
 | `test/live/` | Explicit authenticated Codex/model tests, excluded from standard gates |
@@ -70,6 +70,13 @@ Report every selected command together with the change it covers. Use
 shared-test aggregation scope, and use `./test/test-setup.sh` only when a change
 can affect the full setup aggregation scope. Every started test must finish
 successfully.
+
+The configure-tmux suite is excluded from standard gates. Run it only when an
+explicit plan changes the configure-tmux skill:
+
+```bash
+bash test/skills/configure-tmux/test-configure-tmux-suite.sh
+```
 
 Run live tests only when the affected functionality requires a real model turn.
 They require Codex authentication, network access, and available usage quota:

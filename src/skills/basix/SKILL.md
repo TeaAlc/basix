@@ -46,30 +46,33 @@ explicitly and report each command together with the change it covers. Use
 `./test/verify-basix.sh` only when a change can affect the full agent, skill, or
 shared-test aggregation scope, and use `./test/test-setup.sh` only when a change
 can affect the full setup aggregation scope. Every test that is started must
-finish successfully before completion.
+finish successfully before completion. The configure-tmux suite is excluded from
+standard gates; run it only when an explicit plan changes the configure-tmux skill.
 
 ## Basix agent spawning
 
 Agent level governs coordination and spawn authority; model and reasoning effort
 govern assignment complexity. Never infer one axis from the other.
 
-| Agent | Level | Children |
-|---|---|---|
-| `/root` | principal | native or generic juniors and seniors; directly spawned generic principals |
-| `basix_pager` | senior | `basix_file_explorer`, `basix_researcher` |
-| `basix_verifier` | senior | `basix_file_explorer`, `basix_researcher` |
-| `basix_file_explorer` | junior | none |
-| `basix_researcher` | junior | none |
+| Agent | Level |
+|---|---|
+| `/root` | principal |
+| `basix_pager` | senior |
+| `basix_verifier` | senior |
+| `basix_file_explorer` | junior |
+| `basix_researcher` | junior |
 
 - Juniors perform bounded work without coordination and never spawn children.
-- Seniors may coordinate complex work but may spawn only the two native juniors
-  listed above. Their role, write, sandbox, and ownership boundaries still apply.
-- Principals may spawn juniors and seniors. A non-root principal never spawns
-  another principal.
-- A generic agent defaults to `agent_level: junior`. `/root` may explicitly set
-  `agent_level` to `junior`, `senior`, or `principal` for a direct generic spawn.
-  A generic principal's assignment must state its spawn framework and prohibit
-  principal children. Generic agents have no native TOML metadata.
+- Seniors may coordinate complex work and may spawn every native agent listed as
+  junior in the table. They never spawn generic agents, seniors, or principals.
+  Their role, write, sandbox, and ownership boundaries still apply.
+- Principals may spawn native or generic juniors and seniors. A non-root principal
+  never spawns another principal; only `/root` may directly spawn a generic principal.
+- A generic agent defaults to `agent_level: junior`. Its spawning principal may
+  explicitly set `agent_level` to `junior` or `senior`; `/root` may additionally
+  set it to `principal` for a direct generic spawn. A generic principal's assignment
+  must state its spawn framework and prohibit principal children. Generic agents
+  have no native TOML metadata.
 - All Basix-managed native and generic agents load this router and the complete
   communication contract before work. Level changes spawn authorization only;
   Contract 1.4 messages and direct-parent communication remain unchanged.
@@ -79,5 +82,5 @@ govern assignment complexity. Never infer one axis from the other.
 - Choose `basix_researcher` for current or external facts and website inspection, `basix_file_explorer` for extensive local evidence discovery, `basix_pager` for nontrivial web frontend, backend, UI/UX, fullstack, or integration work, and `basix_verifier` for independent read-only inspection of one frozen result.
 - Spawn every Basix agent with `fork_turns="none"`, a fresh and unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
 - Keep researchers and file explorers read-only. Do not substitute generic web access when required research fails, and do not continue extended local discovery when the required file explorer fails.
-- Native agents may start only the specialized Basix children permitted by the level matrix and their role definition.
+- Native agents derive their spawn authority only from their level and this table.
 - Follow the required communication contract for every spawned agent's lifecycle, messaging, blocker, permission, escalation, waiting, result, and continuation behavior.
