@@ -40,9 +40,13 @@ or beginning domain work. This is the sole runtime copy of Contract 1.4. Native
 agent definitions contain only the validated bootstrap. If the contract cannot be
 loaded, the spawn fails closed.
 
-When changing the collection, update the relevant documentation. From
-`<Basix-Repo>`, run `./test/verify-basix.sh` and
-`./test/test-setup.sh`.
+When changing the collection, update the relevant documentation and select tests
+from the changed components and their dependents. Run the selected test paths
+explicitly and report each command together with the change it covers. Use
+`./test/verify-basix.sh` only when a change can affect the full agent, skill, or
+shared-test aggregation scope, and use `./test/test-setup.sh` only when a change
+can affect the full setup aggregation scope. Every test that is started must
+finish successfully before completion.
 
 ## Basix agent spawning
 

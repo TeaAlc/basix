@@ -658,18 +658,30 @@ class RepositoryPolicyTests(unittest.TestCase):
         self.assertEqual(insights["minItems"], 1)
         self.assertEqual(insights["items"]["pattern"], "\\S")
 
-    def test_documented_repository_test_paths_exist(self):
+    def test_skills_require_selective_repository_verification(self):
         repository = Path(__file__).resolve().parents[3]
         skills = (
             repository / "src/skills/basix/SKILL.md",
             repository / "src/skills/basix-agent-authoring/SKILL.md",
         )
-        documented_paths = ("./test/verify-basix.sh", "./test/test-setup.sh")
         for skill in skills:
             text = skill.read_text()
-            for documented_path in documented_paths:
-                self.assertIn(documented_path, text, skill)
-                self.assertTrue((repository / documented_path.removeprefix("./")).is_file())
+            normalized = " ".join(text.split())
+            self.assertRegex(normalized, r"select (?:tests|directly affected component tests)")
+            self.assertIn("change", normalized)
+            self.assertIn("dependen", normalized)
+            self.assertIn("Run the selected test paths explicitly", normalized)
+            self.assertIn("report each command together with the change it covers", normalized)
+            self.assertRegex(
+                normalized,
+                r"Use\s+`\./test/verify-basix\.sh` only when",
+            )
+            self.assertRegex(
+                normalized,
+                r"use `\./test/test-setup\.sh` only when",
+            )
+            self.assertIn("Every test that is started must", normalized)
+            self.assertIn("finish successfully", normalized)
 
 
 class CliTests(unittest.TestCase):

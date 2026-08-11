@@ -48,8 +48,13 @@ The canonical JSON contract is [message.schema.json](references/message.schema.j
 Validate one message with `message --stdin` and a JSON-lines stream with
 `stream --stdin`. The validator is read-only and uses only the Python standard library.
 
-After collection changes, run `./test/verify-basix.sh` and
-`./test/test-setup.sh` from `<Basix-Repo>`.
+After collection changes, select directly affected component tests from the
+change and its dependencies. Run the selected test paths explicitly and report
+each command together with the change it covers. Use `./test/verify-basix.sh`
+only when the change can affect its full agent, skill, or shared-test aggregation
+scope, and use `./test/test-setup.sh` only when the change can affect its full
+setup aggregation scope. Every test that is started must finish successfully
+before completion.
 
 ## Managed bootstrap block
 

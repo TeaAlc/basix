@@ -55,32 +55,40 @@ More detail is available in the [architecture](src/docs/architecture.md),
 
 ### Verification
 
-From the repository root, run:
+Select tests from the changed components and their dependents, then run the
+selected paths explicitly from the repository root:
 
 ```bash
-./test/verify-basix.sh
-./test/test-setup.sh
-bash test/setup/install-scrapling-codex/test-install-scrapling-codex.sh
-bash test/shared/test-system-cavify.sh
+bash test/agents/<agent>/test-<agent>.sh       # agent changes
+bash test/skills/<skill>/test-<skill>.sh       # skill changes
+bash test/setup/<component>/test-<component>.sh # installer changes
+bash test/shared/<suite>.sh                    # shared-code changes
 ```
 
-The live discovery check is intentionally separate because it performs one real
-model turn and therefore requires Codex authentication, network access, and
-available usage quota:
+Report every selected command together with the change it covers. Use
+`./test/verify-basix.sh` only when a change can affect the full agent, skill, or
+shared-test aggregation scope, and use `./test/test-setup.sh` only when a change
+can affect the full setup aggregation scope. Every started test must finish
+successfully.
+
+Run live tests only when the affected functionality requires a real model turn.
+They require Codex authentication, network access, and available usage quota:
 
 ```bash
 bash test/live/run-live-tests.sh
 ```
 
-For changes to shell scripts, also run ShellCheck when it is installed:
+For affected shell files, also run ShellCheck when it is installed. Always check
+the resulting diff:
 
 ```bash
-find src test -name '*.sh' -type f -print0 | xargs -0 shellcheck
+shellcheck path/to/affected-script.sh
 git diff --check
 ```
 
 Both standard aggregators run every suite after failures and report failed suite
-paths and timings. Live/model tests are only run through `test/live/run-live-tests.sh`.
+paths and timings; they remain available for genuinely broad changes. Live/model
+tests are only run through `test/live/run-live-tests.sh`.
 
 ## 2. Installing and using Basix in Codex projects
 

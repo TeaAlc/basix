@@ -13,7 +13,14 @@ for path in sorted((root / "src/skills").glob("*/SKILL.md")):
     match = re.search(r"(?m)^description:\s*(.+)$", path.read_text())
     assert match and match.group(1).strip().strip("\"'").startswith("Basix-Skill: "), path
 router = (root / "src/skills/basix/SKILL.md").read_text()
+router_flat = " ".join(router.split())
 assert "sole runtime copy of Contract 1.4" in router
+assert "select tests" in router_flat and "changed components and their dependents" in router_flat
+assert "Run the selected test paths explicitly" in router_flat
+assert "report each command together with the change it covers" in router_flat
+assert "`./test/verify-basix.sh` only when" in router_flat
+assert "`./test/test-setup.sh` only when" in router_flat
+assert "Every test that is started must" in router_flat and "finish successfully" in router_flat
 contract = (root / "src/skills/basix/references/agent-communication-contract.md").read_text()
 assert "version=1.4" in contract and "communicates exclusively with its direct spawning parent" in contract
 assert not list((root / "src").glob("**/tests"))
