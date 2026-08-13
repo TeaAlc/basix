@@ -12,8 +12,12 @@ The canonical plugin and marketplace metadata are ordinary source files under `p
 
 Persistent instructions come only from `setup/developer_instruction.md`. They retain the collection conventions, explicit delegation authority, cost-aware Root boundary, mandatory role routing, native spawning rules, and the duty to follow the canonical communication contract. The Python helper validates TOML, changes only the top-level `developer_instructions` string, and atomically replaces the target file. Its markers are ownership boundaries: uninstall removes the Basix instruction span and known Basix agent tables while preserving foreign TOML and instruction content byte-for-byte. Installer state records target type and expected link or content identity for agents and every generated plugin-bundle file. Copy-tree records include per-file relative paths and installation hashes, allowing uninstall to remove unchanged managed files selectively while preserving changed and unrecorded content.
 
-The `basix` router owns the sole runtime copy of Contract 1.4 at
-`skills/basix/references/agent-communication-contract.md`. Native agent TOMLs
+The `basix` router owns runtime routing and the sole runtime copy of Contract 1.4
+at `skills/basix/references/agent-communication-contract.md`. Basix-maintainer
+layout, placement, documentation, and verification guidance is isolated in
+`skills/basix/references/developing-basix.md` and loads only for work on the Basix
+source repository. Complete skill-tree installation packages both references.
+Native agent TOMLs
 begin with commented TOML metadata declaring `author` and agent `level`, then
 contain the byte-for-byte canonical bootstrap that loads the router,
 persistent instructions, and that contract before planning or domain work. The

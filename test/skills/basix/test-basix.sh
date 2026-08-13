@@ -15,14 +15,21 @@ for path in sorted((root / "src/skills").glob("*/SKILL.md")):
 router = (root / "src/skills/basix/SKILL.md").read_text()
 router_flat = " ".join(router.split())
 assert "sole runtime copy of Contract 1.4" in router
-assert "select tests" in router_flat and "changed components and their dependents" in router_flat
-assert "Run the selected test paths explicitly" in router_flat
-assert "report each command together with the change it covers" in router_flat
-assert "`./test/verify-basix.sh` only when" in router_flat
-assert "`./test/test-setup.sh` only when" in router_flat
-assert "Every test that is started must" in router_flat and "finish successfully" in router_flat
+assert "maintaining, extending, testing, reviewing, or verifying" in router_flat
+assert "[developing-basix.md](references/developing-basix.md) completely" in router_flat
+assert "Do not load that reference merely because" in router_flat
+development = (root / "src/skills/basix/references/developing-basix.md").read_text()
+development_flat = " ".join(development.split())
+assert "select tests" in development_flat and "changed components and their dependents" in development_flat
+assert "Run the selected test paths explicitly" in development_flat
+assert "report each command together with the change it covers" in development_flat
+assert "`./test/verify-basix.sh` only when" in development_flat
+assert "`./test/test-setup.sh` only when" in development_flat
+assert "Every test that is started must" in development_flat and "finish successfully" in development_flat
+for moved in ("src/agents", "repository-local `.codex/`", "reusable task workflows", "configure-tmux suite"):
+    assert moved in development and moved not in router, moved
 contract = (root / "src/skills/basix/references/agent-communication-contract.md").read_text()
 assert "version=1.4" in contract and "communicates exclusively with its direct spawning parent" in contract
 assert not list((root / "src").glob("**/tests"))
-print("ok - basix metadata, router, contract, and test layout")
+print("ok - basix metadata, router, development guidance, contract, and test layout")
 PY

@@ -5,31 +5,23 @@ description: Basix-Skill: Use whenever Basix is mentioned or when maintaining or
 
 # Basix
 
-Load this skill for every Basix-related task. Use it to navigate, maintain, and
-extend the Basix collection and its installable standards.
+Load this skill for every Basix-related task. It routes Basix runtime behavior
+and points source-repository work to its separate development guidance.
 
 - Follow all active instructions inside the managed
   `basix:developer-instructions` block. This router supplements those instructions;
   it does not replace or override them.
-- In the Basix source repository, treat `<Basix-Repo>/src/agents`,
-  `<Basix-Repo>/src/skills`, and `<Basix-Repo>/src/scripts` as canonical.
-- In the Basix source repository, exclude repository-local `.codex/` and
-  `.agents/` runtime configuration from agent discovery, product evidence, tests,
-  and verifier scope. Agents must not modify either directory directly. Only
-  Basix installers may write there during an explicitly requested installation;
-  installer tests use isolated temporary targets. Use canonical `src/` sources
-  for development and verification.
 - In an installed skill, resolve skill-local scripts, references, and assets
   relative to the directory containing that skill's `SKILL.md`.
-- Keep reusable task workflows in one skill directory under `src/skills/`.
-- Keep skill-specific scripts, references, and assets beside their `SKILL.md`.
-- Keep shared launchers under `src/scripts/`.
-- Keep native agent definitions canonical under `src/agents/native/`; setup
-  scripts only bind them into supported Codex locations.
 - Write all technical content in English. Write user-facing chat messages in the
   language of the current conversation, inferred from the conversation rather than
   from repository content or quoted text.
-- Do not add a domain workflow to this meta-skill. Create a focused skill with a precise trigger description instead.
+
+When maintaining, extending, testing, reviewing, or verifying the Basix source
+repository, read
+[developing-basix.md](references/developing-basix.md) completely before repository
+work. Do not load that reference merely because a task uses installed Basix
+components.
 
 ## Required communication contract
 
@@ -39,15 +31,6 @@ completely after loading this router and before sending a plan, using domain too
 or beginning domain work. This is the sole runtime copy of Contract 1.4. Native
 agent definitions contain only the validated bootstrap. If the contract cannot be
 loaded, the spawn fails closed.
-
-When changing the collection, update the relevant documentation and select tests
-from the changed components and their dependents. Run the selected test paths
-explicitly and report each command together with the change it covers. Use
-`./test/verify-basix.sh` only when a change can affect the full agent, skill, or
-shared-test aggregation scope, and use `./test/test-setup.sh` only when a change
-can affect the full setup aggregation scope. Every test that is started must
-finish successfully before completion. The configure-tmux suite is excluded from
-standard gates; run it only when an explicit plan changes the configure-tmux skill.
 
 ## Basix agent spawning
 

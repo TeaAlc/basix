@@ -140,18 +140,44 @@ for language, headings in {
 savings_fixture = [(rank, "cause", "action", "effect") for rank in range(1, 6)]
 assert len(savings_fixture) == 5 and [row[0] for row in savings_fixture] == [1, 2, 3, 4, 5]
 router = (root / "skills/basix/SKILL.md").read_text()
+router_flat = " ".join(router.split())
+development_path = root / "skills/basix/references/developing-basix.md"
+assert development_path.is_file()
+development = development_path.read_text()
+development_flat = " ".join(development.split())
 standard_aggregate = (root.parent / "test/verify-basix.sh").read_text()
 assert "test/skills/configure-tmux/test-configure-tmux-suite.sh" not in standard_aggregate
 assert "Follow all active instructions inside the managed" in router
 assert "`basix:developer-instructions` block" in router
 assert "does not replace or override them" in router
-assert "exclude repository-local `.codex/` and" in router
-assert "`.agents/` runtime configuration from agent discovery" in router
-assert "Agents must not modify either directory directly" in router
-assert "Basix installers may write there" in router
-assert "installer tests use isolated temporary targets" in router
-assert "configure-tmux suite is excluded from" in router
-assert "only when an explicit plan changes the configure-tmux skill" in router
+assert "In an installed skill, resolve skill-local scripts" in router
+assert "Write all technical content in English" in router
+assert "language of the current conversation" in router
+assert "maintaining, extending, testing, reviewing, or verifying" in router_flat
+assert "[developing-basix.md](references/developing-basix.md) completely" in router_flat
+assert "Do not load that reference merely because" in router_flat
+for phrase in (
+    "`<Basix-Repo>/src/agents`", "`<Basix-Repo>/src/skills`",
+    "`<Basix-Repo>/src/scripts`", "Exclude repository-local `.codex/` and",
+    "`.agents/` runtime configuration from", "Agents must not modify either directory directly",
+    "Basix installers may write there", "installer tests use isolated temporary targets",
+    "reusable task workflows", "skill-specific scripts, references, and assets",
+    "shared launchers", "native agent definitions canonical", "domain workflow",
+    "Update the relevant documentation", "changed components and their dependents",
+    "Run the selected test paths explicitly", "report each command together with the change it covers",
+    "`./test/verify-basix.sh` only when", "`./test/test-setup.sh` only when",
+    "Every test that is started must finish successfully",
+    "configure-tmux suite is excluded from",
+    "only when an explicit plan changes the configure-tmux skill",
+):
+    assert phrase in development_flat, phrase
+for moved in (
+    "`<Basix-Repo>/src/agents`", "repository-local `.codex/`", "reusable task workflows",
+    "skill-specific scripts", "shared launchers", "native agent definitions canonical",
+    "domain workflow", "Update the relevant documentation", "changed components and their dependents",
+    "verify-basix.sh", "test-setup.sh", "configure-tmux suite",
+):
+    assert moved not in router, moved
 for phrase in ("Agent level governs coordination", "`/root` | principal",
                "`basix_pager` | senior", "`basix_verifier` | senior",
                "`basix_file_explorer` | junior", "`basix_researcher` | junior",
