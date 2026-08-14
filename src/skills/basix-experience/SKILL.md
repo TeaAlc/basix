@@ -99,6 +99,30 @@ If no subagent is evidenced, state that no subagent use is evidenced. Optionally
 add one separate agent idea only when it would clearly help similar future
 sessions. Keep the complete idea to at most 32 words; omit it otherwise.
 
+**Example 1:**
+
+I was satisfied with the work of <agent_name> (<agent_type>), he did his job and helped me with xyz.
+
+- xyz was good
+- abx helped me bacause ...
+- def showed a shortcut to achive ...
+
+What helped a lot was xyz.
+
+
+**Example 2:**
+
+I was not at all satisfied with the work of <agent_name> (<agent_type>), he did his job but made some errors and I had to do everything again.
+
+- xyz was unclear
+- abx was wrong because ...
+- def was not what I asked for ...
+
+The agent did not know his contract at all which made it hard to coordinate it. The agent would have been much better if he'd followed his instructions and knew his contract.
+
+ 
+
+
 ### Token usage
 
 Create a table with rows for input tokens, reasoning tokens, output tokens, and
