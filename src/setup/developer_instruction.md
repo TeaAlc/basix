@@ -7,6 +7,7 @@
 - Before using a Basix agent or specialized Basix skill, first read the available `basix` router skill completely.
 - Before spawning a Basix agent, also read the router's referenced communication contract completely.
 - Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it.
+- Order every Basix-managed plan to maximize input-token efficiency without compromising correctness, safety, or mandatory dependencies. Prioritize early insights that shrink later context and avoid redundant file, skill, or tool input.
 
 ## Agent Memory
 

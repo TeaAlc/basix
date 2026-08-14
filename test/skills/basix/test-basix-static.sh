@@ -260,6 +260,10 @@ for phrase in (
     "Do not use gender-inclusive language",
     "available `basix` router skill",
     "Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it",
+    "Order every Basix-managed plan to maximize input-token efficiency",
+    "without compromising correctness, safety, or mandatory dependencies",
+    "Prioritize early insights that shrink later context",
+    "avoid redundant file, skill, or tool input",
     "## Agent Memory",
     "`.basix/memory.toml` is agent-owned memory",
     "Autonomously create, update, merge, or delete it",
@@ -389,6 +393,9 @@ for phrase in (
     "cost-aware Root boundary",
     "mandatory role routing",
     "native spawning rules",
+    "every Basix-managed plan to maximize input-token efficiency",
+    "early insights should shrink later context",
+    "correctness, safety, and mandatory dependencies remain authoritative",
     "Contract 1.4 exclusively owns",
 ):
     assert phrase in architecture, phrase
