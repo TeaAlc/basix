@@ -103,3 +103,8 @@ insight = "Exclude the configure-tmux suite from standard test aggregators; run 
 date = "2026-08-14"
 category = "Verification"
 insight = "When router policy moves into a required reference, validation must compose both files rather than demand duplicated runtime guidance."
+
+[[entries]]
+date = "2026-08-14"
+category = "Repository"
+insight = "Codex subagent session metadata stores parent_thread_id, agent_path, and agent_role together under payload.source.subagent.thread_spawn; collector discovery must prioritize this relation over legacy activity events."

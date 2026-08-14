@@ -63,6 +63,32 @@ def started(timestamp: str, thread_id: str, agent_path: str) -> dict[str, object
     )
 
 
+def session_meta(
+    timestamp: str,
+    thread_id: str,
+    *,
+    parent_thread_id: str | None = None,
+    agent_path: object = "/root/child",
+    agent_role: object = "worker",
+) -> dict[str, object]:
+    payload: dict[str, object] = {"id": thread_id, "source": "cli"}
+    if parent_thread_id is not None:
+        payload.update(
+            {
+                "source": {
+                    "subagent": {
+                        "thread_spawn": {
+                            "parent_thread_id": parent_thread_id,
+                            "agent_path": agent_path,
+                            "agent_role": agent_role,
+                        }
+                    }
+                },
+            }
+        )
+    return {"timestamp": timestamp, "type": "session_meta", "payload": payload}
+
+
 class CollectorCase(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="basix-token-tests-")
@@ -144,6 +170,117 @@ class CollectorCase(unittest.TestCase):
         self.assertEqual(document["aggregate"]["total_tokens"], 170)
         self.assertEqual(document["aggregate"]["reasoning_output_tokens"], 12)
         self.assertEqual(document["aggregate"]["cache_hit_rate_percent"], 25.0)
+
+    def test_metadata_only_tree_reports_agent_roles_and_exact_aggregate(self) -> None:
+        self.write_rollout(
+            ROOT_ID,
+            [session_meta("2026-08-10T09:00:00Z", ROOT_ID), token_event("2026-08-10T10:00:00Z", input_tokens=10, total_tokens=20)],
+        )
+        self.write_rollout(
+            CHILD_ID,
+            [session_meta("2026-08-10T09:01:00Z", CHILD_ID, parent_thread_id=ROOT_ID, agent_path="/root/explore", agent_role="basix_file_explorer"), token_event("2026-08-10T10:01:00Z", input_tokens=20, total_tokens=30)],
+            branch="b",
+        )
+        self.write_rollout(
+            GRANDCHILD_ID,
+            [session_meta("2026-08-10T09:02:00Z", GRANDCHILD_ID, parent_thread_id=CHILD_ID, agent_path="/root/explore/research", agent_role="basix_researcher"), token_event("2026-08-10T10:02:00Z", input_tokens=30, total_tokens=40)],
+            branch="c",
+        )
+        result, document = self.run_json()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(document["schema_version"], 2)
+        self.assertEqual([thread["thread_id"] for thread in document["threads"]], [ROOT_ID, CHILD_ID, GRANDCHILD_ID])
+        self.assertEqual([thread["agent_role"] for thread in document["threads"]], [None, "basix_file_explorer", "basix_researcher"])
+        self.assertEqual(document["aggregate"]["input_tokens"], 60)
+        self.assertEqual(document["aggregate"]["total_tokens"], 90)
+
+    def test_metadata_wins_and_activity_adds_only_legacy_children(self) -> None:
+        self.write_rollout(
+            ROOT_ID,
+            [
+                session_meta("2026-08-10T09:00:00Z", ROOT_ID),
+                token_event("2026-08-10T10:00:00Z"),
+                started("2026-08-10T10:01:00Z", CHILD_ID, "/wrong/activity-path"),
+                started("2026-08-10T10:02:00Z", OTHER_ID, "/root/legacy"),
+            ],
+        )
+        self.write_rollout(
+            CHILD_ID,
+            [session_meta("2026-08-10T09:01:00Z", CHILD_ID, parent_thread_id=ROOT_ID, agent_path="/root/metadata", agent_role="worker"), token_event("2026-08-10T10:03:00Z")],
+            branch="b",
+        )
+        self.write_rollout(OTHER_ID, [token_event("2026-08-10T10:04:00Z")], branch="c")
+        result, document = self.run_json()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        by_id = {thread["thread_id"]: thread for thread in document["threads"]}
+        self.assertEqual(by_id[CHILD_ID]["agent_path"], "/root/metadata")
+        self.assertEqual(by_id[CHILD_ID]["agent_role"], "worker")
+        self.assertEqual(by_id[OTHER_ID]["agent_role"], None)
+        self.assertNotIn("AGENT_PATH_CONFLICT", document["warnings"])
+
+    def test_metadata_after_cutoff_cannot_be_reintroduced_by_activity(self) -> None:
+        self.write_rollout(
+            ROOT_ID,
+            [token_event("2026-08-10T10:00:00Z"), started("2026-08-10T10:01:00Z", CHILD_ID, "/root/child")],
+        )
+        self.write_rollout(
+            CHILD_ID,
+            [session_meta("2026-08-10T13:00:00Z", CHILD_ID, parent_thread_id=ROOT_ID, agent_path="/root/child", agent_role="worker"), token_event("2026-08-10T10:02:00Z")],
+            branch="b",
+        )
+        result, document = self.run_json()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([thread["thread_id"] for thread in document["threads"]], [ROOT_ID])
+
+    def test_metadata_conflict_after_cutoff_is_ignored(self) -> None:
+        first = session_meta("2026-08-10T09:01:00Z", CHILD_ID, parent_thread_id=ROOT_ID, agent_path="/root/child", agent_role="worker")
+        late = session_meta("2026-08-10T13:01:00Z", CHILD_ID, parent_thread_id=OTHER_ID, agent_path="/root/wrong", agent_role="researcher")
+        self.write_rollout(ROOT_ID, [session_meta("2026-08-10T09:00:00Z", ROOT_ID), token_event("2026-08-10T10:00:00Z")])
+        self.write_rollout(CHILD_ID, [first, late, token_event("2026-08-10T10:01:00Z")], branch="b")
+        result, document = self.run_json()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("PARENT_THREAD_CONFLICT", document["warnings"])
+        self.assertNotIn("AGENT_PATH_CONFLICT", document["warnings"])
+        self.assertNotIn("AGENT_ROLE_CONFLICT", document["warnings"])
+
+    def test_identical_metadata_duplicates_are_deduplicated(self) -> None:
+        meta = session_meta("2026-08-10T09:01:00Z", CHILD_ID, parent_thread_id=ROOT_ID, agent_path="/root/child", agent_role="worker")
+        self.write_rollout(ROOT_ID, [session_meta("2026-08-10T09:00:00Z", ROOT_ID), token_event("2026-08-10T10:00:00Z")])
+        self.write_rollout(CHILD_ID, [meta, meta, token_event("2026-08-10T10:01:00Z")], branch="b")
+        result, document = self.run_json()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([thread["thread_id"] for thread in document["threads"]].count(CHILD_ID), 1)
+
+    def test_metadata_conflicts_and_malformed_metadata_are_sanitized_errors(self) -> None:
+        secret = "SECRET_METADATA_PATH"
+        cases = [
+            (session_meta("2026-08-10T09:02:00Z", CHILD_ID, parent_thread_id=OTHER_ID), "PARENT_THREAD_CONFLICT"),
+            (session_meta("2026-08-10T09:01:00Z", CHILD_ID, parent_thread_id=ROOT_ID, agent_path="/root/other"), "AGENT_PATH_CONFLICT"),
+            (session_meta("2026-08-10T09:01:00Z", CHILD_ID, parent_thread_id=ROOT_ID, agent_role="researcher"), "AGENT_ROLE_CONFLICT"),
+            (session_meta("2026-08-10T09:01:00Z", OTHER_ID, parent_thread_id=ROOT_ID), "ROLLOUT_ID_CONFLICT"),
+        ]
+        for conflicting, expected in cases:
+            with self.subTest(expected=expected):
+                local = self.sessions / expected
+                local.mkdir()
+                self.sessions = local
+                first = session_meta("2026-08-10T09:01:00Z", CHILD_ID, parent_thread_id=ROOT_ID)
+                self.write_rollout(ROOT_ID, [session_meta("2026-08-10T09:00:00Z", ROOT_ID), token_event("2026-08-10T10:00:00Z")])
+                self.write_rollout(CHILD_ID, [first, conflicting, token_event("2026-08-10T10:01:00Z")], branch="b")
+                result, document = self.run_json()
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(expected, document["warnings"])
+
+        local = Path(self.temp.name) / "malformed"
+        local.mkdir()
+        self.sessions = local
+        malformed = session_meta("2026-08-10T09:00:00Z", ROOT_ID)
+        malformed["payload"] = {"id": secret}
+        self.write_rollout(ROOT_ID, [malformed, token_event("2026-08-10T10:00:00Z")])
+        result, document = self.run_json()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("INVALID_SESSION_META", document["warnings"])
+        self.assertNotIn(secret, result.stdout + result.stderr)
 
     def test_nested_agents_deduplicate_cycles_and_respect_cutoff_and_file_order(self) -> None:
         self.write_rollout(
@@ -360,6 +497,8 @@ class CollectorCase(unittest.TestCase):
         self.assertEqual(first_doc, second_doc)
         text_result = self.run_collector("--format", "text")
         self.assertEqual(text_result.returncode, 0)
+        self.assertIn("schema_version: 2\n", text_result.stdout)
+        self.assertIn("agent_role=null", text_result.stdout)
         self.assertIn("status: ok\n", text_result.stdout)
         self.assertIn("cache_hit_rate_percent: 25.0\n", text_result.stdout)
         self.assertNotIn(str(self.sessions), text_result.stdout + text_result.stderr)

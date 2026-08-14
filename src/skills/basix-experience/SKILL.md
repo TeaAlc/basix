@@ -34,7 +34,12 @@ its collector as:
 `PYTHONDONTWRITEBYTECODE=1 python3 <skill-directory>/scripts/collect-token-usage.py --format json`
 
 The collector is best-effort evidence and must never block or abort the report.
-For schema-valid output whose `status` is `ok` or `partial`, use an aggregate
+It discovers current thread identity and parent/child links from `session_meta`
+and uses filename IDs plus `sub_agent_activity` only as a fallback for legacy
+rollouts. Schema 2 preserves the generic `role` and adds the concrete metadata
+`agent_role` for discovered subagents.
+
+For schema-2-valid output whose `status` is `ok` or `partial`, use an aggregate
 metric only when that individual field is non-null; such a value is complete
 across every discovered thread. Map `reasoning_output_tokens` to reasoning tokens,
 `output_tokens` to output tokens, `input_tokens` to input tokens, and
