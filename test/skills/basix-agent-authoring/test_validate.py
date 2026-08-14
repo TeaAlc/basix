@@ -324,9 +324,10 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(agent["sandbox_mode"], "read-only")
         instructions = agent["developer_instructions"]
         for phrase in ("immutable", "inconclusive", "remediation", "fork_turns=\"none\"",
-                       "Fingerprint", "spawning parent"):
+                       "write freeze", "spawning parent"):
             self.assertIn(phrase, instructions)
-        for phrase in ("followup_task", "cycle_revision", "send one concise `final_result`"):
+        for phrase in ("Fingerprint", "target drift", "followup_task", "cycle_revision",
+                       "send one concise `final_result`"):
             self.assertNotIn(phrase, instructions)
 
     def test_all_native_roles_forbid_direct_root_recipient(self):
@@ -648,12 +649,15 @@ class RepositoryPolicyTests(unittest.TestCase):
 
     def test_skills_require_selective_repository_verification(self):
         repository = Path(__file__).resolve().parents[3]
-        skills = (
-            repository / "src/skills/basix/SKILL.md",
-            repository / "src/skills/basix-agent-authoring/SKILL.md",
+        policies = (
+            (
+                repository / "src/skills/basix/SKILL.md",
+                repository / "src/skills/basix/references/developing-basix.md",
+            ),
+            (repository / "src/skills/basix-agent-authoring/SKILL.md",),
         )
-        for skill in skills:
-            text = skill.read_text()
+        for policy_files in policies:
+            text = "\n".join(path.read_text() for path in policy_files)
             normalized = " ".join(text.split())
             self.assertRegex(normalized, r"select (?:tests|directly affected component tests)")
             self.assertIn("change", normalized)

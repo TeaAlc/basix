@@ -1,28 +1,44 @@
-"""Deterministic read-only verifier fixtures.
+"""Deterministic verifier lifecycle fixtures.
 
-The native verifier is prompt-driven, so this smoke test models its non-negotiable
-decision boundary: immutable fingerprints, evidence gaps, and bounded findings.
-The simulated verifier never writes the target after the fixture is created.
+The native verifier is prompt-driven, so this smoke test models the parent's
+non-negotiable write-freeze boundary and bounded evidence verdicts.
 """
 
-import hashlib
-import tempfile
 import unittest
-from pathlib import Path
 
 
-def fingerprint(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+INACTIVE = {"completed", "completed_with_errors", "failed", "stopped"}
 
 
-def verify(path: Path, expected: bytes, evidence: bool, mutate=None) -> dict:
-    before = fingerprint(path)
-    observed = path.read_bytes()
-    if mutate is not None:
-        mutate(path)
-    after = fingerprint(path)
-    if before != after:
-        return {"verdict": "inconclusive", "reason": "target drift"}
+def overlaps(writer_targets, owned_targets):
+    if writer_targets is None or "*" in writer_targets:
+        return True
+    return bool(set(writer_targets) & set(owned_targets))
+
+
+def may_spawn_verifier(writers, owned_targets):
+    return all(
+        writer["status"] in INACTIVE
+        or not overlaps(writer.get("targets"), owned_targets)
+        for writer in writers
+    )
+
+
+class VerificationRun:
+    def __init__(self, owned_targets):
+        self.owned_targets = owned_targets
+        self.active = True
+        self.result_discarded = False
+
+    def may_follow_up(self, writer_targets):
+        return not self.active or not overlaps(writer_targets, self.owned_targets)
+
+    def reopen_for_write(self):
+        self.active = False
+        self.result_discarded = True
+
+
+def verify(observed, expected, evidence):
     if not evidence:
         return {"verdict": "inconclusive", "reason": "evidence gap"}
     if observed != expected:
@@ -34,39 +50,46 @@ def verify(path: Path, expected: bytes, evidence: bool, mutate=None) -> dict:
 
 
 class VerifierSmokeTests(unittest.TestCase):
-    def test_passing_result_is_evidence_backed_and_read_only(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / "result.txt"
-            target.write_bytes(b"accepted\n")
-            before = fingerprint(target)
-            report = verify(target, b"accepted\n", evidence=True)
-            self.assertEqual(report["verdict"], "pass")
-            self.assertEqual(before, fingerprint(target))
+    def test_active_overlapping_writer_blocks_spawn(self):
+        writers = [{"status": "in_progress", "targets": {"src/result.txt"}}]
+        self.assertFalse(may_spawn_verifier(writers, {"src/result.txt"}))
 
-    def test_confirmed_defect_has_actionable_finding(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / "result.txt"
-            target.write_bytes(b"wrong\n")
-            report = verify(target, b"accepted\n", evidence=True)
-            self.assertEqual(report["verdict"], "remediation_required")
-            self.assertEqual(report["findings"][0]["status"], "confirmed")
+    def test_unknown_or_broad_ownership_blocks_fail_closed(self):
+        for targets in (None, {"*"}):
+            with self.subTest(targets=targets):
+                writers = [{"status": "in_progress", "targets": targets}]
+                self.assertFalse(may_spawn_verifier(writers, {"src/result.txt"}))
 
-    def test_missing_evidence_is_inconclusive(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / "result.txt"
-            target.write_bytes(b"accepted\n")
-            report = verify(target, b"accepted\n", evidence=False)
-            self.assertEqual(report["verdict"], "inconclusive")
-            self.assertEqual(report["reason"], "evidence gap")
+    def test_terminal_or_stopped_writer_is_inactive(self):
+        for status in INACTIVE:
+            with self.subTest(status=status):
+                writers = [{"status": status, "targets": {"src/result.txt"}}]
+                self.assertTrue(may_spawn_verifier(writers, {"src/result.txt"}))
 
-    def test_concurrent_target_mutation_is_inconclusive(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / "result.txt"
-            target.write_bytes(b"accepted\n")
-            report = verify(target, b"accepted\n", evidence=True,
-                            mutate=lambda path: path.write_bytes(b"drifted\n"))
-            self.assertEqual(report["verdict"], "inconclusive")
-            self.assertEqual(report["reason"], "target drift")
+    def test_active_disjoint_writer_does_not_block(self):
+        writers = [{"status": "in_progress", "targets": {"docs/other.md"}}]
+        self.assertTrue(may_spawn_verifier(writers, {"src/result.txt"}))
+
+    def test_relevant_followup_is_forbidden_during_verification(self):
+        run = VerificationRun({"src/result.txt"})
+        self.assertFalse(run.may_follow_up({"src/result.txt"}))
+        self.assertTrue(run.may_follow_up({"docs/other.md"}))
+
+    def test_reopening_writes_discards_run_and_requires_fresh_verifier(self):
+        run = VerificationRun({"src/result.txt"})
+        run.reopen_for_write()
+        self.assertFalse(run.active)
+        self.assertTrue(run.result_discarded)
+        fresh_run = VerificationRun({"src/result.txt"})
+        self.assertIsNot(run, fresh_run)
+        self.assertTrue(fresh_run.active)
+
+    def test_evidence_verdicts_remain_bounded(self):
+        self.assertEqual(verify(b"accepted", b"accepted", True)["verdict"], "pass")
+        defect = verify(b"wrong", b"accepted", True)
+        self.assertEqual(defect["verdict"], "remediation_required")
+        self.assertEqual(defect["findings"][0]["id"], "V-001")
+        self.assertEqual(verify(b"accepted", b"accepted", False)["verdict"], "inconclusive")
 
 
 if __name__ == "__main__":

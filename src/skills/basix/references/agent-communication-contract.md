@@ -88,12 +88,20 @@ forwards proposals automatically.
 
 ## Coordination, waiting, and visible output
 
-Do not duplicate delegated work. A parent may continue clearly non-overlapping
-coordination and integration. Freeze concurrent writes while a verifier examines
-a result. Verify every delegated implementation result; parallel workers normally
-receive one aggregate verification unless that review would be unreasonably
-large. Assignments and parent-authored escalations must be complete enough for the
-recipient to act without inherited context.
+Do not duplicate delegated work. Before a verifier spawn, every agent with
+overlapping write ownership must be inactive. Unknown or overly broad ownership
+counts as overlap and blocks spawn. Agents are inactive after any
+`final_result` or explicit stop; only an explicit assignment reactivates them.
+Disjoint writers may remain active.
+
+Until verification completes, the parent neither mutates its scope nor starts,
+continues, or uses `followup_task` on an overlapping writer. The assignment
+retains `owned_targets` and `mutation_window`; the latter confirms relevant writers
+were inactive before spawn and the freeze lasts through completion. A necessary
+write requires first stopping the verifier, discarding its result, completing the
+change, and starting a fresh verifier. Verify every delegated implementation
+result; parallel workers normally receive one aggregate verification. Assignments
+must be complete enough to act without inherited context.
 
 When any Basix child is active, every `wait_agent` call uses exactly
 `timeout_ms: 120000`, unless the user explicitly requires another timeout. Prefer

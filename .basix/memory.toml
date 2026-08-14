@@ -98,3 +98,8 @@ insight = "Normalize whitespace before asserting prose across wrapped Markdown l
 date = "2026-08-11"
 category = "User Instruction"
 insight = "Exclude the configure-tmux suite from standard test aggregators; run it only when an explicit plan changes the configure-tmux skill."
+
+[[entries]]
+date = "2026-08-14"
+category = "Verification"
+insight = "When router policy moves into a required reference, validation must compose both files rather than demand duplicated runtime guidance."

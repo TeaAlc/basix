@@ -247,8 +247,8 @@ and persistent instructions are loaded. Basix then supplies:
   with exactly one profile (`ui_ux`, `frontend`, `backend_web`, `fullstack`, or
   `integration`), while explorer and researcher agents remain read-only;
 - the read-only `basix_verifier` for one fresh-context, immutable-result review;
-  it fingerprints the target, reports evidence-backed verdicts, and requires a
-  fresh verifier for drift, remediation, changed criteria, or expanded scope;
+  the parent first makes overlapping writers inactive, holds the write freeze
+  through completion, and starts a fresh verifier after remediation or scope changes;
 - Lumen semantic project search when the optional integration is installed and
   the project has been indexed.
 
@@ -309,11 +309,16 @@ step. Review handoffs, fixes, terminal results, and continuations follow Contrac
 ### Coordinating verification
 
 Start `basix_verifier` with `fork_turns="none"`, a unique task name, a complete
-assignment, and a mutation-free verification window. Include the original
-requirements, worker report, owned targets, known pre-existing changes, allowed
-checks, and constraints. Contract 1.4 governs its messages and continuation cycle;
-target drift, remediation validation, changed acceptance criteria, or a new result
-always gets a fresh verifier.
+assignment, and a mutation-free verification window. Before spawning it, make all
+agents with overlapping or unclear write ownership inactive; clearly disjoint
+writers may continue. Include the original requirements, worker report,
+`owned_targets`, known pre-existing changes, allowed checks, constraints, and a
+`mutation_window` confirmation that relevant writers are inactive and the freeze
+lasts through completion. Do not mutate the scope or reactivate an overlapping
+writer during the run. If another relevant write is necessary, stop the verifier,
+discard its result, complete the change, and start a fresh verifier. Contract 1.4
+governs its messages and continuation cycle; remediation validation, changed
+acceptance criteria, or a new result always gets a fresh verifier.
 
 Invoke the relevant skill or agent naturally in Codex, or mention Basix when the
 task concerns maintaining its installable standards and structure.

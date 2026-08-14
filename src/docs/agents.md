@@ -50,12 +50,12 @@ TOML metadata.
 The native read-only agents are:
 
 - `basix_verifier` is a Highly complex reference role using `gpt-5.6-luna` with
-  `xhigh` reasoning. It receives one immutable, bounded result in fresh context,
-  fingerprints relevant state before and after inspection, and reports
-  `pass`, `pass_with_findings`, `remediation_required`, or `inconclusive` without
-  modifying the target. A continued cycle is allowed only for the same unchanged
-  result when the spawning parent documents why retained context is materially required; changed
-  files, criteria, scope, or remediation always require a fresh verifier.
+  `xhigh` reasoning. It receives one immutable, bounded result in fresh context
+  and reports `pass`, `pass_with_findings`, `remediation_required`, or
+  `inconclusive` without modifying the target. A continued cycle is allowed only
+  for the same unchanged result when the spawning parent documents why retained
+  context is materially required; changed files, criteria, scope, or remediation
+  always require a fresh verifier.
 - `basix_researcher` uses `gpt-5.6-luna` with medium reasoning for general research. Persistent
   developer instructions require the main agent to delegate all external research, website
   inspection, and scraping to it; the Basix skill supplies fresh-context and bounded-assignment
@@ -106,15 +106,20 @@ The spawning parent starts every verifier with `fork_turns="none"` and a unique 
 verification ID, original assignment and user outcome, authoritative requirements,
 worker report or exact result location, owned targets, allowed and forbidden side
 effects, known pre-existing changes, required checks, applicable instructions or
-contracts, report strictness, and constraints that may block a check. The parent freezes
-workspace mutation for the verification window; unrelated read-only agents may run,
-but no concurrent writer may alter the target.
+contracts, report strictness, and constraints that may block a check. Before the
+spawn, the parent makes every agent with overlapping write ownership inactive;
+unknown or overly broad ownership counts as possible overlap and blocks the spawn.
+Agents are inactive after any `final_result` or an explicit stop and resume only
+through an explicit new assignment. Active writers with clearly disjoint ownership
+may continue.
 
-The verifier treats worker claims as untrusted evidence, keeps the target read-only,
-and records a start/end fingerprint. Unexpected target drift is `inconclusive` and
-must not be attributed without evidence. A final report contains scoped checks,
-evidence-backed findings, unverified checks, worker-claim mismatches, concrete
-actions, and whether fresh re-verification is required.
+The verifier treats worker claims as untrusted evidence and keeps the target
+read-only. During the run, the parent may neither change the verification scope nor
+start, continue, or send `followup_task` to an overlapping writer. If a relevant
+write becomes necessary, the parent first stops the verifier, discards its result,
+completes the change, and starts a fresh verifier. A final report contains scoped
+checks, evidence-backed findings, unverified checks, worker-claim mismatches,
+concrete actions, and whether fresh re-verification is required.
 
 Use this complete verifier start-assignment shape (fill every field before spawning):
 
@@ -140,11 +145,11 @@ required_checks:
 applicable_instructions: <repository rules, skills, contracts, or design docs>
 report_strictness: normal | safety-critical
 constraints: <missing tools, permissions, network, or generated-file limits>
-mutation_window: spawning parent freezes concurrent workspace writers
+mutation_window: relevant writers inactive before spawn; write freeze held through verifier completion
 ```
 
-Contract 1.4 governs verifier cycles and continuations. Remediation checks, target
-drift, changed acceptance criteria, expanded scope, or a new result require a new
+Contract 1.4 governs verifier cycles and continuations. Remediation checks, changed
+acceptance criteria, expanded scope, or a new result require a new
 fresh-context verifier rather than continuation.
 
 ## Pager selection and start assignment

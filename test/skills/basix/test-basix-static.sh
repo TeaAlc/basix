@@ -230,9 +230,9 @@ verifier = tomllib.loads(verifier_path.read_text())
 assert verifier["name"] == "basix_verifier"
 assert verifier["model"] == "gpt-5.6-luna" and verifier["model_reasoning_effort"] == "xhigh"
 assert verifier["sandbox_mode"] == "read-only"
-for phrase in ("immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent"):
+for phrase in ("immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent", "write freeze"):
     assert phrase in verifier["developer_instructions"], phrase
-for phrase in ("cycle_revision", "followup_task", "send exactly one `final_result`"):
+for phrase in ("Fingerprint", "target drift", "cycle_revision", "followup_task", "send exactly one `final_result`"):
     assert phrase not in verifier["developer_instructions"], phrase
 assert not (root / "agents/exec").exists()
 PY
@@ -304,6 +304,11 @@ for phrase in (
     "the spawn fails closed",
     "## Agent management",
     "Follow the communication contract for all child lifecycle",
+    "overlapping or unclear write ownership is inactive",
+    "clearly disjoint active writers do not block",
+    "inactive after any `final_result` or an explicit stop",
+    "send `followup_task` to an overlapping writer",
+    "stop the verifier, discard its result",
     "current or external facts, web research, website inspection, and scraping",
     "extensive local evidence discovery",
     "preferably before discovery begins",
@@ -350,7 +355,6 @@ for removed in (
     "Subagent confirmations",
     "task_profile",
     "intermediate_result",
-    "followup_task",
     ".basix/contracts/",
     "Adaptive pager selection and lifecycle",
     "Read-only verification lifecycle",
@@ -426,6 +430,10 @@ for phrase in (
     "immutable",
     "verification_id:",
     "mutation_window:",
+    "relevant writers inactive before spawn",
+    "write freeze held through verifier completion",
+    "unknown or overly broad ownership counts as possible overlap",
+    "first stops the verifier, discards its result",
     "report_strictness:",
     "fresh verifier",
     "Manual pager smoke scenarios",
@@ -438,6 +446,7 @@ for phrase in (
     assert phrase in agent_docs, phrase
 
 heartbeat = (root / "skills/basix/references/agent-communication-contract.md").read_text()
+heartbeat_flat = " ".join(heartbeat.split())
 assert "version=1.4" in heartbeat
 assert "cycle_revision" in heartbeat
 assert "`Report start delivered to parent.`" in heartbeat
@@ -446,6 +455,16 @@ assert "Escalation is a newly authored parent `issue` or `permission_request`" i
 assert "`cycle_revision + 1`" in heartbeat
 assert "afterward resume\nautomatically" in heartbeat
 assert "subagent_insights" in heartbeat and "at most 24 words" in heartbeat
+for phrase in (
+    "overlapping write ownership must be inactive",
+    "Unknown or overly broad ownership counts as overlap",
+    "inactive after any `final_result`",
+    "Disjoint writers may remain active",
+    "uses `followup_task` on an overlapping writer",
+    "requires first stopping the verifier, discarding its result",
+    "retains `owned_targets` and `mutation_window`",
+):
+    assert phrase in heartbeat_flat, phrase
 assert re.search(r"first status 120 seconds after the plan, then every 120 seconds", heartbeat)
 assert "Plan delivered to parent." in heartbeat and "Delivery failed: <short reason>." in heartbeat
 assert len(re.findall(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", heartbeat)) <= 1050

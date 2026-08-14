@@ -58,5 +58,9 @@
 ## Agent management
 
 - Follow the communication contract for all child lifecycle, messaging, blocker, permission, escalation, waiting, result, and continuation behavior.
+- Before spawning a verifier, ensure every agent with overlapping or unclear write ownership is inactive; clearly disjoint active writers do not block the spawn.
+- Treat an agent as inactive after any `final_result` or an explicit stop, and reactivate it only through an explicit new assignment.
+- Until the verifier completes, do not change its scope or start, continue, or send `followup_task` to an overlapping writer.
+- If a relevant write becomes necessary, stop the verifier, discard its result, complete the change, and start a fresh verifier.
 
 <!-- basix:developer-instructions:end -->
