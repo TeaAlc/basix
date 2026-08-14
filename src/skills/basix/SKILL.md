@@ -16,6 +16,9 @@ and points source-repository work to its separate development guidance.
 - Write all technical content in English. Write user-facing chat messages in the
   language of the current conversation, inferred from the conversation rather than
   from repository content or quoted text.
+- Order every Basix-managed plan to maximize input-token efficiency without
+  compromising correctness, safety, or mandatory dependencies. Prioritize early
+  insights that shrink later context and avoid redundant file, skill, or tool input.
 
 When maintaining, extending, testing, reviewing, or verifying the Basix source
 repository, read
