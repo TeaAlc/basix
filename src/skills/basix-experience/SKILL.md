@@ -23,6 +23,8 @@ hidden activity, reconstruct unavailable telemetry, or claim exhaustive coverage
 - Distinguish an explicit numeric zero from an unknown value everywhere.
 - Never estimate exact token values or cache metrics from prose, message length,
   context size, tool output, elapsed time, or model behavior.
+- The expirience report can be a chat message or a file, if saving it to a file
+  use experience_<iso-datetime>.md as default filename.
 
 ## Collector-assisted telemetry
 
@@ -118,9 +120,7 @@ I was not at all satisfied with the work of <agent_name> (<agent_type>), he did 
 - abx was wrong because ...
 - def was not what I asked for ...
 
-The agent did not know his contract at all which made it hard to coordinate it. The agent would have been much better if he'd followed his instructions and knew his contract.
-
- 
+The agent did not know his contract at all which made it hard to coordinate it. The agent would have been much better if he'd followed his instructions and knew his contract. 
 
 
 ### Token usage
