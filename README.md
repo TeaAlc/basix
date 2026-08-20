@@ -200,6 +200,11 @@ whose container egress is restricted to Tor:
 ./src/setup/install-scrapling-codex.sh
 ```
 
+This starts two persistent, separately networked containers: Tor has the egress
+network, while `basix-scrapling-mcp` is attached only to the internal network and
+publishes Streamable HTTP exclusively on `http://127.0.0.1:8002/mcp`. Choose a
+different unprivileged loopback port with `--port PORT`.
+
 The installer permits exactly one detected Scrapling registration and always uses
 the canonical MCP name `scrapling`. If one older or third-party registration is
 found, approve its replacement interactively or use `--force` for the same
@@ -212,13 +217,33 @@ noninteractive confirmation:
 Two or more registrations, foreign running Scrapling MCP processes, or unsafe
 runtime resources always cause an abort; `--force` cannot bypass those checks.
 The installer pulls the configured Scrapling image, pins the verified digest,
-validates the exact MCP tool policy, and registers a hardened launcher only after
-Tor egress succeeds. Restart running Codex sessions after a successful migration.
+validates the exact MCP tool policy, and registers the HTTP URL only after an MCP
+initialize handshake, schema inspection, and a real `get` tool call report
+`IsTor: true`. Restart running Codex sessions after a successful migration. The
+installed controller supports `prepare`, `start`, `stop`, `status`, and `tor-ip`.
+
+Every tool call requires a canonical UUID v4 `client_id`. Generate it from a
+cryptographically secure system source, reuse it for related session calls, and
+share it with a subagent only deliberately. It is a session capability, not
+general server authentication: sessions opened with one UUID are invisible and
+unusable with another, and all mappings disappear when the service restarts. The
+installer never creates or stores this UUID.
+
+Hermes and other local clients can share the service:
+
+```yaml
+mcp_servers:
+  scrapling:
+    url: "http://127.0.0.1:8002/mcp"
+    enabled: true
+```
 
 This provides a Tor-only guarantee at the container network boundary. It does
 **not** turn Chromium into Tor Browser or reproduce Tor Browser's fingerprinting
 protections. Administrators controlling the container daemon, host networking, or
 root access remain outside this security boundary.
+There is intentionally no TLS or global authentication because the published
+socket is loopback-only. Remote access is outside this version's trust model.
 
 ### Using Basix after installation
 

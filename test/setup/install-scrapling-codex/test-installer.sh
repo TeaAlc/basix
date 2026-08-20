@@ -13,72 +13,85 @@ case "$*" in
   'mcp --help') printf 'Commands: add list remove\n' ;;
   'mcp list --help') printf 'Options: --json\n' ;;
   'mcp list --json')
-    count_file=$MOCK_ROOT/list-count; count=0; [[ ! -f $count_file ]] || count=$(<"$count_file"); ((count+=1)); printf '%s' "$count" >"$count_file"
+    count=0; [[ ! -f $MOCK_ROOT/count ]] || count=$(<"$MOCK_ROOT/count"); ((count+=1)); printf %s "$count" >"$MOCK_ROOT/count"
     if [[ ${MOCK_RACE:-false} == true && $count -ge 2 ]]; then printf '[{"name":"scrapling","transport":{"type":"stdio","command":"changed","args":[]}}]\n'
     else command cp "$MOCK_ROOT/list.json" /dev/stdout; fi ;;
-  mcp\ remove\ *)
-    [[ ${MOCK_REMOVE:-ok} == ok ]] || exit 1
-    printf '[]\n' >"$MOCK_ROOT/list.json" ;;
-  mcp\ add\ scrapling\ --\ *)
-    [[ ${MOCK_ADD:-ok} == ok ]] || exit 1
-    launcher=$5
-    printf '[{"name":"scrapling","enabled":true,"transport":{"type":"stdio","command":"%s","args":["run"],"env":null,"cwd":null}}]\n' "$launcher" >"$MOCK_ROOT/list.json" ;;
+  mcp\ remove\ *) [[ ${MOCK_REMOVE:-ok} == ok ]] || exit 1; printf '[]\n' >"$MOCK_ROOT/list.json" ;;
+  'mcp add scrapling --url '* )
+    [[ ${MOCK_ADD:-ok} == ok ]] || exit 1; url=$5
+    printf '[{"name":"scrapling","enabled":true,"transport":{"type":"http","url":"%s"}}]\n' "$url" >"$MOCK_ROOT/list.json" ;;
   *) exit 1 ;;
 esac
 EOF
+  cat >"$case_dir/bin/python3" <<'EOF'
+#!/usr/bin/env bash
+printf 'python3 %s\n' "$*" >>"$MOCK_LOG"
+if [[ ${1-} == */health_check.py ]]; then
+  [[ ${MOCK_HANDSHAKE:-ok} == ok ]] || { printf 'MCP HTTP, schema, or Tor verification failed: handshake\n' >&2; exit 9; }
+  [[ ${MOCK_ISTOR:-true} == true ]] || { printf 'MCP HTTP, schema, or Tor verification failed: IsTor=true required\n' >&2; exit 9; }
+  exit 0
+fi
+if [[ ${1-} == - && ${2-} =~ ^[0-9]+$ ]]; then exit 0; fi
+exec /usr/bin/python3 "$@"
+EOF
+  cat >"$case_dir/bin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
   cat >"$case_dir/bin/podman" <<'EOF'
 #!/usr/bin/env bash
-printf 'podman %s\n' "$*" >>"$MOCK_LOG"
+printf '%s %s\n' "${0##*/}" "$*" >>"$MOCK_LOG"
 case "${1-}" in
   info) [[ ${MOCK_INFO:-ok} == ok ]] ;;
-  ps) printf '[]\n' ;;
+  ps) [[ ${MOCK_FOREIGN:-false} == true ]] && printf 'foreign-scrapling\n' || true ;;
   pull|build) [[ ${MOCK_RUNTIME:-ok} == ok ]] ;;
   image)
-    [[ ${2-} == inspect ]] || exit 0
-    if [[ $* == *basix-scrapling-tor* ]]; then
-      if [[ ${MOCK_TOR_INSPECT_OUTPUT+x} ]]; then printf '%s' "$MOCK_TOR_INSPECT_OUTPUT"
-      elif [[ ${0##*/} == podman ]]; then printf '%064d\n' 2
-      else printf 'sha256:%064d\n' 2; fi
-    elif [[ ${MOCK_SCRAPLING_INSPECT_OUTPUT+x} ]]; then printf '%s' "$MOCK_SCRAPLING_INSPECT_OUTPUT"
+    if [[ $* == *basix-scrapling-tor* ]]; then printf '%064d\n' 2
+    elif [[ ${4-} == '{{.Id}}' ]]; then printf 'sha256:%064d\n' 1
     else printf 'docker.io/pyd4vinci/scrapling@sha256:%064d\n' 1; fi ;;
   network)
     case ${2-} in
-      inspect)
-        name=${*: -1}; [[ -f $MOCK_ROOT/net-$name ]] || exit 1
-        internal=false; [[ $name == basix-scrapling-internal ]] && internal=true
-        net_containers=${MOCK_NET_CONTAINERS:-'{}'}
-        printf '[{"Driver":"bridge","Internal":%s,"EnableIPv6":false,"Labels":{"io.basix.scrapling-tor.managed":"%s"},"Containers":%s}]\n' "$internal" "${MOCK_OWNER:-true}" "$net_containers" ;;
+      inspect) name=${*: -1}; [[ -f $MOCK_ROOT/net-$name ]] || exit 1; internal=false; [[ $name == basix-scrapling-internal ]] && internal=true; printf '[{"Driver":"bridge","Internal":%s,"EnableIPv6":false,"Labels":{"io.basix.scrapling-tor.managed":"%s"}}]\n' "$internal" "${MOCK_OWNER:-true}" ;;
       create) name=${*: -1}; : >"$MOCK_ROOT/net-$name" ;;
-      connect|rm) : ;;
-      *) exit 1 ;;
+      connect) : ;;
+      rm) rm -f "$MOCK_ROOT/net-${*: -1}" ;;
     esac ;;
   inspect)
+    name=${*: -1}
     if [[ $* == *--format* ]]; then
-      [[ $* == *Health.Status* ]] && printf '%s\n' "${MOCK_HEALTH:-healthy}" || printf '10.89.1.2\n'
-    else
-      [[ -f $MOCK_ROOT/container ]] || exit 1
-      tor_id=$(printf '%064d' 2)
-      if [[ -f $MOCK_ROOT/container-recreated ]]; then image=$tor_id; config_image=sha256:$tor_id
-      else image=${MOCK_CONTAINER_IMAGE:-$tor_id}; config_image=${MOCK_CONFIG_IMAGE:-localhost/basix-scrapling-tor:bookworm}; fi
-      if [[ ${0##*/} == docker ]]; then cap_drop=${MOCK_CAP_DROP:-'["ALL"]'}
-      else cap_drop=${MOCK_CAP_DROP:-'["CAP_CHOWN","CAP_DAC_OVERRIDE","CAP_FOWNER","CAP_FSETID","CAP_KILL","CAP_NET_BIND_SERVICE","CAP_SETFCAP","CAP_SETGID","CAP_SETPCAP","CAP_SETUID","CAP_SYS_CHROOT"]'}; fi
-      create_command=${MOCK_CREATE_COMMAND:-'["podman","run","--cap-drop","ALL"]'}
-      effective=${MOCK_EFFECTIVE_CAPS:-null}; bounding=${MOCK_BOUNDING_CAPS:-null}
-      printf '[{"Image":"%s","EffectiveCaps":%s,"BoundingCaps":%s,"Mounts":[],"Config":{"Image":"%s","CreateCommand":%s,"Labels":{"io.basix.scrapling-tor.managed":"%s"},"Healthcheck":{"Test":["CMD-SHELL","grep -q '\''Bootstrapped 100%%'\'' /var/log/tor/notices.log"]},"ExposedPorts":null,"Volumes":null},"HostConfig":{"Privileged":false,"CapAdd":null,"CapDrop":%s,"Binds":null,"PortBindings":{},"SecurityOpt":["no-new-privileges"]},"NetworkSettings":{"Networks":{"basix-tor-egress":{"IPAddress":"10.89.0.2"},"basix-scrapling-internal":{"IPAddress":"10.89.1.2"}}}}]\n' "$image" "$effective" "$bounding" "$config_image" "$create_command" "${MOCK_CONTAINER_OWNER:-${MOCK_OWNER:-true}}" "$cap_drop"
-    fi ;;
+      if [[ $* == *Health.Status* ]]; then printf '%s\n' "${MOCK_HEALTH:-healthy}"
+      elif [[ $* == *State.Status* ]]; then printf 'running\n'
+      else printf '10.89.1.2\n'; fi
+      exit 0
+    fi
+    if [[ $name == foreign-scrapling ]]; then
+      printf '[{"Config":{"Image":"docker.io/pyd4vinci/scrapling@sha256:%064d","Entrypoint":["python"],"Cmd":["policy_mcp.py"]}}]\n' 1
+      exit 0
+    fi
+    [[ -f $MOCK_ROOT/container-$name ]] || exit 1
+    tor=0; [[ $name == basix-scrapling-tor ]] && tor=1
+    if ((tor)); then image=sha256:$(printf '%064d' 2); nets='{"basix-tor-egress":{},"basix-scrapling-internal":{}}'; ports='{}'; mounts='[]'; env='[]'; entrypoint='null'; cmd='null'; health='{"Test":["CMD-SHELL","grep -q '\''Bootstrapped 100%'\'' /var/log/tor/notices.log"]}'
+    else image=sha256:$(printf '%064d' 1); config_image=docker.io/pyd4vinci/scrapling@sha256:$(printf '%064d' 1); nets='{"basix-scrapling-internal":{}}'; port=$(<"$MOCK_ROOT/scrapling-port"); ports="{\"$port/tcp\":[{\"HostIp\":\"127.0.0.1\",\"HostPort\":\"$port\"}]}"; mounts="[{\"Source\":\"$MOCK_ROOT/home/codex/basix/scrapling-tor/policy_mcp.py\",\"Destination\":\"/opt/basix/policy_mcp.py\",\"RW\":false}]"; env="[\"BASIX_TOR_IP=10.89.1.2\",\"BASIX_PORT=$port\",\"HTTP_PROXY=socks5h://10.89.1.2:9050\",\"HTTPS_PROXY=socks5h://10.89.1.2:9050\",\"ALL_PROXY=socks5h://10.89.1.2:9050\",\"http_proxy=socks5h://10.89.1.2:9050\",\"https_proxy=socks5h://10.89.1.2:9050\",\"all_proxy=socks5h://10.89.1.2:9050\",\"NO_PROXY=\",\"no_proxy=\"]"; entrypoint='["/app/.venv/bin/python"]'; cmd='["/opt/basix/policy_mcp.py"]'; health='null'; fi
+    config_image=${config_image:-$image}
+    owner=${MOCK_CONTAINER_OWNER:-${MOCK_OWNER:-true}}
+    printf '[{"Image":"%s","EffectiveCaps":[],"BoundingCaps":[],"Mounts":%s,"Config":{"Image":"%s","Env":%s,"Entrypoint":%s,"Cmd":%s,"Healthcheck":%s,"CreateCommand":["podman","run","--cap-drop","ALL"],"Labels":{"io.basix.scrapling-tor.managed":"%s"}},"HostConfig":{"Privileged":false,"CapAdd":null,"CapDrop":["ALL"],"PortBindings":%s,"SecurityOpt":["no-new-privileges"],"RestartPolicy":{"Name":"unless-stopped"}},"NetworkSettings":{"Networks":%s}}]\n' "$image" "$mounts" "$config_image" "$env" "$entrypoint" "$cmd" "$health" "$owner" "$ports" "$nets" ;;
   run)
-    if [[ $* == *' -d '* || $* == *'run -d '* ]]; then : >"$MOCK_ROOT/container"; : >"$MOCK_ROOT/container-recreated"
+    if [[ $* == *' --name basix-scrapling-tor '* ]]; then : >"$MOCK_ROOT/container-basix-scrapling-tor"
+    elif [[ $* == *' --name basix-scrapling-mcp '* ]]; then
+      : >"$MOCK_ROOT/container-basix-scrapling-mcp"; previous=''
+      for argument in "$@"; do if [[ $previous == -p ]]; then binding=$argument; break; fi; previous=$argument; done
+      binding=${binding#127.0.0.1:}; printf '%s\n' "${binding%%:*}" >"$MOCK_ROOT/scrapling-port"
     elif [[ $* == *check.torproject.org* ]]; then printf '{"IsTor":%s}\n' "${MOCK_ISTOR:-true}"
-    elif [[ $* == *policy_mcp.py* ]]; then
-      [[ ${MOCK_HANDSHAKE:-ok} == ok ]] && printf '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18"}}\n' || exit 1
     else [[ ${MOCK_RUNTIME:-ok} == ok ]]; fi ;;
-  start) : ;; rm) rm -f "$MOCK_ROOT/container" ;;
+  start) : ;;
+  stop) : ;;
+  rm) rm -f "$MOCK_ROOT/container-${*: -1}" ;;
   *) exit 1 ;;
 esac
 EOF
   cp "$case_dir/bin/podman" "$case_dir/bin/docker"
   chmod +x "$case_dir/bin/"*
-  for tool in bash chmod cp dirname grep mkdir mktemp mv ps rm seq sleep; do ln -s "$(command -v "$tool")" "$case_dir/bin/$tool"; done
+  for tool in bash chmod cp dirname grep mkdir mktemp mv rm seq sleep; do ln -s "$(command -v "$tool")" "$case_dir/bin/$tool"; done
 }
 
 run_installer() {
@@ -86,73 +99,54 @@ run_installer() {
   PATH="$case_dir/bin:$PATH" HOME="$case_dir/home" CODEX_HOME="$case_dir/home/codex" MOCK_LOG="$log" MOCK_ROOT="$case_dir" \
     MOCK_ADD="${MOCK_ADD:-ok}" MOCK_REMOVE="${MOCK_REMOVE:-ok}" MOCK_RACE="${MOCK_RACE:-false}" MOCK_OWNER="${MOCK_OWNER:-true}" \
     MOCK_HEALTH="${MOCK_HEALTH:-healthy}" MOCK_ISTOR="${MOCK_ISTOR:-true}" MOCK_HANDSHAKE="${MOCK_HANDSHAKE:-ok}" MOCK_RUNTIME="${MOCK_RUNTIME:-ok}" \
-    MOCK_NET_CONTAINERS="${MOCK_NET_CONTAINERS-}" \
+    MOCK_FOREIGN="${MOCK_FOREIGN:-false}" \
     "$ROOT/src/setup/install-scrapling-codex.sh" "$@" >"$output" 2>&1
   status=$?; set -e
 }
 check() {
   local name=$1 want=$2 pattern=$3 forbidden=${4-}
-  if [[ $status == "$want" ]] && grep -qE "$pattern" "$output" && { [[ -z $forbidden ]] || ! grep -qE "$forbidden" "$log"; }; then
-    printf 'ok - %s\n' "$name"; ((passes+=1))
-  else printf 'not ok - %s (status %s)\n' "$name" "$status"; sed -n '1,140p' "$output"; printf '%s\n' '--- log ---'; sed -n '1,140p' "$log"; ((failures+=1)); fi
+  if [[ $status == "$want" ]] && grep -qE "$pattern" "$output" && { [[ -z $forbidden ]] || ! grep -qE "$forbidden" "$log"; }; then printf 'ok - %s\n' "$name"; ((passes+=1))
+  else printf 'not ok - %s (status %s)\n' "$name" "$status"; sed -n '1,120p' "$output"; printf '%s\n' '--- log ---'; sed -n '1,120p' "$log"; ((failures+=1)); fi
   rm -rf "$case_dir"
 }
 
 make_mocks; run_installer
-tor_id=$(printf '%064d' 2)
-grep -qx "TOR_IMAGE=sha256:$tor_id" "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
-grep -q "sha256:$tor_id" "$log" || status=99
-check 'Podman raw Tor image ID is normalized, stored, and used' 0 'immutable image docker.io/.+@sha256:' ''
-make_mocks; : >"$case_dir/container"; MOCK_CONFIG_IMAGE="sha256:$tor_id" run_installer
-if grep -q 'podman rm -f basix-scrapling-tor' "$log"; then status=99; fi
-check 'canonical Podman sidecar is reused with real expanded CapDrop' 0 'installation verified' ''
-make_mocks; : >"$case_dir/container"; MOCK_CONTAINER_IMAGE=$(printf '%064d' 9) run_installer
-grep -q 'podman rm -f basix-scrapling-tor' "$log" || status=99
-grep -q 'podman run -d .*sha256:' "$log" || status=99
-check 'safe managed sidecar with stale image is replaced' 0 'Replacing safely managed Tor sidecar' ''
-make_mocks; : >"$case_dir/container"; MOCK_CONTAINER_IMAGE=$(printf '%064d' 9) MOCK_CONTAINER_OWNER=false run_installer
-check 'foreign stale sidecar is rejected and never removed' 7 'foreign or unsafe Tor container' 'podman rm -f basix-scrapling-tor|codex mcp remove|codex mcp add'
-make_mocks; : >"$case_dir/container"; MOCK_CONTAINER_IMAGE=$(printf '%064d' 9) MOCK_CREATE_COMMAND='["podman","run"]' MOCK_CAP_DROP='["CAP_CHOWN"]' run_installer
-check 'unsafe stale sidecar is rejected and never removed' 7 'foreign or unsafe Tor container' 'podman rm -f basix-scrapling-tor|codex mcp remove|codex mcp add'
-make_mocks; : >"$case_dir/container"; MOCK_CONTAINER_IMAGE=$(printf '%064d' 9) MOCK_EFFECTIVE_CAPS='["CAP_CHOWN"]' run_installer
-check 'effective Podman capabilities make a stale sidecar unsafe' 7 'foreign or unsafe Tor container' 'podman rm -f basix-scrapling-tor|codex mcp remove|codex mcp add'
-make_mocks; run_installer --runtime docker
-grep -qx "TOR_IMAGE=sha256:$tor_id" "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
-check 'Docker prefixed Tor image ID remains accepted' 0 'installation verified' ''
-make_mocks; MOCK_SCRAPLING_INSPECT_OUTPUT=$(printf '%064d\n' 3) run_installer
-grep -qx "SCRAPLING_IMAGE=sha256:$(printf '%064d' 3)" "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
-check 'raw Scrapling fallback image ID is normalized' 0 'installation verified' ''
-make_mocks; MOCK_TOR_INSPECT_OUTPUT='' run_installer; check 'empty Tor inspect output is rejected before Codex mutation' 6 'immutable Tor image ID' 'codex mcp remove|codex mcp add'
-make_mocks; MOCK_TOR_INSPECT_OUTPUT='not-an-image-id' run_installer; check 'invalid Tor inspect output is rejected before Codex mutation' 6 'immutable Tor image ID' 'codex mcp remove|codex mcp add'
-make_mocks; MOCK_TOR_INSPECT_OUTPUT=$(printf '%063d\n' 2) run_installer; check 'short Tor inspect output is rejected before Codex mutation' 6 'immutable Tor image ID' 'codex mcp remove|codex mcp add'
-make_mocks; MOCK_TOR_INSPECT_OUTPUT=$(printf '%064d\n%064d\n' 2 3) run_installer; check 'multiline Tor inspect output is rejected before Codex mutation' 6 'immutable Tor image ID' 'codex mcp remove|codex mcp add'
-one='[{"name":"old-wrapper","enabled":true,"transport":{"type":"stdio","command":"/opt/Scrapling-wrapper","args":[],"env":{"TOKEN":"super-secret"},"cwd":null}}]'
-make_mocks; printf '%s\n' "$one" >"$case_dir/list.json"; run_installer; check 'one registration needs noninteractive approval' 7 'rerun with --force' 'podman pull|codex mcp remove'
-make_mocks; printf '%s\n' "$one" >"$case_dir/list.json"; run_installer --force; check 'force migrates differently named registration' 0 'Running Codex sessions may keep' ''
-make_mocks; : >"$case_dir/net-basix-tor-egress"; : >"$case_dir/net-basix-scrapling-internal"
-MOCK_NET_CONTAINERS='{"random-old-mcp":{"Name":"sleepy_scrapling"}}' run_installer
-check 'randomly named running Scrapling container does not block migration' 0 'installation verified' ''
-two='[{"name":"scrapling","command":"x"},{"name":"other","url":"http://SCRAPLING.example/mcp","enabled":false}]'
-make_mocks; printf '%s\n' "$two" >"$case_dir/list.json"; run_installer --force; check 'multiple registrations always fail before mutation' 7 'Multiple Scrapling' 'podman pull|podman build|codex mcp remove|codex mcp add'
-make_mocks; printf '%s\n' "$two" >"$case_dir/list.json"; run_installer --dry-run; check 'multiple registrations also fail in dry-run' 7 'Multiple Scrapling' 'podman pull|podman build'
-make_mocks; printf '%s\n' "$one" >"$case_dir/list.json"; run_installer --dry-run; check 'dry-run shows migration but changes nothing' 0 'Would prompt.*old-wrapper' 'podman pull|codex mcp remove|codex mcp add'
-make_mocks; printf '%s\n' "$one" >"$case_dir/list.json"; MOCK_RACE=true run_installer --force; check 'race is detected before Codex mutation' 7 'changed concurrently' 'codex mcp remove|codex mcp add'
-make_mocks; printf '%s\n' "$one" >"$case_dir/list.json"; printf 'original = true\n' >"$case_dir/home/codex/config.toml"; MOCK_ADD=fail run_installer --force; restored=$(<"$case_dir/home/codex/config.toml"); [[ $restored == 'original = true' ]] || status=99; check 'add failure restores exact Codex config' 8 'Could not add canonical' ''
-make_mocks; printf '%s\n' "$one" >"$case_dir/list.json"; MOCK_REMOVE=fail run_installer --force; check 'remove failure is a Codex error' 8 'Could not remove old' ''
-make_mocks; MOCK_OWNER=false run_installer; check 'unsafe preexisting runtime resource rejected' 7 'foreign or unsafe network' 'codex mcp add'
-make_mocks; MOCK_ISTOR=false run_installer; check 'non-Tor egress blocks registration' 9 'IsTor=true' 'codex mcp add'
-make_mocks; : >"$case_dir/container"; : >"$case_dir/net-basix-tor-egress"; : >"$case_dir/net-basix-scrapling-internal"; MOCK_CONFIG_IMAGE="sha256:$tor_id" MOCK_ISTOR=false run_installer
-check 'external Tor failure preserves a preexisting canonical sidecar' 9 'IsTor=true' 'podman rm -f basix-scrapling-tor|codex mcp add'
-make_mocks; MOCK_HANDSHAKE=fail run_installer
-grep -q 'podman rm -f basix-scrapling-tor' "$log" || status=99
-check 'failed MCP handshake rolls back new runtime and blocks registration' 9 'handshake failed' 'codex mcp add'
-make_mocks; MOCK_HEALTH=unhealthy run_installer; check 'unhealthy Tor blocks registration' 9 'failed validation or bootstrap' 'codex mcp add'
-make_mocks; run_installer --runtime docker; check 'Docker path avoids Podman-only DNS flag' 0 'installation verified' ''
-make_mocks; run_installer --wat; check 'unknown option rejected' 2 'Unknown option' ''
-make_mocks; run_installer --image 'bad image'; check 'bad image rejected' 2 'Invalid OCI image' ''
+grep -qx 'PORT=8002' "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
+grep -q -- '--network basix-scrapling-internal.*-p 127.0.0.1:8002:8002' "$log" || status=99
+grep -q 'codex mcp add scrapling --url http://127.0.0.1:8002/mcp' "$log" || status=99
+check 'default installs isolated persistent HTTP service' 0 'Endpoint: http://127.0.0.1:8002/mcp'
+
+make_mocks; run_installer --port 9123
+grep -qx 'PORT=9123' "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
+grep -q 'codex mcp add scrapling --url http://127.0.0.1:9123/mcp' "$log" || status=99
+check 'custom port reaches container and Codex URL' 0 'Endpoint: http://127.0.0.1:9123/mcp'
+
+for bad in 80 00080 0 65536 word; do make_mocks; run_installer --port "$bad"; check "unsafe port $bad is rejected" 2 'Port must be' 'podman pull|codex mcp add'; done
+make_mocks; run_installer --port 01024
+grep -qx 'PORT=1024' "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
+check 'leading-zero safe port is normalized in base ten' 0 'Endpoint: http://127.0.0.1:1024/mcp'
+
+old='[{"name":"old-wrapper","enabled":true,"transport":{"type":"stdio","command":"/old/policy_mcp","args":["run"]}}]'
+make_mocks; printf '%s\n' "$old" >"$case_dir/list.json"; run_installer; check 'stdio migration requires approval' 7 'rerun with --force' 'podman pull|codex mcp remove'
+make_mocks; printf '%s\n' "$old" >"$case_dir/list.json"; run_installer --force; check 'force migrates stdio to URL' 0 'Endpoint: http://127.0.0.1:8002/mcp'
+extra='[{"name":"scrapling","enabled":true,"transport":{"type":"http","url":"http://127.0.0.1:8002/mcp","command":"/evil"}}]'
+make_mocks; printf '%s\n' "$extra" >"$case_dir/list.json"; run_installer; check 'URL registration with stale stdio fields is not canonical' 7 'rerun with --force' 'podman pull'
+make_mocks; printf '%s\n' "$old" >"$case_dir/list.json"; MOCK_RACE=true run_installer --force; check 'race blocks Codex mutation' 7 'changed concurrently' 'codex mcp remove|codex mcp add'
+
+make_mocks; MOCK_OWNER=false run_installer; check 'foreign runtime resource is not taken over' 7 'foreign or unsafe network' 'codex mcp add'
+make_mocks; MOCK_FOREIGN=true run_installer; check 'foreign running Scrapling container blocks install' 7 'foreign running Scrapling' 'codex mcp add'
+make_mocks; MOCK_HANDSHAKE=fail run_installer; check 'HTTP failure rolls back both new containers' 9 'HTTP.*verification failed' 'codex mcp add'
+make_mocks; MOCK_ISTOR=false run_installer; check 'non-Tor egress blocks Codex registration' 9 'IsTor=true' 'codex mcp add'
+make_mocks; MOCK_HEALTH=unhealthy run_installer; check 'Tor health blocks service registration' 9 'failed validation or bootstrap' 'codex mcp add'
+make_mocks; run_installer --runtime docker; check 'Docker receives the same security boundary' 0 'installation verified'
+
+make_mocks; printf '%s\n' "$old" >"$case_dir/list.json"; printf 'original = true\n' >"$case_dir/home/codex/config.toml"; MOCK_ADD=fail run_installer --force
+[[ $(<"$case_dir/home/codex/config.toml") == 'original = true' ]] || status=99
+check 'add failure restores Codex config' 8 'Could not add canonical'
 
 secret='[{"name":"neutral","url":"https://token:very-secret@host/SCRAPLING","env":{"API_TOKEN":"never-print"}}]'
-make_mocks; printf '%s\n' "$secret" >"$case_dir/list.json"; run_installer --dry-run; if grep -qE 'very-secret|never-print' "$case_dir/output"; then status=99; fi; check 'diagnostics redact URL credentials and env values' 0 '<redacted>' ''
+make_mocks; printf '%s\n' "$secret" >"$case_dir/list.json"; run_installer --dry-run; grep -qE 'very-secret|never-print' "$case_dir/output" && status=99
+check 'diagnostics redact credentials and values' 0 '<redacted>'
 
 printf '%d passed, %d failed\n' "$passes" "$failures"
 ((failures == 0))

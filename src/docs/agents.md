@@ -65,6 +65,11 @@ The native read-only agents are:
   but no Scrapling tool is available; the main agent must not fall back to the generic web tool.
   Its blocker tells the spawning parent to use the Basix `install-scrapling-codex.sh` installer and explains
   that Basix Scrapling requires Podman and routes all web requests through the Tor network.
+  The shared service uses Streamable HTTP at `http://127.0.0.1:8002/mcp`. For every
+  tool call, agents generate a canonical UUID v4 with a cryptographically secure
+  system source, reuse it for related session operations, and disclose it to a
+  subagent only when intentionally sharing that session capability. The UUID is
+  not server authentication and must not be logged or persisted by the installer.
 - `basix_file_explorer` uses `gpt-5.6-luna` with low reasoning for extensive local file
   discovery. It inventories all supported file types, verifies evidence with `rg` and targeted
   reads, and forbids Lumen, other MCP search tools, and web search. Persistent developer instructions

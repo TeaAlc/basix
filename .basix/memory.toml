@@ -108,3 +108,8 @@ insight = "When router policy moves into a required reference, validation must c
 date = "2026-08-14"
 category = "Repository"
 insight = "Codex subagent session metadata stores parent_thread_id, agent_path, and agent_role together under payload.source.subagent.thread_spawn; collector discovery must prioritize this relation over legacy activity events."
+
+[[entries]]
+date = "2026-08-20"
+category = "Verification"
+insight = "Container reuse checks must bind configured and actual image identities, command, mounts, environment, network, health, and restart policy; labels and one matching image field are insufficient."

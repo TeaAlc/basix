@@ -2,17 +2,18 @@
 set -euo pipefail
 
 readonly SERVER_NAME=scrapling DEFAULT_IMAGE='docker.io/pyd4vinci/scrapling:latest'
+readonly DEFAULT_PORT=8002
 readonly TOR_BUILD_TAG='localhost/basix-scrapling-tor:bookworm'
 readonly EXIT_USAGE=2 EXIT_PREREQUISITE=3 EXIT_RUNTIME=4 EXIT_PULL=5 EXIT_IMAGE_CHECK=6
 readonly EXIT_CONFLICT=7 EXIT_CODEX=8 EXIT_VERIFY=9
 SOURCE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/scrapling-tor" && pwd); readonly SOURCE_DIR
 SCAN=$SOURCE_DIR/codex_scan.py
-image=$DEFAULT_IMAGE runtime_choice=auto runtime='' force=false dry_run=false
+image=$DEFAULT_IMAGE runtime_choice=auto runtime='' port=$DEFAULT_PORT force=false dry_run=false
 codex_home=${CODEX_HOME:-${HOME:?HOME is required}/.codex}
 install_dir=$codex_home/basix/scrapling-tor launcher=$install_dir/launcher.sh
 
 usage() { cat <<EOF
-Usage: ./install-scrapling-codex.sh [--runtime auto|podman|docker] [--image IMAGE] [--force] [--dry-run] [--help]
+Usage: ./install-scrapling-codex.sh [--runtime auto|podman|docker] [--image IMAGE] [--port PORT] [--force] [--dry-run] [--help]
 
 Installs exactly one canonical Codex MCP named "scrapling" behind a managed,
 fail-closed Tor sidecar. This guarantees Tor-only container egress; it does not
@@ -20,6 +21,7 @@ give Chromium the fingerprinting properties of Tor Browser.
 
   --runtime NAME  auto, podman, or docker (auto prefers Podman)
   --image IMAGE   Scrapling image (default: $DEFAULT_IMAGE)
+  --port PORT     Unprivileged loopback service port (default: $DEFAULT_PORT)
   --force         Confirm noninteractive replacement of exactly one registration
   --dry-run       Detect conflicts and print actions without changing anything
   --help          Show this help
@@ -50,10 +52,19 @@ normalize_image_reference() {
 while (($#)); do case $1 in
   --runtime) (($# >= 2)) || fail "$EXIT_USAGE" '--runtime requires a value'; runtime_choice=$2; shift 2 ;;
   --image) (($# >= 2)) || fail "$EXIT_USAGE" '--image requires a value'; image=$2; shift 2 ;;
+  --port) (($# >= 2)) || fail "$EXIT_USAGE" '--port requires a value'; port=$2; shift 2 ;;
   --force) force=true; shift ;; --dry-run) dry_run=true; shift ;; --help|-h) usage; exit 0 ;;
   *) fail "$EXIT_USAGE" "Unknown option: $1" ;;
 esac; done
 validate_image "$image" || fail "$EXIT_USAGE" "Invalid OCI image reference: $image"
+if [[ ! $port =~ ^[0-9]+$ ]]; then
+  fail "$EXIT_USAGE" 'Port must be an integer from 1024 through 65535'
+fi
+port=$((10#$port))
+if ((port < 1024 || port > 65535)); then
+  fail "$EXIT_USAGE" 'Port must be an integer from 1024 through 65535'
+fi
+endpoint="http://127.0.0.1:$port/mcp"
 command -v python3 >/dev/null || fail "$EXIT_PREREQUISITE" 'python3 is required'
 command -v codex >/dev/null || fail "$EXIT_PREREQUISITE" 'Codex CLI not found'
 case $runtime_choice in
@@ -87,17 +98,17 @@ trap cleanup EXIT
 
 scan_codex() {
   codex mcp list --json >"$list_file" 2>"$work/list.err" || fail "$EXIT_CODEX" 'codex mcp list --json failed'
-  python3 "$SCAN" fingerprint <"$list_file" || fail "$EXIT_CODEX" 'Codex returned invalid MCP JSON'
+  PYTHONDONTWRITEBYTECODE=1 python3 "$SCAN" fingerprint <"$list_file" || fail "$EXIT_CODEX" 'Codex returned invalid MCP JSON'
 }
 initial_scan=$(scan_codex); read -r match_count initial_fingerprint <<<"$initial_scan"
 printf 'Detected Scrapling MCP registrations: %s\n' "$match_count"
-python3 "$SCAN" report <"$list_file" || fail "$EXIT_CODEX" 'Could not report Codex registrations'
+PYTHONDONTWRITEBYTECODE=1 python3 "$SCAN" report <"$list_file" || fail "$EXIT_CODEX" 'Could not report Codex registrations'
 ((match_count < 2)) || fail "$EXIT_CONFLICT" 'Multiple Scrapling MCP registrations found; no changes were made'
 
 expected_existing=false old_name=''
 if ((match_count == 1)); then
-  old_name=$(python3 "$SCAN" names <"$list_file")
-  if python3 "$SCAN" verify --launcher "$launcher" <"$list_file" 2>/dev/null; then expected_existing=true; fi
+  old_name=$(PYTHONDONTWRITEBYTECODE=1 python3 "$SCAN" names <"$list_file")
+  if PYTHONDONTWRITEBYTECODE=1 python3 "$SCAN" verify --endpoint "$endpoint" <"$list_file" 2>/dev/null; then expected_existing=true; fi
   if ! $expected_existing; then
     if $force; then printf 'Replacement of registration %q confirmed by --force.\n' "$old_name"
     elif $dry_run; then printf 'Would prompt to remove %q and replace it with canonical "scrapling".\n' "$old_name"
@@ -113,13 +124,15 @@ fi
 if $dry_run; then
   printf 'Dry run (no changes): pull %q; pin its digest; verify exact tool policy; build/pin Tor; validate networks and sidecar; test Tor egress.\n' "$image"
   ((match_count == 0)) || $expected_existing || printf 'Would run: codex mcp remove %q\n' "$old_name"
-  printf 'Would run: codex mcp add scrapling -- %q run\n' "$launcher"
+  printf 'Would run: codex mcp add scrapling --url %q\n' "$endpoint"
   exit 0
 fi
 
 run "$runtime" pull "$image" || fail "$EXIT_PULL" "Could not pull $image"
 scrapling_inspected=$("$runtime" image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{else}}{{.Id}}{{end}}' "$image") || fail "$EXIT_IMAGE_CHECK" 'Could not pin pulled Scrapling image'
 scrapling_pinned=$(normalize_image_reference "$scrapling_inspected") || fail "$EXIT_IMAGE_CHECK" 'Runtime did not return an immutable Scrapling digest or image ID'
+scrapling_id_inspected=$("$runtime" image inspect --format '{{.Id}}' "$scrapling_pinned") || fail "$EXIT_IMAGE_CHECK" 'Could not resolve pinned Scrapling image ID'
+scrapling_id=$(normalize_image_reference "$scrapling_id_inspected") || fail "$EXIT_IMAGE_CHECK" 'Runtime did not return Scrapling immutable image ID'
 run "$runtime" run --rm --network none --entrypoint /app/.venv/bin/python "$scrapling_pinned" -c '
 import asyncio,inspect
 from scrapling.core.ai import ScraplingMCPServer as S
@@ -128,15 +141,16 @@ actual={t.name for t in asyncio.run(s._build_server("127.0.0.1",8000).list_tools
 assert actual==expected
 required={"open_session":{"proxy","cdp_url","real_chrome","executable_path","additional_args","block_webrtc"},"get":{"proxy","proxy_auth","http3"},"bulk_get":{"proxy","proxy_auth","http3"},"fetch":{"proxy","cdp_url","real_chrome","executable_path","session_id"},"bulk_fetch":{"proxy","cdp_url","real_chrome","executable_path","session_id"},"stealthy_fetch":{"proxy","cdp_url","real_chrome","executable_path","additional_args","block_webrtc","session_id"},"bulk_stealthy_fetch":{"proxy","cdp_url","real_chrome","executable_path","additional_args","block_webrtc","session_id"}}
 assert all(v <= set(inspect.signature(getattr(s,k)).parameters) for k,v in required.items())
+assert "allowed_hosts" in inspect.signature(s.serve).parameters
 ' || fail "$EXIT_IMAGE_CHECK" 'Scrapling MCP tools or schemas are incompatible with the Basix policy'
 run "$runtime" build --label 'io.basix.scrapling-tor.managed=true' -t "$TOR_BUILD_TAG" "$SOURCE_DIR" || fail "$EXIT_PULL" 'Could not build Tor sidecar'
 tor_inspected=$("$runtime" image inspect --format '{{.Id}}' "$TOR_BUILD_TAG") || fail "$EXIT_IMAGE_CHECK" 'Could not pin Tor image'
 tor_pinned=$(normalize_image_reference "$tor_inspected") || fail "$EXIT_IMAGE_CHECK" 'Runtime did not return an immutable Tor image ID'
 
 mkdir -p "$work/support"
-cp "$SOURCE_DIR/launcher.sh" "$SOURCE_DIR/policy_mcp.py" "$SOURCE_DIR/codex_scan.py" "$work/support/"
-printf 'RUNTIME=%q\nSCRAPLING_IMAGE=%q\nTOR_IMAGE=%q\n' "$runtime" "$scrapling_pinned" "$tor_pinned" >"$work/support/config"
-chmod 755 "$work/support/launcher.sh" "$work/support/codex_scan.py"
+cp "$SOURCE_DIR/launcher.sh" "$SOURCE_DIR/policy_mcp.py" "$SOURCE_DIR/codex_scan.py" "$SOURCE_DIR/health_check.py" "$work/support/"
+printf 'RUNTIME=%q\nSCRAPLING_IMAGE=%q\nSCRAPLING_ID=%q\nTOR_IMAGE=%q\nPORT=%q\n' "$runtime" "$scrapling_pinned" "$scrapling_id" "$tor_pinned" "$port" >"$work/support/config"
+chmod 755 "$work/support/launcher.sh" "$work/support/codex_scan.py" "$work/support/health_check.py"
 mkdir -p "$(dirname "$install_dir")"
 if [[ -e $install_dir ]]; then mv "$install_dir" "$backup_support"; old_support_saved=true; fi
 if ! mv "$work/support" "$install_dir"; then
@@ -149,6 +163,13 @@ run "$launcher" prepare || {
   ((launcher_status == EXIT_CONFLICT)) && fail "$EXIT_CONFLICT" 'Managed runtime resource conflict; Codex was not changed'
   fail "$EXIT_VERIFY" 'Managed Tor failed validation or bootstrap; Codex was not changed'
 }
+if [[ $runtime == podman ]]; then
+  if command -v systemctl >/dev/null 2>&1 && systemctl --user enable podman-restart.service >/dev/null 2>&1; then
+    printf 'Enabled Podman user restart service for managed containers.\n'
+  else
+    printf 'Warning: Podman user-systemd autostart is unavailable; run %q start after reboot.\n' "$launcher" >&2
+  fi
+fi
 # The only non-rollbackable phase starts here. Re-scan immediately around every
 # Codex mutation and restore config.toml byte-for-byte if any operation fails.
 current_scan=$(scan_codex); read -r current_count current_fingerprint <<<"$current_scan"
@@ -162,13 +183,13 @@ if ((match_count == 1)) && ! $expected_existing; then
 fi
 if ! $expected_existing; then
   codex_changed=true
-  run codex mcp add "$SERVER_NAME" -- "$launcher" run || fail "$EXIT_CODEX" 'Could not add canonical Scrapling registration'
+  run codex mcp add "$SERVER_NAME" --url "$endpoint" || fail "$EXIT_CODEX" 'Could not add canonical Scrapling registration'
 fi
 final_scan=$(scan_codex); read -r final_count _ <<<"$final_scan"
-if ((final_count != 1)) || ! python3 "$SCAN" verify --launcher "$launcher" <"$list_file"; then
+if ((final_count != 1)) || ! PYTHONDONTWRITEBYTECODE=1 python3 "$SCAN" verify --endpoint "$endpoint" <"$list_file"; then
   fail "$EXIT_CODEX" 'Final Codex registration is not exactly canonical Scrapling'
 fi
 
 rm -rf "$backup_support"; support_installed=false; old_support_saved=false; codex_changed=false
 printf '\nScrapling MCP installation verified with immutable image %s.\n' "$scrapling_pinned"
-printf 'Running Codex sessions may keep an already-started direct MCP; restart them to use the canonical saved configuration. Tor-only egress is enforced at the container network boundary.\n'
+printf 'Endpoint: %s\nRunning clients may keep an older MCP connection; restart them to use the canonical saved configuration. Tor-only egress is enforced at the container network boundary.\n' "$endpoint"

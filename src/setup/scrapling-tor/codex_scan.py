@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import sys
 
@@ -85,23 +84,22 @@ def fingerprint(found):
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def expected(entry, launcher):
+def expected(entry, endpoint):
     spec = transport(entry)
+    allowed = {"type", "url"} if spec is not entry else {"name", "enabled", "disabled", "type", "url"}
     return (
         entry.get("name") == "scrapling"
         and entry.get("enabled", not entry.get("disabled", False))
-        and (spec.get("type") or "stdio") == "stdio"
-        and spec.get("command") == launcher
-        and spec.get("args") == ["run"]
-        and spec.get("cwd") is None
-        and spec.get("env") in (None, {})
+        and (spec.get("type") or "http") in ("http", "streamable_http")
+        and spec.get("url") == endpoint
+        and set(spec) <= allowed
     )
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("report", "fingerprint", "names", "verify"))
-    parser.add_argument("--launcher")
+    parser.add_argument("--endpoint")
     args = parser.parse_args()
     try:
         data = json.load(sys.stdin)
@@ -117,9 +115,9 @@ def main():
         for entry, _ in found:
             print(entry.get("name", ""))
     else:
-        if not args.launcher:
-            parser.error("verify requires --launcher")
-        if len(found) != 1 or not expected(found[0][0], os.path.abspath(args.launcher)):
+        if not args.endpoint:
+            parser.error("verify requires --endpoint")
+        if len(found) != 1 or not expected(found[0][0], args.endpoint):
             print("expected exactly one canonical managed Scrapling registration", file=sys.stderr)
             return 1
     return 0
