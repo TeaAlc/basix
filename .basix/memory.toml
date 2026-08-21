@@ -113,3 +113,8 @@ insight = "Codex subagent session metadata stores parent_thread_id, agent_path, 
 date = "2026-08-20"
 category = "Verification"
 insight = "Container reuse checks must bind configured and actual image identities, command, mounts, environment, network, health, and restart policy; labels and one matching image field are insufficient."
+
+[[entries]]
+date = "2026-08-21"
+category = "Repository"
+insight = "Legacy Basix Scrapling containers may have an empty Podman restart policy; replace them only after every other ownership and security invariant passes."

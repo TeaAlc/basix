@@ -74,11 +74,14 @@ case "${1-}" in
     else image=sha256:$(printf '%064d' 1); config_image=docker.io/pyd4vinci/scrapling@sha256:$(printf '%064d' 1); nets='{"basix-scrapling-internal":{}}'; port=$(<"$MOCK_ROOT/scrapling-port"); ports="{\"$port/tcp\":[{\"HostIp\":\"127.0.0.1\",\"HostPort\":\"$port\"}]}"; mounts="[{\"Source\":\"$MOCK_ROOT/home/codex/basix/scrapling-tor/policy_mcp.py\",\"Destination\":\"/opt/basix/policy_mcp.py\",\"RW\":false}]"; env="[\"BASIX_TOR_IP=10.89.1.2\",\"BASIX_PORT=$port\",\"HTTP_PROXY=socks5h://10.89.1.2:9050\",\"HTTPS_PROXY=socks5h://10.89.1.2:9050\",\"ALL_PROXY=socks5h://10.89.1.2:9050\",\"http_proxy=socks5h://10.89.1.2:9050\",\"https_proxy=socks5h://10.89.1.2:9050\",\"all_proxy=socks5h://10.89.1.2:9050\",\"NO_PROXY=\",\"no_proxy=\"]"; entrypoint='["/app/.venv/bin/python"]'; cmd='["/opt/basix/policy_mcp.py"]'; health='null'; fi
     config_image=${config_image:-$image}
     owner=${MOCK_CONTAINER_OWNER:-${MOCK_OWNER:-true}}
-    printf '[{"Image":"%s","EffectiveCaps":[],"BoundingCaps":[],"Mounts":%s,"Config":{"Image":"%s","Env":%s,"Entrypoint":%s,"Cmd":%s,"Healthcheck":%s,"CreateCommand":["podman","run","--cap-drop","ALL"],"Labels":{"io.basix.scrapling-tor.managed":"%s"}},"HostConfig":{"Privileged":false,"CapAdd":null,"CapDrop":["ALL"],"PortBindings":%s,"SecurityOpt":["no-new-privileges"],"RestartPolicy":{"Name":"unless-stopped"}},"NetworkSettings":{"Networks":%s}}]\n' "$image" "$mounts" "$config_image" "$env" "$entrypoint" "$cmd" "$health" "$owner" "$ports" "$nets" ;;
+    restart=${MOCK_RESTART:-unless-stopped}
+    [[ $restart != legacy-empty || -f $MOCK_ROOT/restart-current-$name ]] || restart=''
+    [[ $restart != legacy-empty ]] || restart=unless-stopped
+    printf '[{"Image":"%s","EffectiveCaps":[],"BoundingCaps":[],"Mounts":%s,"Config":{"Image":"%s","Env":%s,"Entrypoint":%s,"Cmd":%s,"Healthcheck":%s,"CreateCommand":["podman","run","--cap-drop","ALL"],"Labels":{"io.basix.scrapling-tor.managed":"%s"}},"HostConfig":{"Privileged":false,"CapAdd":null,"CapDrop":["ALL"],"PortBindings":%s,"SecurityOpt":["no-new-privileges"],"RestartPolicy":{"Name":"%s"}},"NetworkSettings":{"Networks":%s}}]\n' "$image" "$mounts" "$config_image" "$env" "$entrypoint" "$cmd" "$health" "$owner" "$ports" "$restart" "$nets" ;;
   run)
-    if [[ $* == *' --name basix-scrapling-tor '* ]]; then : >"$MOCK_ROOT/container-basix-scrapling-tor"
+    if [[ $* == *' --name basix-scrapling-tor '* ]]; then : >"$MOCK_ROOT/container-basix-scrapling-tor"; : >"$MOCK_ROOT/restart-current-basix-scrapling-tor"
     elif [[ $* == *' --name basix-scrapling-mcp '* ]]; then
-      : >"$MOCK_ROOT/container-basix-scrapling-mcp"; previous=''
+      : >"$MOCK_ROOT/container-basix-scrapling-mcp"; : >"$MOCK_ROOT/restart-current-basix-scrapling-mcp"; previous=''
       for argument in "$@"; do if [[ $previous == -p ]]; then binding=$argument; break; fi; previous=$argument; done
       binding=${binding#127.0.0.1:}; printf '%s\n' "${binding%%:*}" >"$MOCK_ROOT/scrapling-port"
     elif [[ $* == *check.torproject.org* ]]; then printf '{"IsTor":%s}\n' "${MOCK_ISTOR:-true}"
@@ -99,7 +102,7 @@ run_installer() {
   PATH="$case_dir/bin:$PATH" HOME="$case_dir/home" CODEX_HOME="$case_dir/home/codex" MOCK_LOG="$log" MOCK_ROOT="$case_dir" \
     MOCK_ADD="${MOCK_ADD:-ok}" MOCK_REMOVE="${MOCK_REMOVE:-ok}" MOCK_RACE="${MOCK_RACE:-false}" MOCK_OWNER="${MOCK_OWNER:-true}" \
     MOCK_HEALTH="${MOCK_HEALTH:-healthy}" MOCK_ISTOR="${MOCK_ISTOR:-true}" MOCK_HANDSHAKE="${MOCK_HANDSHAKE:-ok}" MOCK_RUNTIME="${MOCK_RUNTIME:-ok}" \
-    MOCK_FOREIGN="${MOCK_FOREIGN:-false}" \
+    MOCK_FOREIGN="${MOCK_FOREIGN:-false}" MOCK_RESTART="${MOCK_RESTART:-unless-stopped}" \
     "$ROOT/src/setup/install-scrapling-codex.sh" "$@" >"$output" 2>&1
   status=$?; set -e
 }
@@ -134,6 +137,15 @@ make_mocks; printf '%s\n' "$extra" >"$case_dir/list.json"; run_installer; check 
 make_mocks; printf '%s\n' "$old" >"$case_dir/list.json"; MOCK_RACE=true run_installer --force; check 'race blocks Codex mutation' 7 'changed concurrently' 'codex mcp remove|codex mcp add'
 
 make_mocks; MOCK_OWNER=false run_installer; check 'foreign runtime resource is not taken over' 7 'foreign or unsafe network' 'codex mcp add'
+make_mocks
+touch "$case_dir/net-basix-tor-egress" "$case_dir/net-basix-scrapling-internal" "$case_dir/container-basix-scrapling-tor" "$case_dir/container-basix-scrapling-mcp"
+printf '8002\n' >"$case_dir/scrapling-port"
+MOCK_RESTART=legacy-empty run_installer
+grep -q 'rm -f basix-scrapling-tor' "$log" || status=99
+grep -q 'rm -f basix-scrapling-mcp' "$log" || status=99
+grep -q 'run -d --name basix-scrapling-tor ' "$log" || status=99
+grep -q 'run -d --name basix-scrapling-mcp ' "$log" || status=99
+check 'legacy managed containers without restart policy are upgraded' 0 'installation verified'
 make_mocks; MOCK_FOREIGN=true run_installer; check 'foreign running Scrapling container blocks install' 7 'foreign running Scrapling' 'codex mcp add'
 make_mocks; MOCK_HANDSHAKE=fail run_installer; check 'HTTP failure rolls back both new containers' 9 'HTTP.*verification failed' 'codex mcp add'
 make_mocks; MOCK_ISTOR=false run_installer; check 'non-Tor egress blocks Codex registration' 9 'IsTor=true' 'codex mcp add'

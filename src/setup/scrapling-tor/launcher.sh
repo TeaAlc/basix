@@ -63,7 +63,8 @@ if labels.get("io.basix.scrapling-tor.managed")!="true" or host.get("Privileged"
 if not any("no-new-privileges" in str(x).lower() for x in security) or nets!=expected or ports!=wanted_ports: raise SystemExit(1)
 if kind=="tor" and mounts: raise SystemExit(1)
 restart=(host.get("RestartPolicy") or {}).get("Name")
-if restart!="unless-stopped": raise SystemExit(1)
+legacy_restart=restart in (None,"")
+if restart!="unless-stopped" and not legacy_restart: raise SystemExit(1)
 if kind=="tor":
  health=cfg.get("Healthcheck") or {}
  expected_health="grep -q "+chr(39)+"Bootstrapped 100%"+chr(39)+" /var/log/tor/notices.log"
@@ -80,7 +81,7 @@ if kind=="scrapling":
 actual=str(c.get("Image") or "").lower(); started=str(cfg.get("Image") or "").lower()
 if len(actual)==64: actual="sha256:"+actual
 if len(started)==64: started="sha256:"+started
-raise SystemExit(0 if actual==wanted_actual.lower() and started==wanted_started.lower() else 10)
+raise SystemExit(0 if not legacy_restart and actual==wanted_actual.lower() and started==wanted_started.lower() else 10)
 ' "$kind" "$configured_image" "$actual_image" "$PORT" "$tor_address" "$policy_path"
 }
 
