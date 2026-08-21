@@ -118,3 +118,8 @@ insight = "Container reuse checks must bind configured and actual image identiti
 date = "2026-08-21"
 category = "Repository"
 insight = "Legacy Basix Scrapling containers may have an empty Podman restart policy; replace them only after every other ownership and security invariant passes."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Podman inspect may serialize Config.Entrypoint as a string and Config.Cmd as a list; normalize both before combining commands during foreign-container scans."

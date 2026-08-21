@@ -128,7 +128,11 @@ reject_foreign_scrapling() {
     if container_json "$name" | PYTHONDONTWRITEBYTECODE=1 python3 -c '
 import json,sys
 c=json.load(sys.stdin)[0]; cfg=c.get("Config") or {}
-image=str(cfg.get("Image") or "").lower(); command=" ".join(str(x) for x in ((cfg.get("Entrypoint") or [])+(cfg.get("Cmd") or []))).lower()
+image=str(cfg.get("Image") or "").lower(); parts=[]
+for value in (cfg.get("Entrypoint"),cfg.get("Cmd")):
+ if isinstance(value,list): parts.extend(str(x) for x in value)
+ elif value is not None: parts.append(str(value))
+command=" ".join(parts).lower()
 wanted=sys.argv[1].lower()
 raise SystemExit(0 if image==wanted or "policy_mcp.py" in command or "scrapling" in command else 1)
 ' "$SCRAPLING_IMAGE"; then

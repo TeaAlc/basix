@@ -43,7 +43,9 @@ EOF
 printf '%s %s\n' "${0##*/}" "$*" >>"$MOCK_LOG"
 case "${1-}" in
   info) [[ ${MOCK_INFO:-ok} == ok ]] ;;
-  ps) [[ ${MOCK_FOREIGN:-false} == true ]] && printf 'foreign-scrapling\n' || true ;;
+  ps)
+    [[ ${MOCK_FOREIGN:-false} != true ]] || printf 'foreign-scrapling\n'
+    [[ ${MOCK_BENIGN_SCALAR:-false} != true ]] || printf 'benign-scalar-entrypoint\n' ;;
   pull|build) [[ ${MOCK_RUNTIME:-ok} == ok ]] ;;
   image)
     if [[ $* == *basix-scrapling-tor* ]]; then printf '%064d\n' 2
@@ -66,6 +68,10 @@ case "${1-}" in
     fi
     if [[ $name == foreign-scrapling ]]; then
       printf '[{"Config":{"Image":"docker.io/pyd4vinci/scrapling@sha256:%064d","Entrypoint":["python"],"Cmd":["policy_mcp.py"]}}]\n' 1
+      exit 0
+    fi
+    if [[ $name == benign-scalar-entrypoint ]]; then
+      printf '[{"Config":{"Image":"docker.io/library/debian:bookworm-slim","Entrypoint":"/usr/bin/tini","Cmd":["sleep","infinity"]}}]\n'
       exit 0
     fi
     [[ -f $MOCK_ROOT/container-$name ]] || exit 1
@@ -102,7 +108,7 @@ run_installer() {
   PATH="$case_dir/bin:$PATH" HOME="$case_dir/home" CODEX_HOME="$case_dir/home/codex" MOCK_LOG="$log" MOCK_ROOT="$case_dir" \
     MOCK_ADD="${MOCK_ADD:-ok}" MOCK_REMOVE="${MOCK_REMOVE:-ok}" MOCK_RACE="${MOCK_RACE:-false}" MOCK_OWNER="${MOCK_OWNER:-true}" \
     MOCK_HEALTH="${MOCK_HEALTH:-healthy}" MOCK_ISTOR="${MOCK_ISTOR:-true}" MOCK_HANDSHAKE="${MOCK_HANDSHAKE:-ok}" MOCK_RUNTIME="${MOCK_RUNTIME:-ok}" \
-    MOCK_FOREIGN="${MOCK_FOREIGN:-false}" MOCK_RESTART="${MOCK_RESTART:-unless-stopped}" \
+    MOCK_FOREIGN="${MOCK_FOREIGN:-false}" MOCK_BENIGN_SCALAR="${MOCK_BENIGN_SCALAR:-false}" MOCK_RESTART="${MOCK_RESTART:-unless-stopped}" \
     "$ROOT/src/setup/install-scrapling-codex.sh" "$@" >"$output" 2>&1
   status=$?; set -e
 }
@@ -147,6 +153,7 @@ grep -q 'run -d --name basix-scrapling-tor ' "$log" || status=99
 grep -q 'run -d --name basix-scrapling-mcp ' "$log" || status=99
 check 'legacy managed containers without restart policy are upgraded' 0 'installation verified'
 make_mocks; MOCK_FOREIGN=true run_installer; check 'foreign running Scrapling container blocks install' 7 'foreign running Scrapling' 'codex mcp add'
+make_mocks; MOCK_BENIGN_SCALAR=true run_installer; check 'scalar entrypoint on unrelated container is ignored' 0 'installation verified'
 make_mocks; MOCK_HANDSHAKE=fail run_installer; check 'HTTP failure rolls back both new containers' 9 'HTTP.*verification failed' 'codex mcp add'
 make_mocks; MOCK_ISTOR=false run_installer; check 'non-Tor egress blocks Codex registration' 9 'IsTor=true' 'codex mcp add'
 make_mocks; MOCK_HEALTH=unhealthy run_installer; check 'Tor health blocks service registration' 9 'failed validation or bootstrap' 'codex mcp add'
