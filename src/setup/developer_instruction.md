@@ -13,21 +13,21 @@
 ## Agent Memory
 
 - `.basix/memory.toml` is agent-owned memory, not a user log. Autonomously create, update, merge, or delete it; never request user approval for memory operations.
-- Read it exactly once at session start and after each context compaction. Create it for the first qualifying insight.
+- Read it exactly once at session start and after each context compaction; create it for the first qualifying insight.
 - Apply entries to reduce effort and prevent repeated mistakes; reading alone is insufficient.
-- Retain evidenced failure prevention, efficiency methods, stable repository knowledge or user instructions, and guidance for future task or subagent decisions.
-  - Write failures as prevention rules. Do not omit the top insight because the task succeeded.
-  - Never store secrets, credentials, tokens, keys, private personal data, guesses, raw conversations, transient status, or documented facts. Without evidence, store nothing.
-- Do not run a memory-reflection round after every turn. Write collected insights only before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
-  - Bundle updates with normal work; start no subagent, research, or tests solely for maintenance.
-  - Consider existing knowledge first. Update, merge, replace, or delete duplicates, contradictions, stale insights, and now-documented facts. Keep the smallest useful set, not a fixed count.
-  - Updating may also contain compaction and merging of existing entries.
+- Retain evidenced failure prevention, efficiency methods, stable repository knowledge, user instructions, and guidance.
+  - Write failures as prevention rules. Do not omit top insight after task success.
+  - Never store secrets, credentials, tokens, keys, private personal data, guesses, conversations, transient status, or documented facts; without evidence, store nothing.
+- Do not run a memory-reflection round after every turn. Write insights only before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
+  - Bundle updates with work; start no subagent, research, or tests solely for maintenance.
+  - Before every commit or task completion, keep at most 64 `[[entries]]` across all categories (including `Subagent Insight`). If exceeded, merge only semantically compatible or overlapping insights; preserve active user instructions and indispensable contract rules, with shortening/merging allowed; drop mixed-origin metadata if TOML is valid; delete least important until 64. Prioritize repository-error prevention over token/work savings; no automatic pruning helper or `.basix/memory.toml` edits.
+  - Consider existing knowledge first. Keep the smallest useful set, not a fixed count.
 - Keep this TOML contract:
   - Use `version = 1` and zero or more `[[entries]]` records.
   - Records have exactly `date`, `category`, and `insight`; `Subagent Insight` also has `subagent_type`. Dates are quoted ISO 8601 `YYYY-MM-DD`.
   - `category` is one of `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`; use `Other` only if none fits.
-  - `subagent_type` names the exact native role and is exclusive to `Subagent Insight`. `insight` is actionable, at most three sentences and 32 words.
-  - Evaluate proposals for evidence and future utility; Root may shorten them but stores accepted subagent insights separately.
+  - `subagent_type` is the exact native role, exclusive to `Subagent Insight`; `insight` is actionable, at most three sentences and 32 words.
+  - Evaluate proposals for evidence and utility; Root may shorten; stores accepted subagent insights separately.
 - Commit updates with task changes unless `.basix` is ignored. Before compaction, commit eligible updates after verification. Never override ignore rules.
 
 ## Completion and commits
