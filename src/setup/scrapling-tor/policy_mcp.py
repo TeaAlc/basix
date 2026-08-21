@@ -42,6 +42,18 @@ CLIENT_ID_GUIDANCE = (
     "session lifecycle operations; do not use `default`, a `session_id`, or a "
     "server-generated placeholder. The server controls all network settings."
 )
+CLIENT_ID_PARAMETER = (
+    ":param client_id: Required. The calling agent supplies the canonical UUID v4 "
+    "used to isolate its sessions and must reuse it for related calls."
+)
+SINGULAR_FETCH_GUIDANCE = (
+    "This is the single-URL variant of the corresponding bulk fetch tool: pass "
+    "one `url`; use `bulk_fetch` or `bulk_stealthy_fetch` for multiple URLs."
+)
+BULK_FETCH_GUIDANCE = (
+    "This is the multi-URL variant: pass `urls` as a list and keep the same "
+    "`client_id` for related session calls."
+)
 
 
 def validate_configuration():
@@ -113,9 +125,13 @@ class ClientPolicy:
         return signature.replace(parameters=parameters)
 
     @staticmethod
-    def _description(method):
+    def _description(method, *, alias_guidance=None):
         original = inspect.getdoc(method) or ""
-        return f"{CLIENT_ID_GUIDANCE}\n\n{original}".strip()
+        parts = [CLIENT_ID_GUIDANCE, CLIENT_ID_PARAMETER]
+        if alias_guidance:
+            parts.append(alias_guidance)
+        parts.append(original)
+        return "\n\n".join(parts).strip()
 
     def network_tool(self, method, *, browser=False, session_aware=False, forced=None):
         forced = forced or {}
@@ -142,7 +158,10 @@ class ClientPolicy:
             return await method(*args, **kwargs)
 
         guarded.__signature__ = self._signature(method)
-        guarded.__doc__ = self._description(method)
+        alias_guidance = BULK_FETCH_GUIDANCE if method.__name__ in {
+            "bulk_fetch", "bulk_stealthy_fetch"
+        } else None
+        guarded.__doc__ = self._description(method, alias_guidance=alias_guidance)
         return guarded
 
     def singular_network_tool(self, method, bulk_method):
@@ -158,7 +177,7 @@ class ClientPolicy:
             return result[0] if isinstance(result, (list, tuple)) else result
 
         guarded.__signature__ = self._signature(method)
-        guarded.__doc__ = self._description(method)
+        guarded.__doc__ = self._description(method, alias_guidance=SINGULAR_FETCH_GUIDANCE)
         return guarded
 
     def open_session(self, method):

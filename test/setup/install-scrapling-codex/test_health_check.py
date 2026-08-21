@@ -49,7 +49,8 @@ class HealthCheckTests(unittest.TestCase):
                         "name": name,
                         "description": (
                             "The calling agent is the MCP client. Generate a canonical RFC 4122 "
-                            "UUID version 4 and pass it as `client_id`."
+                            "UUID version 4 and pass it as `client_id`. "
+                            ":param client_id: Required client capability."
                         ),
                         "inputSchema": {"required": ["client_id"], "properties": {}},
                     }

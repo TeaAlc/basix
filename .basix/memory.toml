@@ -163,3 +163,8 @@ insight = "Current Codex emits streamable_http registrations with null auth/head
 date = "2026-08-21"
 category = "Verification"
 insight = "Scrapling singular browser tools dynamically call their bulk counterparts; policy wrappers must expose singular adapters that pass client_id into wrapped bulk methods to preserve session ownership."
+
+[[entries]]
+date = "2026-08-21"
+category = "Tooling"
+insight = "Scrapling tool_describe reads the active MCP container; source-side metadata changes remain invisible until the managed service is reinstalled or restarted."

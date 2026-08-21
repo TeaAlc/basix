@@ -106,6 +106,11 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             description = inspect.getdoc(getattr(self.server, name))
             self.assertIn("calling agent is the MCP client", description)
             self.assertIn("canonical RFC 4122 UUID version 4", description)
+            self.assertIn(":param client_id:", description)
+        self.assertIn("single-URL variant", inspect.getdoc(self.server.fetch))
+        self.assertIn("multi-URL variant", inspect.getdoc(self.server.bulk_fetch))
+        self.assertIn("single-URL variant", inspect.getdoc(self.server.stealthy_fetch))
+        self.assertIn("multi-URL variant", inspect.getdoc(self.server.bulk_stealthy_fetch))
         self.assertNotIn("session_id", inspect.signature(self.server.open_session).parameters)
 
     async def test_invalid_client_id_is_rejected_before_tool(self):

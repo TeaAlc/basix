@@ -15,6 +15,7 @@ CLIENT_DESCRIPTION_MARKERS = (
     "calling agent is the MCP client",
     "canonical RFC 4122 UUID version 4",
     "pass it as `client_id`",
+    ":param client_id:",
 )
 HIDDEN_ARGUMENTS = {
     "proxy", "proxy_auth", "cdp_url", "real_chrome", "executable_path",
