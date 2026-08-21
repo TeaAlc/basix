@@ -230,7 +230,10 @@ Before starting Tor, the controller runs a temporary named probe in the existing
 egress network. If the host cannot create the rootless network namespace, it
 aborts before creating either service and reports the runtime, rootless status,
 and `Store.RunRoot`; it never repairs the host runtime or falls back to another
-network backend.
+network backend. Tor bootstrap is verified directly from its notice file because
+rootless Podman does not necessarily run container healthchecks without an
+active healthcheck manager; transient loopback resets while the HTTP service
+starts are retried before rollback.
 
 Every change to this installer, its launcher, or the runtime policy must pass the
 real isolated Podman release gate after deterministic setup tests:

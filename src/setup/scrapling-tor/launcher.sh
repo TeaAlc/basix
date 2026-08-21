@@ -52,6 +52,16 @@ ensure_network() {
   validate_network "$name" "$internal"
 }
 
+tor_bootstrap_verified() {
+  local state
+  state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$TOR_CONTAINER" 2>/dev/null || true)
+  [[ $state == running ]] || return 1
+  # Podman does not run healthchecks by itself unless a healthcheck manager is
+  # active.  Check Tor's notice file directly so rootless installs do not wait
+  # forever on a perpetually "starting" runtime health state.
+  "$RUNTIME" exec "$TOR_CONTAINER" grep -q 'Bootstrapped 100%' /var/log/tor/notices.log
+}
+
 runtime_diagnostics() {
   local rootless runroot
   rootless='unknown'; runroot='unknown'
@@ -140,9 +150,19 @@ ensure_tor() {
     "$RUNTIME" network connect "$INTERNAL_NET" "$TOR_CONTAINER" >/dev/null
     classify_container "$TOR_CONTAINER" tor "$TOR_IMAGE" "$TOR_IMAGE"
   fi
-  local health=''
-  for _ in $(seq 1 120); do health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$TOR_CONTAINER" 2>/dev/null || true); [[ $health == healthy || $health == unhealthy ]] && break; sleep 2; done
-  [[ $health == healthy ]] || { printf 'Tor sidecar did not reach 100%% bootstrap (health: %s).\n' "${health:-unknown}" >&2; return 9; }
+  local health state verified=false
+  for attempt in $(seq 1 120); do
+    if tor_bootstrap_verified; then verified=true; break; fi
+    state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$TOR_CONTAINER" 2>/dev/null || true)
+    [[ $state == exited || $state == stopped || $state == dead ]] && break
+    sleep 2
+  done
+  if ! $verified; then
+    health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$TOR_CONTAINER" 2>/dev/null || true)
+    state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$TOR_CONTAINER" 2>/dev/null || true)
+    printf 'Tor sidecar did not reach 100%% bootstrap (state: %s; runtime health: %s; direct notice check: failed).\n' "${state:-unknown}" "${health:-unknown}" >&2
+    return 9
+  fi
 }
 
 tor_ip() { "$RUNTIME" inspect --format "{{with index .NetworkSettings.Networks \"$INTERNAL_NET\"}}{{.IPAddress}}{{end}}" "$TOR_CONTAINER"; }
@@ -158,7 +178,7 @@ PY
 }
 
 container_diagnostics() {
-  local listing name state health ip
+  local listing name state health bootstrap ip
   printf 'MCP verification failed; collecting container diagnostics before rollback.\n' >&2
   printf '%s\n' "$(runtime_diagnostics)" >&2
   if listing=$("$RUNTIME" ps -a --no-trunc 2>&1); then
@@ -170,7 +190,9 @@ container_diagnostics() {
   for name in "$TOR_CONTAINER" "$SCRAPLING_CONTAINER"; do
     state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$name" 2>/dev/null || printf 'absent')
     health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$name" 2>/dev/null || printf 'unavailable')
-    printf 'Container %s: state=%s health=%s\n' "$name" "$state" "$health" >&2
+    bootstrap='n/a'
+    [[ $name != "$TOR_CONTAINER" ]] || { tor_bootstrap_verified && bootstrap=verified || bootstrap=failed; }
+    printf 'Container %s: state=%s health=%s bootstrap=%s\n' "$name" "$state" "$health" "$bootstrap" >&2
     printf 'Logs for %s (last 200 lines):\n' "$name" >&2
     if ! "$RUNTIME" logs --tail 200 "$name" >&2; then
       printf 'Could not collect logs for %s.\n' "$name" >&2
@@ -246,12 +268,26 @@ ensure_scrapling() {
 }
 
 verify_mcp() {
-  local status=0
-  if PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/health_check.py" "$ENDPOINT"; then
-    return 0
-  else
-    status=$?
-  fi
+  local status=0 output attempt
+  for attempt in $(seq 1 6); do
+    if output=$(PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/health_check.py" "$ENDPOINT" 2>&1); then
+      [[ -z $output ]] || printf '%s\n' "$output"
+      return 0
+    else
+      status=$?
+    fi
+    printf '%s\n' "$output" >&2
+    case $output in
+      *'Connection reset by peer'*|*'Connection refused'*|*'timed out'*|*'Remote end closed connection without response'*)
+        if ((attempt < 6)); then
+          printf 'MCP endpoint is still starting; retrying health check (%s/6).\n' "$((attempt + 1))" >&2
+          sleep 2
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
   container_diagnostics
   return "$status"
 }
@@ -261,11 +297,12 @@ migrate_legacy() { ensure_scrapling; verify_mcp; remove_validated_legacy; }
 start() { ensure_scrapling; verify_mcp; remove_validated_legacy; }
 stop() { "$RUNTIME" stop "$SCRAPLING_CONTAINER" "$TOR_CONTAINER" >/dev/null; }
 status() {
-  local tor_health scrapling_state registration
+  local tor_health tor_bootstrap scrapling_state registration
   tor_health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$TOR_CONTAINER" 2>/dev/null || printf absent)
+  if tor_bootstrap_verified; then tor_bootstrap=verified; else tor_bootstrap=not-verified; fi
   scrapling_state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$SCRAPLING_CONTAINER" 2>/dev/null || printf absent)
   if command -v codex >/dev/null 2>&1 && codex mcp list --json 2>/dev/null | PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/codex_scan.py" verify --endpoint "$ENDPOINT" >/dev/null 2>&1; then registration=canonical; else registration=missing-or-different; fi
-  printf 'Tor health: %s\nScrapling state: %s\nEndpoint: %s\nCodex registration: %s\n' "$tor_health" "$scrapling_state" "$ENDPOINT" "$registration"
+  printf 'Tor health: %s\nTor bootstrap: %s\nScrapling state: %s\nEndpoint: %s\nCodex registration: %s\n' "$tor_health" "$tor_bootstrap" "$scrapling_state" "$ENDPOINT" "$registration"
 }
 
 case "${1:-status}" in

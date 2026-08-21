@@ -38,15 +38,22 @@ podman run -d --name basix-scrapling-tor --label io.basix.scrapling-tor.managed=
   localhost/basix-scrapling-tor:legacy >/dev/null
 podman network connect basix-scrapling-internal basix-scrapling-tor
 
-health=''
+tor_bootstrap=false
 for _ in $(seq 1 120); do
-  health=$(podman inspect --format '{{.State.Health.Status}}' basix-scrapling-tor)
-  [[ $health == healthy || $health == unhealthy ]] && break
+  state=$(podman inspect --format '{{.State.Status}}' basix-scrapling-tor 2>/dev/null || true)
+  if [[ $state == running ]] && podman exec basix-scrapling-tor grep -q 'Bootstrapped 100%' /var/log/tor/notices.log; then
+    tor_bootstrap=true
+    break
+  fi
+  [[ $state == exited || $state == stopped || $state == dead ]] && break
   sleep 2
 done
-if [[ $health != healthy ]]; then
-  printf 'legacy Tor bootstrap failed: %s\n' "$health" >&2
+if ! $tor_bootstrap; then
+  health=$(podman inspect --format '{{.State.Health.Status}}' basix-scrapling-tor 2>/dev/null || true)
+  state=$(podman inspect --format '{{.State.Status}}' basix-scrapling-tor 2>/dev/null || true)
+  printf 'legacy Tor bootstrap failed: state=%s runtime-health=%s direct-notice-check=failed\n' "${state:-unknown}" "${health:-unknown}" >&2
   podman logs basix-scrapling-tor >&2 || true
+  podman exec basix-scrapling-tor sh -c 'tail -n 200 /var/log/tor/notices.log' >&2 || true
   exit 9
 fi
 tor_ip=$(podman inspect --format '{{with index .NetworkSettings.Networks "basix-scrapling-internal"}}{{.IPAddress}}{{end}}' basix-scrapling-tor)

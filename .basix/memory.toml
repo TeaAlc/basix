@@ -143,3 +143,18 @@ insight = "Emit runtime status, health, logs, and Tor IP inside verify_mcp befor
 date = "2026-08-21"
 category = "Tooling"
 insight = "urllib build_opener may omit an empty ProxyHandler from handlers; retain the handler reference when tests must prove environment proxies are explicitly disabled."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Rootless Podman may leave State.Health.Status at starting because no healthcheck manager is active; verify Tor bootstrap with an explicit exec notice-file check and keep runtime health diagnostic-only."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Fresh rootless port forwarding can reset the first MCP POST; retry only transient transport failures before rollback, then parse nested JSON text for an exact IsTor=true boolean."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Current Codex emits streamable_http registrations with null auth/header fields and unsupported auth_status; accept only this exact safe shape, rejecting non-null credentials or unknown fields."

@@ -104,6 +104,11 @@ class HealthCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, rf"MCP phase tools/call failed at {self.endpoint}"):
             health_check.validate_tor_result(self.endpoint, {"result": {"content": []}})
 
+    def test_tor_policy_accepts_nested_json_text_marker(self):
+        health_check.validate_tor_result(self.endpoint, {
+            "result": {"content": [{"type": "text", "text": '{\n  "IsTor": true\n}'}]}
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

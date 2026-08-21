@@ -19,7 +19,7 @@ case "$*" in
   mcp\ remove\ *) [[ ${MOCK_REMOVE:-ok} == ok ]] || exit 1; printf '[]\n' >"$MOCK_ROOT/list.json" ;;
   'mcp add scrapling --url '* )
     [[ ${MOCK_ADD:-ok} == ok ]] || exit 1; url=$5
-    printf '[{"name":"scrapling","enabled":true,"transport":{"type":"http","url":"%s"}}]\n' "$url" >"$MOCK_ROOT/list.json" ;;
+    printf '[{"name":"scrapling","enabled":true,"disabled_reason":null,"transport":{"type":"streamable_http","url":"%s","bearer_token_env_var":null,"http_headers":null,"env_http_headers":null},"startup_timeout_sec":null,"tool_timeout_sec":null,"auth_status":"unsupported"}]\n' "$url" >"$MOCK_ROOT/list.json" ;;
   *) exit 1 ;;
 esac
 EOF
@@ -27,7 +27,12 @@ EOF
 #!/usr/bin/env bash
 printf 'python3 %s\n' "$*" >>"$MOCK_LOG"
 if [[ ${1-} == */health_check.py ]]; then
-  [[ ${MOCK_HANDSHAKE:-ok} == ok ]] || { printf 'MCP HTTP, schema, or Tor verification failed: handshake\n' >&2; exit 9; }
+  if [[ ${MOCK_HANDSHAKE:-ok} == reset-once && ! -e $MOCK_ROOT/health-reset ]]; then
+    : >"$MOCK_ROOT/health-reset"
+    printf 'MCP HTTP, schema, or Tor verification failed: MCP phase initialize failed at http://127.0.0.1:8002/mcp: [Errno 104] Connection reset by peer\n' >&2
+    exit 9
+  fi
+  [[ ${MOCK_HANDSHAKE:-ok} == ok || (${MOCK_HANDSHAKE:-ok} == reset-once && -e $MOCK_ROOT/health-reset) ]] || { printf 'MCP HTTP, schema, or Tor verification failed: handshake\n' >&2; exit 9; }
   [[ ${MOCK_ISTOR:-true} == true ]] || { printf 'MCP HTTP, schema, or Tor verification failed: IsTor=true required\n' >&2; exit 9; }
   exit 0
 fi
@@ -68,7 +73,8 @@ case "${1-}" in
     name=${*: -1}
     if [[ $* == *--format* ]]; then
       if [[ $* == *Health.Status* ]]; then printf '%s\n' "${MOCK_HEALTH:-healthy}"
-      elif [[ $* == *State.Status* ]]; then printf 'running\n'
+      elif [[ $* == *State.Status* ]]; then
+        [[ ${MOCK_BOOTSTRAP:-true} == true ]] && printf 'running\n' || printf 'exited\n'
       else printf '10.89.1.2\n'; fi
       exit 0
     fi
@@ -102,6 +108,10 @@ case "${1-}" in
     [[ $restart != legacy-empty || -f $MOCK_ROOT/restart-current-$name ]] || restart=''
     [[ $restart != legacy-empty ]] || restart=unless-stopped
     printf '[{"Image":"%s","EffectiveCaps":[],"BoundingCaps":[],"Mounts":%s,"Config":{"Image":"%s","Env":%s,"Entrypoint":%s,"Cmd":%s,"Healthcheck":%s,"CreateCommand":["podman","run","--cap-drop","ALL"],"Labels":{"io.basix.scrapling-tor.managed":"%s"}},"HostConfig":{"Privileged":false,"CapAdd":null,"CapDrop":["ALL"],"PortBindings":%s,"SecurityOpt":["no-new-privileges"],"RestartPolicy":{"Name":"%s"}},"NetworkSettings":{"Networks":%s}}]\n' "$image" "$mounts" "$config_image" "$env" "$entrypoint" "$cmd" "$health" "$owner" "$ports" "$restart" "$nets" ;;
+  exec)
+    if [[ $* == *'/var/log/tor/notices.log'* ]]; then
+      [[ ${MOCK_BOOTSTRAP:-true} == true ]]
+    fi ;;
   run)
     if [[ $* == *'--name basix-scrapling-egress-probe-'* ]]; then
       if [[ ${MOCK_PROBE_FAIL:-false} == true ]]; then
@@ -145,7 +155,7 @@ run_installer() {
     MOCK_PS_FAIL="${MOCK_PS_FAIL:-false}" \
     MOCK_PS_MALFORMED="${MOCK_PS_MALFORMED:-false}" \
     MOCK_PROBE_FAIL="${MOCK_PROBE_FAIL:-false}" MOCK_ROOTLESS="${MOCK_ROOTLESS:-true}" MOCK_RUNROOT="${MOCK_RUNROOT:-/run/user/1000/containers}" \
-    MOCK_TOR_RUN_FAIL="${MOCK_TOR_RUN_FAIL:-false}" MOCK_SCRAPLING_RUN_FAIL="${MOCK_SCRAPLING_RUN_FAIL:-false}" \
+    MOCK_TOR_RUN_FAIL="${MOCK_TOR_RUN_FAIL:-false}" MOCK_SCRAPLING_RUN_FAIL="${MOCK_SCRAPLING_RUN_FAIL:-false}" MOCK_BOOTSTRAP="${MOCK_BOOTSTRAP:-true}" \
     MOCK_TOR_FOREIGN_CREATED="${MOCK_TOR_FOREIGN_CREATED:-false}" MOCK_SCRAPLING_FOREIGN_CREATED="${MOCK_SCRAPLING_FOREIGN_CREATED:-false}" \
     "$ROOT/src/setup/install-scrapling-codex.sh" "$@" >"$output" 2>&1
   status=$?; set -e
@@ -233,7 +243,8 @@ rollback_line=$(grep -n 'podman rm -f tor-running-id' "$log" | tail -n1 | cut -d
 grep -q 'MCP verification failed; collecting container diagnostics before rollback' "$output" || status=99
 check 'HTTP failure rolls back both new containers with diagnostics first' 9 'Status 9:.*status 4' 'codex mcp add'
 make_mocks; MOCK_ISTOR=false run_installer; check 'non-Tor egress blocks Codex registration' 9 'IsTor=true' 'codex mcp add'
-make_mocks; MOCK_HEALTH=unhealthy run_installer; check 'Tor health blocks service registration' 9 'failed validation or bootstrap' 'codex mcp add'
+make_mocks; MOCK_HEALTH=starting MOCK_BOOTSTRAP=false run_installer; check 'direct Tor bootstrap check blocks service registration' 9 'direct notice check: failed' 'codex mcp add'
+make_mocks; MOCK_HANDSHAKE=reset-once run_installer; check 'transient MCP startup reset is retried' 0 'retrying health check'
 make_mocks; run_installer --runtime docker; check 'Docker receives the same security boundary' 0 'installation verified'
 
 make_mocks; printf '%s\n' "$old" >"$case_dir/list.json"; printf 'original = true\n' >"$case_dir/home/codex/config.toml"; MOCK_ADD=fail run_installer --force

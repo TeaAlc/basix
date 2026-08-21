@@ -86,13 +86,28 @@ def fingerprint(found):
 
 def expected(entry, endpoint):
     spec = transport(entry)
-    allowed = {"type", "url"} if spec is not entry else {"name", "enabled", "disabled", "type", "url"}
+    if spec is entry:
+        allowed = {"name", "enabled", "disabled", "disabled_reason", "type", "url",
+                   "startup_timeout_sec", "tool_timeout_sec", "auth_status"}
+        transport_allowed = allowed
+    else:
+        allowed = {"name", "enabled", "disabled", "disabled_reason", "transport",
+                   "startup_timeout_sec", "tool_timeout_sec", "auth_status"}
+        transport_allowed = {"type", "url", "bearer_token_env_var", "http_headers", "env_http_headers"}
     return (
         entry.get("name") == "scrapling"
         and entry.get("enabled", not entry.get("disabled", False))
         and (spec.get("type") or "http") in ("http", "streamable_http")
         and spec.get("url") == endpoint
-        and set(spec) <= allowed
+        and set(entry) <= allowed
+        and set(spec) <= transport_allowed
+        and entry.get("disabled_reason") is None
+        and entry.get("startup_timeout_sec") is None
+        and entry.get("tool_timeout_sec") is None
+        and entry.get("auth_status") in (None, "unsupported")
+        and spec.get("bearer_token_env_var") is None
+        and spec.get("http_headers") is None
+        and spec.get("env_http_headers") is None
     )
 
 

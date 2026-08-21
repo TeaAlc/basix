@@ -119,7 +119,19 @@ def validate_initialize(endpoint, initialized):
 
 
 def validate_tor_result(endpoint, called):
-    if '"IsTor":true' not in json.dumps(called, separators=(",", ":")):
+    def contains_marker(value):
+        if isinstance(value, dict):
+            return value.get("IsTor") is True or any(contains_marker(item) for item in value.values())
+        if isinstance(value, list):
+            return any(contains_marker(item) for item in value)
+        if isinstance(value, str):
+            try:
+                return contains_marker(json.loads(value))
+            except (TypeError, ValueError):
+                return False
+        return False
+
+    if not contains_marker(called):
         raise RuntimeError(f"MCP phase tools/call failed at {endpoint}: Scrapling tool call did not report IsTor=true")
     return called
 
