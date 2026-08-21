@@ -32,3 +32,9 @@ scope. Every test that is started must finish successfully before completion.
 
 The configure-tmux suite is excluded from standard gates; run it only when an
 explicit plan changes the configure-tmux skill.
+
+Changes to `install-scrapling-codex.sh`, `scrapling-tor/launcher.sh`, or any
+Scrapling runtime-policy component additionally require
+`test/setup/install-scrapling-codex/release-gate-podman.sh` after the deterministic
+setup aggregation. This real gate uses isolated temporary Podman storage and must
+complete before host installation or commit.

@@ -221,6 +221,29 @@ validates the exact MCP tool policy, and registers the HTTP URL only after an MC
 initialize handshake, schema inspection, and a real `get` tool call report
 `IsTor: true`. Restart running Codex sessions after a successful migration. The
 installed controller supports `prepare`, `start`, `stop`, `status`, and `tor-ip`.
+An older Basix-managed stdio container is migrated only when its complete runtime
+and security signature is intact. It remains running until the replacement HTTP
+service passes those checks, is revalidated by immutable container ID, and is then
+removed. Partially matching or foreign containers are never adopted or removed,
+including with `--force`.
+Before starting Tor, the controller runs a temporary named probe in the existing
+egress network. If the host cannot create the rootless network namespace, it
+aborts before creating either service and reports the runtime, rootless status,
+and `Store.RunRoot`; it never repairs the host runtime or falls back to another
+network backend.
+
+Every change to this installer, its launcher, or the runtime policy must pass the
+real isolated Podman release gate after deterministic setup tests:
+
+```bash
+./test/test-setup.sh
+./test/setup/install-scrapling-codex/release-gate-podman.sh
+```
+
+The release gate uses temporary Podman graph and run roots, constructs the legacy
+stdio/Tor topology, performs the live Tor and HTTP-MCP migration, checks the exact
+runtime boundary, reruns the installer for idempotency, and removes all temporary
+resources.
 
 Every tool call requires a canonical UUID v4 `client_id`. Generate it from a
 cryptographically secure system source, reuse it for related session calls, and

@@ -1,0 +1,21 @@
+[
+  {
+    "Id": "49ac63819ee416d827015b0cd8136e3d1c849f0316a701f1c2949ccd48a7ecab",
+    "Name": "adoring_rhodes",
+    "Image": "1e2934df1a65238ea1f7855a0f0a1b1f664fed3021fdb59ab5eda2699530e951",
+    "Mounts": [{"Type":"bind","Source":"/home/codex/.codex/basix/scrapling-tor/policy_mcp.py","Destination":"/opt/basix/policy_mcp.py","RW":false}],
+    "EffectiveCaps": null,
+    "BoundingCaps": null,
+    "Config": {
+      "Image": "docker.io/pyd4vinci/scrapling@sha256:1add316e8f347aee3290ee448eff5c7591cbf12341bf160261cdd9a0c3965524",
+      "Entrypoint": "/app/.venv/bin/python",
+      "Cmd": ["/opt/basix/policy_mcp.py"],
+      "Env": ["BASIX_TOR_IP=10.89.1.1","HTTP_PROXY=socks5h://10.89.1.1:9050","HTTPS_PROXY=socks5h://10.89.1.1:9050","ALL_PROXY=socks5h://10.89.1.1:9050","http_proxy=socks5h://10.89.1.1:9050","https_proxy=socks5h://10.89.1.1:9050","all_proxy=socks5h://10.89.1.1:9050","NO_PROXY=","no_proxy="],
+      "Labels": {"io.basix.scrapling-tor.managed":"true"},
+      "Annotations": {"io.podman.annotations.autoremove":"TRUE"},
+      "CreateCommand": ["podman","run","-i","--rm","--cap-drop","ALL","--security-opt","no-new-privileges"]
+    },
+    "HostConfig": {"Privileged":false,"CapAdd":[],"CapDrop":["CAP_CHOWN","CAP_DAC_OVERRIDE","CAP_FOWNER","CAP_FSETID","CAP_KILL","CAP_NET_BIND_SERVICE","CAP_SETFCAP","CAP_SETGID","CAP_SETPCAP","CAP_SETUID","CAP_SYS_CHROOT"],"PortBindings":{},"PublishAllPorts":false,"SecurityOpt":["no-new-privileges"],"AutoRemove":true,"RestartPolicy":{"Name":""}},
+    "NetworkSettings": {"Ports":{"8000/tcp":null},"Networks":{"basix-scrapling-internal":{}}}
+  }
+]

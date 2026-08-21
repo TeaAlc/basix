@@ -1,0 +1,1 @@
+[{"Id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Name":"worker","Config":{"Image":"docker.io/library/debian:bookworm-slim","Entrypoint":"/usr/bin/tini","Cmd":["sleep","infinity"]},"HostConfig":{},"NetworkSettings":{"Networks":{}}}]

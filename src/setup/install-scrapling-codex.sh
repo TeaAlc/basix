@@ -148,9 +148,11 @@ tor_inspected=$("$runtime" image inspect --format '{{.Id}}' "$TOR_BUILD_TAG") ||
 tor_pinned=$(normalize_image_reference "$tor_inspected") || fail "$EXIT_IMAGE_CHECK" 'Runtime did not return an immutable Tor image ID'
 
 mkdir -p "$work/support"
-cp "$SOURCE_DIR/launcher.sh" "$SOURCE_DIR/policy_mcp.py" "$SOURCE_DIR/codex_scan.py" "$SOURCE_DIR/health_check.py" "$work/support/"
+cp "$SOURCE_DIR/launcher.sh" "$SOURCE_DIR/policy_mcp.py" "$SOURCE_DIR/codex_scan.py" \
+  "$SOURCE_DIR/container_policy.py" "$SOURCE_DIR/health_check.py" "$work/support/"
 printf 'RUNTIME=%q\nSCRAPLING_IMAGE=%q\nSCRAPLING_ID=%q\nTOR_IMAGE=%q\nPORT=%q\n' "$runtime" "$scrapling_pinned" "$scrapling_id" "$tor_pinned" "$port" >"$work/support/config"
-chmod 755 "$work/support/launcher.sh" "$work/support/codex_scan.py" "$work/support/health_check.py"
+chmod 755 "$work/support/launcher.sh" "$work/support/codex_scan.py" \
+  "$work/support/container_policy.py" "$work/support/health_check.py"
 mkdir -p "$(dirname "$install_dir")"
 if [[ -e $install_dir ]]; then mv "$install_dir" "$backup_support"; old_support_saved=true; fi
 if ! mv "$work/support" "$install_dir"; then
@@ -161,7 +163,8 @@ support_installed=true
 run "$launcher" prepare || {
   launcher_status=$?
   ((launcher_status == EXIT_CONFLICT)) && fail "$EXIT_CONFLICT" 'Managed runtime resource conflict; Codex was not changed'
-  fail "$EXIT_VERIFY" 'Managed Tor failed validation or bootstrap; Codex was not changed'
+  ((launcher_status == EXIT_RUNTIME)) && fail "$EXIT_RUNTIME" 'Host runtime/network namespace unavailable; Codex was not changed'
+  fail "$EXIT_VERIFY" 'Status 9: Managed Tor failed validation or bootstrap, or the MCP HTTP/Tor verification failed. Check the container logs and Tor gateway diagnostics above; status 4 is reserved for an unavailable rootless runtime/network namespace. Codex was not changed'
 }
 if [[ $runtime == podman ]]; then
   if command -v systemctl >/dev/null 2>&1 && systemctl --user enable podman-restart.service >/dev/null 2>&1; then
@@ -189,6 +192,12 @@ final_scan=$(scan_codex); read -r final_count _ <<<"$final_scan"
 if ((final_count != 1)) || ! PYTHONDONTWRITEBYTECODE=1 python3 "$SCAN" verify --endpoint "$endpoint" <"$list_file"; then
   fail "$EXIT_CODEX" 'Final Codex registration is not exactly canonical Scrapling'
 fi
+run "$launcher" migrate-legacy || {
+  launcher_status=$?
+  ((launcher_status == EXIT_CONFLICT)) && fail "$EXIT_CONFLICT" 'Validated legacy runtime changed before removal'
+  ((launcher_status == EXIT_RUNTIME)) && fail "$EXIT_RUNTIME" 'Host runtime/network namespace unavailable; Codex was restored'
+  fail "$EXIT_VERIFY" 'Managed HTTP service or legacy migration failed'
+}
 
 rm -rf "$backup_support"; support_installed=false; old_support_saved=false; codex_changed=false
 printf '\nScrapling MCP installation verified with immutable image %s.\n' "$scrapling_pinned"

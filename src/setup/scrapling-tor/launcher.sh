@@ -4,18 +4,23 @@ set -Eeuo pipefail
 readonly LABEL_KEY='io.basix.scrapling-tor.managed' LABEL_VALUE='true'
 readonly INTERNAL_NET='basix-scrapling-internal' EGRESS_NET='basix-tor-egress'
 readonly TOR_CONTAINER='basix-scrapling-tor' SCRAPLING_CONTAINER='basix-scrapling-mcp'
+readonly PROBE_CONTAINER="basix-scrapling-egress-probe-$$-$RANDOM"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); readonly HERE
+readonly CONTAINER_POLICY="$HERE/container_policy.py"
 [[ -r $HERE/config ]] || { printf 'Basix Scrapling configuration is missing; rerun the installer.\n' >&2; exit 3; }
 # shellcheck source=/dev/null
 source "$HERE/config"
 : "${RUNTIME:?}" "${SCRAPLING_IMAGE:?}" "${SCRAPLING_ID:?}" "${TOR_IMAGE:?}" "${PORT:?}"
 readonly ENDPOINT="http://127.0.0.1:$PORT/mcp"
 
-created_internal=false created_egress=false created_tor=false created_scrapling=false
+created_internal=false created_egress=false created_tor=false created_scrapling=false probe_created=false
+created_tor_ref='' created_scrapling_ref=''
+legacy_ids=() legacy_names=()
 rollback() {
   local status=$?; trap - ERR
-  if $created_scrapling; then "$RUNTIME" rm -f "$SCRAPLING_CONTAINER" >/dev/null 2>&1 || true; fi
-  if $created_tor; then "$RUNTIME" rm -f "$TOR_CONTAINER" >/dev/null 2>&1 || true; fi
+  if $probe_created; then "$RUNTIME" rm -f "$PROBE_CONTAINER" >/dev/null 2>&1 || true; fi
+  if $created_scrapling && [[ -n $created_scrapling_ref ]]; then "$RUNTIME" rm -f "$created_scrapling_ref" >/dev/null 2>&1 || true; fi
+  if $created_tor && [[ -n $created_tor_ref ]]; then "$RUNTIME" rm -f "$created_tor_ref" >/dev/null 2>&1 || true; fi
   if $created_internal; then "$RUNTIME" network rm "$INTERNAL_NET" >/dev/null 2>&1 || true; fi
   if $created_egress; then "$RUNTIME" network rm "$EGRESS_NET" >/dev/null 2>&1 || true; fi
   return "$status"
@@ -47,46 +52,76 @@ ensure_network() {
   validate_network "$name" "$internal"
 }
 
+runtime_diagnostics() {
+  local rootless runroot
+  rootless='unknown'; runroot='unknown'
+  if rootless=$("$RUNTIME" info --format '{{.Host.Security.Rootless}}' 2>/dev/null); then
+    [[ -n $rootless ]] || rootless='unknown'
+  else
+    rootless='unknown'
+  fi
+  if runroot=$("$RUNTIME" info --format '{{.Store.RunRoot}}' 2>/dev/null); then
+    [[ -n $runroot ]] || runroot='unknown'
+  else
+    runroot='unknown'
+  fi
+  printf 'Runtime: %s; Rootless: %s; Store.RunRoot: %s' "$RUNTIME" "$rootless" "$runroot"
+}
+
+probe_egress_netns() {
+  local probe_status=0 cleanup_status=0
+  probe_created=true
+  if "$RUNTIME" run --name "$PROBE_CONTAINER" --network "$EGRESS_NET" \
+    --cap-drop ALL --security-opt no-new-privileges --entrypoint /bin/true "$TOR_IMAGE" >/dev/null; then
+    :
+  else
+    probe_status=$?
+  fi
+  if "$RUNTIME" rm -f "$PROBE_CONTAINER" >/dev/null 2>&1; then
+    probe_created=false
+  else
+    cleanup_status=$?
+  fi
+  if ((probe_status != 0 || cleanup_status != 0)); then
+    printf 'Host runtime/network namespace probe failed (probe exit: %s; cleanup exit: %s; %s); no Tor or Scrapling container was started. Check the rootless netns runroot and retry after the host runtime is fixed.\n' "$probe_status" "$cleanup_status" "$(runtime_diagnostics)" >&2
+    return 4
+  fi
+}
+
+run_created_container() {
+  local ref_name=$1 output='' status=0 cidfile='' id='' run_args=()
+  shift
+  run_args=("$@")
+  cidfile=$(mktemp "${TMPDIR:-/tmp}/basix-scrapling-container.XXXXXX")
+  rm -f "$cidfile"
+  if output=$("$RUNTIME" run "${run_args[0]}" "${run_args[1]}" "${run_args[2]}" --cidfile "$cidfile" "${run_args[@]:3}"); then
+    status=0
+  else
+    status=$?
+  fi
+  [[ -r $cidfile ]] && id=$(<"$cidfile")
+  rm -f "$cidfile"
+  if [[ $output =~ ^[[:alnum:]_.-]+$ ]]; then
+    printf -v "$ref_name" '%s' "$output"
+  elif [[ $id =~ ^[[:alnum:]_.-]+$ ]]; then
+    printf -v "$ref_name" '%s' "$id"
+  else
+    printf -v "$ref_name" '%s' ''
+  fi
+  return "$status"
+}
+
 classify_container() {
   local name=$1 kind=$2 configured_image=$3 actual_image=$4 tor_address=${5-} policy_path=${6-}
-  container_json "$name" | PYTHONDONTWRITEBYTECODE=1 python3 -c '
-import json,sys
-c=json.load(sys.stdin)[0]; kind,wanted_started,wanted_actual,port,tor_ip,policy_path=sys.argv[1:]
-cfg=c.get("Config") or {}; host=c.get("HostConfig") or {}; labels=cfg.get("Labels") or {}
-nets=set(((c.get("NetworkSettings") or {}).get("Networks") or {})); expected={"basix-tor-egress","basix-scrapling-internal"} if kind=="tor" else {"basix-scrapling-internal"}
-caps=host.get("CapAdd") or []; drops={str(x).upper().removeprefix("CAP_") for x in host.get("CapDrop") or []}
-create=cfg.get("CreateCommand") or []; podman_drop=any(x=="--cap-drop=ALL" for x in create) or any(create[i]=="--cap-drop" and create[i+1]=="ALL" for i in range(len(create)-1))
-podman_empty="EffectiveCaps" in c and "BoundingCaps" in c and not(c.get("EffectiveCaps") or []) and not(c.get("BoundingCaps") or [])
-ports=host.get("PortBindings") or {}; wanted_ports={} if kind=="tor" else {port+"/tcp":[{"HostIp":"127.0.0.1","HostPort":port}]}
-mounts=c.get("Mounts") or []; security=host.get("SecurityOpt") or []
-if labels.get("io.basix.scrapling-tor.managed")!="true" or host.get("Privileged") is not False or caps or not("ALL" in drops or (podman_drop and podman_empty)): raise SystemExit(1)
-if not any("no-new-privileges" in str(x).lower() for x in security) or nets!=expected or ports!=wanted_ports: raise SystemExit(1)
-if kind=="tor" and mounts: raise SystemExit(1)
-restart=(host.get("RestartPolicy") or {}).get("Name")
-legacy_restart=restart in (None,"")
-if restart!="unless-stopped" and not legacy_restart: raise SystemExit(1)
-if kind=="tor":
- health=cfg.get("Healthcheck") or {}
- expected_health="grep -q "+chr(39)+"Bootstrapped 100%"+chr(39)+" /var/log/tor/notices.log"
- if health.get("Test") != ["CMD-SHELL",expected_health]: raise SystemExit(1)
-if kind=="scrapling":
- if len(mounts)!=1 or mounts[0].get("Destination")!="/opt/basix/policy_mcp.py" or mounts[0].get("RW") is not False or mounts[0].get("Source")!=policy_path: raise SystemExit(1)
- env=dict(item.split("=",1) for item in (cfg.get("Env") or []) if "=" in item)
- required={"BASIX_TOR_IP":tor_ip,"BASIX_PORT":port,"NO_PROXY":"","no_proxy":""}
- if any(env.get(k)!=v for k,v in required.items()): raise SystemExit(1)
- for key in ("HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","http_proxy","https_proxy","all_proxy"):
-  if env.get(key)!=f"socks5h://{tor_ip}:9050": raise SystemExit(1)
- entrypoint=cfg.get("Entrypoint") or []; command=cfg.get("Cmd") or []
- if entrypoint != ["/app/.venv/bin/python"] or command != ["/opt/basix/policy_mcp.py"]: raise SystemExit(1)
-actual=str(c.get("Image") or "").lower(); started=str(cfg.get("Image") or "").lower()
-if len(actual)==64: actual="sha256:"+actual
-if len(started)==64: started="sha256:"+started
-raise SystemExit(0 if not legacy_restart and actual==wanted_actual.lower() and started==wanted_started.lower() else 10)
-' "$kind" "$configured_image" "$actual_image" "$PORT" "$tor_address" "$policy_path"
+  local policy_args=(managed "$kind" --configured "$configured_image" --actual "$actual_image" --port "$PORT" --policy "$policy_path")
+  [[ $kind == scrapling ]] && policy_args+=(--tor-ip "$tor_address")
+  container_json "$name" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" "${policy_args[@]}"
 }
 
 ensure_tor() {
-  ensure_network "$EGRESS_NET" false; ensure_network "$INTERNAL_NET" true
+  ensure_network "$EGRESS_NET" false
+  probe_egress_netns
+  ensure_network "$INTERNAL_NET" true
   local create=true classification=0
   if container_json "$TOR_CONTAINER" >/dev/null 2>&1; then
     classify_container "$TOR_CONTAINER" tor "$TOR_IMAGE" "$TOR_IMAGE" || classification=$?
@@ -97,15 +132,16 @@ ensure_tor() {
     esac
   fi
   if $create; then
-    "$RUNTIME" run -d --name "$TOR_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
+    created_tor=true
+    run_created_container created_tor_ref -d --name "$TOR_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
       --network "$EGRESS_NET" --cap-drop ALL --security-opt no-new-privileges \
       --health-cmd "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log" \
       --health-interval 5s --health-timeout 3s --health-start-period 10s --health-retries 24 "$TOR_IMAGE" >/dev/null
-    created_tor=true; "$RUNTIME" network connect "$INTERNAL_NET" "$TOR_CONTAINER" >/dev/null
+    "$RUNTIME" network connect "$INTERNAL_NET" "$TOR_CONTAINER" >/dev/null
     classify_container "$TOR_CONTAINER" tor "$TOR_IMAGE" "$TOR_IMAGE"
   fi
   local health=''
-  for _ in $(seq 1 48); do health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$TOR_CONTAINER" 2>/dev/null || true); [[ $health == healthy || $health == unhealthy ]] && break; sleep 2; done
+  for _ in $(seq 1 120); do health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$TOR_CONTAINER" 2>/dev/null || true); [[ $health == healthy || $health == unhealthy ]] && break; sleep 2; done
   [[ $health == healthy ]] || { printf 'Tor sidecar did not reach 100%% bootstrap (health: %s).\n' "${health:-unknown}" >&2; return 9; }
 }
 
@@ -121,32 +157,73 @@ finally: s.close()
 PY
 }
 
-reject_foreign_scrapling() {
-  local name
-  while IFS= read -r name; do
-    [[ -n $name && $name != "$TOR_CONTAINER" && $name != "$SCRAPLING_CONTAINER" ]] || continue
-    if container_json "$name" | PYTHONDONTWRITEBYTECODE=1 python3 -c '
-import json,sys
-c=json.load(sys.stdin)[0]; cfg=c.get("Config") or {}
-image=str(cfg.get("Image") or "").lower(); parts=[]
-for value in (cfg.get("Entrypoint"),cfg.get("Cmd")):
- if isinstance(value,list): parts.extend(str(x) for x in value)
- elif value is not None: parts.append(str(value))
-command=" ".join(parts).lower()
-wanted=sys.argv[1].lower()
-raise SystemExit(0 if image==wanted or "policy_mcp.py" in command or "scrapling" in command else 1)
-' "$SCRAPLING_IMAGE"; then
-      printf 'Refusing foreign running Scrapling container named %s.\n' "$name" >&2
-      return 7
+container_diagnostics() {
+  local listing name state health ip
+  printf 'MCP verification failed; collecting container diagnostics before rollback.\n' >&2
+  printf '%s\n' "$(runtime_diagnostics)" >&2
+  if listing=$("$RUNTIME" ps -a --no-trunc 2>&1); then
+    printf '%s\n' 'Container status (all containers):' >&2
+    printf '%s\n' "$listing" >&2
+  else
+    printf 'Could not collect container status: %s\n' "$listing" >&2
+  fi
+  for name in "$TOR_CONTAINER" "$SCRAPLING_CONTAINER"; do
+    state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$name" 2>/dev/null || printf 'absent')
+    health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$name" 2>/dev/null || printf 'unavailable')
+    printf 'Container %s: state=%s health=%s\n' "$name" "$state" "$health" >&2
+    printf 'Logs for %s (last 200 lines):\n' "$name" >&2
+    if ! "$RUNTIME" logs --tail 200 "$name" >&2; then
+      printf 'Could not collect logs for %s.\n' "$name" >&2
     fi
-  done < <("$RUNTIME" ps --format '{{.Names}}')
+  done
+  ip=$(tor_ip 2>/dev/null || true)
+  printf 'Tor gateway IP on %s: %s\n' "$INTERNAL_NET" "${ip:-unavailable}" >&2
+}
+
+classify_running_scrapling() {
+  local id name extra result classification listing
+  legacy_ids=(); legacy_names=()
+  if ! listing=$("$RUNTIME" ps --no-trunc --format '{{.ID}} {{.Names}}'); then
+    printf 'Could not enumerate running containers; refusing Scrapling migration.\n' >&2
+    return 7
+  fi
+  while read -r id name extra; do
+    [[ -z $id && -z $name && -z $extra ]] && continue
+    [[ -n $id && -n $name && -z $extra ]] || { printf 'Runtime returned malformed container listing; refusing Scrapling migration.\n' >&2; return 7; }
+    [[ $name != "$TOR_CONTAINER" && $name != "$SCRAPLING_CONTAINER" ]] || continue
+    classification=0
+    result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || classification=$?
+    case $classification:$result in
+      0:unrelated) ;;
+      0:managed-legacy)
+        legacy_ids+=("$id"); legacy_names+=("$name")
+        printf 'Validated managed legacy Scrapling container %s for deferred migration.\n' "$name" >&2 ;;
+      *)
+        printf 'Refusing foreign or unsafe running Scrapling container named %s.\n' "$name" >&2
+        return 7 ;;
+    esac
+  done <<<"$listing"
+}
+
+remove_validated_legacy() {
+  local index id name result classification
+  for index in "${!legacy_ids[@]}"; do
+    id=${legacy_ids[$index]}; name=${legacy_names[$index]}; classification=0
+    result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || classification=$?
+    [[ $classification == 0 && $result == managed-legacy ]] || {
+      printf 'Validated legacy Scrapling container %s disappeared or changed; refusing removal.\n' "$name" >&2
+      return 7
+    }
+    "$RUNTIME" rm -f "$id" >/dev/null || return 7
+    printf 'Removed validated legacy Scrapling container %s after HTTP verification.\n' "$name" >&2
+  done
 }
 
 ensure_scrapling() {
   ensure_tor
   local ip create=true classification=0; ip=$(tor_ip)
   [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Could not determine numeric Tor gateway IP.\n' >&2; return 9; }
-  reject_foreign_scrapling
+  classify_running_scrapling
   if container_json "$SCRAPLING_CONTAINER" >/dev/null 2>&1; then
     classify_container "$SCRAPLING_CONTAINER" scrapling "$SCRAPLING_IMAGE" "$SCRAPLING_ID" "$ip" "$HERE/policy_mcp.py" || classification=$?
     case $classification in
@@ -158,21 +235,30 @@ ensure_scrapling() {
   if $create; then
     port_available || { printf 'Loopback port %s is already in use; no resource was replaced.\n' "$PORT" >&2; return 7; }
     local dns=(); [[ $RUNTIME != podman ]] || dns=(--dns 127.0.0.1)
-    "$RUNTIME" run -d --name "$SCRAPLING_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
+    created_scrapling=true
+    run_created_container created_scrapling_ref -d --name "$SCRAPLING_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
       --network "$INTERNAL_NET" "${dns[@]}" --cap-drop ALL --security-opt no-new-privileges -p "127.0.0.1:$PORT:$PORT" \
       -e "BASIX_TOR_IP=$ip" -e "BASIX_PORT=$PORT" -e "HTTP_PROXY=socks5h://$ip:9050" -e "HTTPS_PROXY=socks5h://$ip:9050" -e "ALL_PROXY=socks5h://$ip:9050" \
       -e "http_proxy=socks5h://$ip:9050" -e "https_proxy=socks5h://$ip:9050" -e "all_proxy=socks5h://$ip:9050" -e 'NO_PROXY=' -e 'no_proxy=' \
       -v "$HERE/policy_mcp.py:/opt/basix/policy_mcp.py:ro" --entrypoint /app/.venv/bin/python "$SCRAPLING_IMAGE" /opt/basix/policy_mcp.py >/dev/null
-    created_scrapling=true; classify_container "$SCRAPLING_CONTAINER" scrapling "$SCRAPLING_IMAGE" "$SCRAPLING_ID" "$ip" "$HERE/policy_mcp.py"
+    classify_container "$SCRAPLING_CONTAINER" scrapling "$SCRAPLING_IMAGE" "$SCRAPLING_ID" "$ip" "$HERE/policy_mcp.py"
   fi
 }
 
 verify_mcp() {
-  PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/health_check.py" "$ENDPOINT"
+  local status=0
+  if PYTHONDONTWRITEBYTECODE=1 python3 "$HERE/health_check.py" "$ENDPOINT"; then
+    return 0
+  else
+    status=$?
+  fi
+  container_diagnostics
+  return "$status"
 }
 
 prepare() { ensure_scrapling; verify_mcp; }
-start() { ensure_scrapling; verify_mcp; }
+migrate_legacy() { ensure_scrapling; verify_mcp; remove_validated_legacy; }
+start() { ensure_scrapling; verify_mcp; remove_validated_legacy; }
 stop() { "$RUNTIME" stop "$SCRAPLING_CONTAINER" "$TOR_CONTAINER" >/dev/null; }
 status() {
   local tor_health scrapling_state registration
@@ -183,6 +269,6 @@ status() {
 }
 
 case "${1:-status}" in
-  prepare) prepare ;; start) start ;; stop) stop ;; status) status ;; tor-ip) ensure_tor; tor_ip ;;
-  *) printf 'Usage: %s [prepare|start|stop|status|tor-ip]\n' "$0" >&2; exit 2 ;;
+  prepare) prepare ;; migrate-legacy) migrate_legacy ;; start) start ;; stop) stop ;; status) status ;; tor-ip) ensure_tor; tor_ip ;;
+  *) printf 'Usage: %s [prepare|migrate-legacy|start|stop|status|tor-ip]\n' "$0" >&2; exit 2 ;;
 esac

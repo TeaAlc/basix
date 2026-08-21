@@ -1,0 +1,1 @@
+[{"Id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","Name":"unsafe-scrapling","Config":{"Image":"docker.io/pyd4vinci/scrapling:latest","Entrypoint":["python"],"Cmd":["policy_mcp.py"],"Labels":{"io.basix.scrapling-tor.managed":"true"}},"HostConfig":{"Privileged":true,"AutoRemove":true,"RestartPolicy":{"Name":""}},"NetworkSettings":{"Networks":{"host":{}}}}]

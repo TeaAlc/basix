@@ -123,3 +123,23 @@ insight = "Legacy Basix Scrapling containers may have an empty Podman restart po
 date = "2026-08-21"
 category = "Verification"
 insight = "Podman inspect may serialize Config.Entrypoint as a string and Config.Cmd as a list; normalize both before combining commands during foreign-container scans."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Isolated rootless Podman can complete large registry pulls yet fail Tor bootstrap when its network namespace cannot mount or egress; record this separately from installer test evidence."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Rollback of a failed named container run must remove a runtime-issued ID (output or cidfile), never fall back to the name because a race can replace it with a foreign container."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Emit runtime status, health, logs, and Tor IP inside verify_mcp before returning failure; the ERR trap then rolls back while preserving diagnostics ordering."
+
+[[entries]]
+date = "2026-08-21"
+category = "Tooling"
+insight = "urllib build_opener may omit an empty ProxyHandler from handlers; retain the handler reference when tests must prove environment proxies are explicitly disabled."
