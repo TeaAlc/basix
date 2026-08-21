@@ -248,12 +248,14 @@ stdio/Tor topology, performs the live Tor and HTTP-MCP migration, checks the exa
 runtime boundary, reruns the installer for idempotency, and removes all temporary
 resources.
 
-Every tool call requires a canonical UUID v4 `client_id`. Generate it from a
-cryptographically secure system source, reuse it for related session calls, and
-share it with a subagent only deliberately. It is a session capability, not
-general server authentication: sessions opened with one UUID are invisible and
-unusable with another, and all mappings disappear when the service restarts. The
-installer never creates or stores this UUID.
+Every tool call requires a canonical RFC 4122 UUID v4 `client_id`. The calling
+agent is the MCP client: generate the ID from a cryptographically secure system
+source, pass it on every tool call, reuse it for related session calls, and share
+it with a subagent only deliberately. It is a session capability, not general
+server authentication: sessions opened with one UUID are invisible and unusable
+with another, and all mappings disappear when the service restarts. Never use
+`default`, a `session_id`, or a server-generated placeholder. The installer never
+creates or stores this UUID.
 
 Hermes and other local clients can share the service:
 

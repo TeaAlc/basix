@@ -21,12 +21,21 @@ class FakeServer:
     def __init__(self):
         self.sessions = []
         self.next_id = 0
+        self.singular_calls = []
 
     async def get(self, url, proxy=None, proxy_auth=None, http3=True): return proxy, proxy_auth, http3
+    async def bulk_fetch(self, urls, proxy=None, cdp_url=None, real_chrome=False, executable_path=None,
+                         additional_args=None, block_webrtc=False, session_id=None):
+        await asyncio.sleep(0)
+        return [(proxy, session_id) for _ in urls]
     async def fetch(self, url, proxy=None, cdp_url=None, real_chrome=False, executable_path=None,
                     additional_args=None, block_webrtc=False, session_id=None):
-        await asyncio.sleep(0)
-        return proxy, session_id
+        self.singular_calls.append("fetch")
+        return (await self.bulk_fetch(
+            urls=[url], proxy=proxy, cdp_url=cdp_url, real_chrome=real_chrome,
+            executable_path=executable_path, additional_args=additional_args,
+            block_webrtc=block_webrtc, session_id=session_id,
+        ))[0]
     async def open_session(self, session_type, session_id=None, proxy=None, cdp_url=None,
                            real_chrome=False, executable_path=None, additional_args=None,
                            block_webrtc=False):
@@ -39,10 +48,21 @@ class FakeServer:
         return {"closed": session_id}
     async def list_sessions(self): return list(self.sessions)
     async def screenshot(self, url, session_id=None): return url, session_id
-    bulk_get = get
-    bulk_fetch = fetch
-    stealthy_fetch = fetch
-    bulk_stealthy_fetch = fetch
+    async def bulk_get(self, urls, proxy=None, proxy_auth=None, http3=True):
+        return [await self.get(url, proxy, proxy_auth, http3) for url in urls]
+    async def bulk_stealthy_fetch(self, urls, proxy=None, cdp_url=None, real_chrome=False,
+                                  executable_path=None, additional_args=None, block_webrtc=False,
+                                  session_id=None):
+        await asyncio.sleep(0)
+        return [(proxy, session_id) for _ in urls]
+    async def stealthy_fetch(self, url, proxy=None, cdp_url=None, real_chrome=False, executable_path=None,
+                             additional_args=None, block_webrtc=False, session_id=None):
+        self.singular_calls.append("stealthy_fetch")
+        return (await self.bulk_stealthy_fetch(
+            urls=[url], proxy=proxy, cdp_url=cdp_url, real_chrome=real_chrome,
+            executable_path=executable_path, additional_args=additional_args,
+            block_webrtc=block_webrtc, session_id=session_id,
+        ))[0]
     def _build_server(self, host, port): return FakeMCP()
     def serve(self, http, host, port, allowed_hosts=()):
         return http, host, port, allowed_hosts
@@ -83,12 +103,17 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("client_id", signature.parameters, name)
             self.assertEqual(signature.parameters["client_id"].default, inspect.Parameter.empty)
             self.assertTrue(policy.NETWORK_OVERRIDES.isdisjoint(signature.parameters), name)
+            description = inspect.getdoc(getattr(self.server, name))
+            self.assertIn("calling agent is the MCP client", description)
+            self.assertIn("canonical RFC 4122 UUID version 4", description)
         self.assertNotIn("session_id", inspect.signature(self.server.open_session).parameters)
 
     async def test_invalid_client_id_is_rejected_before_tool(self):
         for value in (None, "", str(uuid.uuid1()), self.client.upper()):
             with self.assertRaisesRegex(ValueError, "canonical UUID v4"):
                 await self.server.get("https://example", client_id=value)
+            with self.assertRaisesRegex(ValueError, "canonical UUID v4"):
+                await self.server.fetch("https://example", client_id=value)
         with self.assertRaises(TypeError):
             await self.server.get("https://example")
 
@@ -97,6 +122,16 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             "https://example", proxy="http://evil", http3=True, client_id=self.client
         )
         self.assertEqual(result, ("socks5h://10.77.0.2:9050", None, False))
+
+    async def test_singular_browser_aliases_forward_client_id_through_bulk_policy(self):
+        result = await self.server.fetch(
+            "https://example", proxy="http://evil", block_webrtc=False, client_id=self.client
+        )
+        self.assertEqual(result, ("socks5://10.77.0.2:9050", None))
+        self.assertEqual(self.server.singular_calls, [])
+        stealthy = await self.server.stealthy_fetch("https://example", client_id=self.client)
+        self.assertEqual(stealthy, ("socks5://10.77.0.2:9050", None))
+        self.assertEqual(self.server.singular_calls, [])
 
     async def test_session_lifecycle_is_private_and_server_named(self):
         opened = await self.server.open_session(

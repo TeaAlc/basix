@@ -28,6 +28,10 @@ inventory, treat the assignment as blocked and unsuccessful under the communicat
 contract. Tell the spawning parent to install Scrapling with the Basix installer
 `install-scrapling-codex.sh`. Also explain that Basix
 Scrapling requires Podman and routes all web requests through the Tor network.
+The calling researcher is the MCP client: generate a canonical RFC 4122 UUID v4
+from a cryptographically secure system source and pass it as `client_id` on every
+Scrapling tool call. Reuse it for related session calls and never use `default` or
+a server-generated placeholder.
 
 <!-- basix-agent-authoring:bootstrap:start -->
 Before any plan, contract message, substantive tool call, or domain work:

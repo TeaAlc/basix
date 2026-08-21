@@ -35,6 +35,13 @@ CHROMIUM_FLAGS = (
 )
 SUSPICIOUS_NETWORK_NAME = re.compile(r"proxy|cdp|chrome|execut|argument|webrtc|dns|http3|quic", re.I)
 SESSION_UNAVAILABLE = {"error": "session not available"}
+CLIENT_ID_GUIDANCE = (
+    "The calling agent is the MCP client. Before calling this tool, generate a "
+    "canonical RFC 4122 UUID version 4 with a cryptographically secure system "
+    "source and pass it as `client_id`. Reuse that same ID for related calls and "
+    "session lifecycle operations; do not use `default`, a `session_id`, or a "
+    "server-generated placeholder. The server controls all network settings."
+)
 
 
 def validate_configuration():
@@ -105,6 +112,11 @@ class ClientPolicy:
         ))
         return signature.replace(parameters=parameters)
 
+    @staticmethod
+    def _description(method):
+        original = inspect.getdoc(method) or ""
+        return f"{CLIENT_ID_GUIDANCE}\n\n{original}".strip()
+
     def network_tool(self, method, *, browser=False, session_aware=False, forced=None):
         forced = forced or {}
         signature = inspect.signature(method)
@@ -130,6 +142,23 @@ class ClientPolicy:
             return await method(*args, **kwargs)
 
         guarded.__signature__ = self._signature(method)
+        guarded.__doc__ = self._description(method)
+        return guarded
+
+    def singular_network_tool(self, method, bulk_method):
+        """Adapt Scrapling's singular aliases to the policy-wrapped bulk tool."""
+        bulk_guarded = bulk_method
+
+        @functools.wraps(method)
+        async def guarded(*args, client_id, **kwargs):
+            canonical_client_id(client_id)
+            bound = inspect.signature(method).bind(*args, **kwargs)
+            url = bound.arguments.pop("url")
+            result = await bulk_guarded(urls=[url], client_id=client_id, **bound.arguments)
+            return result[0] if isinstance(result, (list, tuple)) else result
+
+        guarded.__signature__ = self._signature(method)
+        guarded.__doc__ = self._description(method)
         return guarded
 
     def open_session(self, method):
@@ -150,6 +179,7 @@ class ClientPolicy:
                 return result
 
         guarded.__signature__ = self._signature(method, hide_session=True)
+        guarded.__doc__ = self._description(method)
         return guarded
 
     def list_sessions(self, method):
@@ -163,6 +193,7 @@ class ClientPolicy:
                 return [item for item in result if self.owners.get(_listed_session_id(item)) == client_id]
 
         guarded.__signature__ = self._signature(method)
+        guarded.__doc__ = self._description(method)
         return guarded
 
     def close_session(self, method):
@@ -183,6 +214,7 @@ class ClientPolicy:
                 return result
 
         guarded.__signature__ = self._signature(method)
+        guarded.__doc__ = self._description(method)
         return guarded
 
 
@@ -197,6 +229,11 @@ def assert_upstream_tools(server):
         }
         if unknown:
             raise RuntimeError(f"Unreviewed network parameters on {name}: {sorted(unknown)}")
+    for singular, bulk in (("fetch", "bulk_fetch"), ("stealthy_fetch", "bulk_stealthy_fetch")):
+        if "url" not in inspect.signature(getattr(server, singular)).parameters:
+            raise RuntimeError(f"Unsupported Scrapling {singular} signature: missing url")
+        if "urls" not in inspect.signature(getattr(server, bulk)).parameters:
+            raise RuntimeError(f"Unsupported Scrapling {bulk} signature: missing urls")
 
 
 def configure_server(server):
@@ -207,10 +244,26 @@ def configure_server(server):
     server.open_session = policy.open_session(server.open_session)
     server.list_sessions = policy.list_sessions(server.list_sessions)
     server.close_session = policy.close_session(server.close_session)
-    for name in ("fetch", "bulk_fetch", "stealthy_fetch", "bulk_stealthy_fetch", "screenshot"):
+    for name in ("bulk_fetch", "bulk_stealthy_fetch"):
         method = getattr(server, name)
-        forced = {"block_webrtc": True} if "stealthy" in name else None
-        setattr(server, name, policy.network_tool(method, browser=True, session_aware=True, forced=forced))
+        setattr(
+            server,
+            name,
+            policy.network_tool(
+                method,
+                browser=True,
+                session_aware=True,
+                forced={"block_webrtc": True} if "stealthy" in name else None,
+            ),
+        )
+    for name, bulk_name in (("fetch", "bulk_fetch"), ("stealthy_fetch", "bulk_stealthy_fetch")):
+        setattr(
+            server,
+            name,
+            policy.singular_network_tool(getattr(server, name), getattr(server, bulk_name)),
+        )
+    screenshot = getattr(server, "screenshot")
+    setattr(server, "screenshot", policy.network_tool(screenshot, browser=True, session_aware=True))
     return policy
 
 

@@ -11,6 +11,11 @@ EXPECTED_TOOLS = {
     "open_session", "close_session", "list_sessions", "get", "bulk_get",
     "fetch", "bulk_fetch", "stealthy_fetch", "bulk_stealthy_fetch", "screenshot",
 }
+CLIENT_DESCRIPTION_MARKERS = (
+    "calling agent is the MCP client",
+    "canonical RFC 4122 UUID version 4",
+    "pass it as `client_id`",
+)
 HIDDEN_ARGUMENTS = {
     "proxy", "proxy_auth", "cdp_url", "real_chrome", "executable_path",
     "additional_args", "block_webrtc", "dns_over_https", "http3", "extra_flags",
@@ -21,6 +26,7 @@ class MCPClient:
     def __init__(self, endpoint: str):
         self.endpoint = endpoint
         self.session_id = None
+        self.client_id = str(uuid.uuid4())
         # The service is published on loopback.  Do not let a host proxy
         # intercept the installer handshake (or make a reset look like an
         # MCP failure in an unrelated proxy).
@@ -74,6 +80,13 @@ def validate_tool_inventory(endpoint, listing):
     if len(names) != len(EXPECTED_TOOLS) or set(names) != EXPECTED_TOOLS:
         raise RuntimeError(f"MCP phase tools/list failed at {endpoint}: Scrapling tool inventory is not canonical")
     for tool in tools:
+        description = tool.get("description")
+        if not isinstance(description, str) or not all(
+            marker in description for marker in CLIENT_DESCRIPTION_MARKERS
+        ):
+            raise RuntimeError(
+                f"MCP phase tools/list failed at {endpoint}: {tool.get('name')} does not explain MCP client_id generation"
+            )
         schema = tool.get("inputSchema")
         if schema is None:
             schema = {}
@@ -150,11 +163,10 @@ def main():
     listing = client.send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
                           phase="tools/list")
     tools = validate_tool_inventory(endpoint, listing)
-    capability = str(uuid.uuid4())
     called = client.send({
         "jsonrpc": "2.0", "id": 3, "method": "tools/call",
         "params": {"name": "get", "arguments": {
-            "url": "https://check.torproject.org/api/ip", "client_id": capability,
+            "url": "https://check.torproject.org/api/ip", "client_id": client.client_id,
         }},
     }, phase="tools/call")
     validate_tor_result(endpoint, called)

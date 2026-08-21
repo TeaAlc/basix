@@ -158,3 +158,8 @@ insight = "Fresh rootless port forwarding can reset the first MCP POST; retry on
 date = "2026-08-21"
 category = "Verification"
 insight = "Current Codex emits streamable_http registrations with null auth/header fields and unsupported auth_status; accept only this exact safe shape, rejecting non-null credentials or unknown fields."
+
+[[entries]]
+date = "2026-08-21"
+category = "Verification"
+insight = "Scrapling singular browser tools dynamically call their bulk counterparts; policy wrappers must expose singular adapters that pass client_id into wrapped bulk methods to preserve session ownership."
