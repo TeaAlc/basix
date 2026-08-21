@@ -168,3 +168,8 @@ insight = "Scrapling singular browser tools dynamically call their bulk counterp
 date = "2026-08-21"
 category = "Tooling"
 insight = "Scrapling tool_describe reads the active MCP container; source-side metadata changes remain invisible until the managed service is reinstalled or restarted."
+
+[[entries]]
+date = "2026-08-21"
+category = "User Instruction"
+insight = "Every persistent function, whether in an MCP server or script, must document every parameter in its respective docstring."
