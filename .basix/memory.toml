@@ -173,3 +173,8 @@ insight = "Scrapling tool_describe reads the active MCP container; source-side m
 date = "2026-08-21"
 category = "User Instruction"
 insight = "Every persistent function, whether in an MCP server or script, must document every parameter in its respective docstring."
+
+[[entries]]
+date = "2026-08-22"
+category = "Repository"
+insight = "Native agent TOMLs are auto-discovered by installers and setup copy tests; adding one needs no installer logic change, but requires deterministic agent and aggregate coverage."

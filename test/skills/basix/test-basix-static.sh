@@ -212,6 +212,7 @@ for moved in (
 for phrase in ("Agent level governs coordination", "`/root` | principal",
                "`basix_pager` | senior", "`basix_verifier` | senior",
                "`basix_file_explorer` | junior", "`basix_researcher` | junior",
+               "`basix_miraculix` | junior",
                "agent_level: junior", "non-root principal", "never spawn generic agents"):
     assert phrase in router, phrase
 assert "| Agent | Level |" in router and "| Children |" not in router
@@ -576,6 +577,7 @@ for phrase in (
     "basix_file_explorer",
     "basix_pager",
     "basix_verifier",
+    "basix_miraculix",
 ):
     assert phrase in policy, phrase
 
@@ -636,6 +638,8 @@ for phrase in (
     "generic web access",
     "derive their spawn authority",
     "Follow the required communication contract",
+    "strongly recommended under extreme uncertainty",
+    "`basix_miraculix`",
 ):
     assert phrase in skill, phrase
 for removed in ("generic subagent", "Native and generic", "communicate directly with `/root`", "Relay assignments and results"):
@@ -669,6 +673,7 @@ description_requirements = {
     "basix-researcher.toml": ("researcher", "read-only", "assign"),
     "basix-pager.toml": ("pager", "workspace-writing", "authorized"),
     "basix-verifier.toml": ("verifier", "read-only", "frozen"),
+    "basix-miraculix.toml": ("short-answer consultant", "read-only", "goal"),
 }
 for name, phrases in description_requirements.items():
     description = tomllib.loads((root / "agents/native" / name).read_text())["description"]
@@ -721,6 +726,10 @@ for phrase in (
     "the parent chooses those paths",
     "never scans `.basix/`",
     "Quality gates remain forbidden from inspecting `.basix/`",
+    "basix_miraculix",
+    "gpt-5.6-sol",
+    "strongly recommended under extreme uncertainty",
+    "Das weiß ich nicht",
 ):
     assert phrase in agent_docs, phrase
 

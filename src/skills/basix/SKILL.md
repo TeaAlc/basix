@@ -47,6 +47,7 @@ govern assignment complexity. Never infer one axis from the other.
 | `basix_verifier` | senior |
 | `basix_file_explorer` | junior |
 | `basix_researcher` | junior |
+| `basix_miraculix` | junior |
 
 - Juniors perform bounded work without coordination and never spawn children.
 - Seniors may coordinate complex work and may spawn every native agent listed as
@@ -66,6 +67,7 @@ govern assignment complexity. Never infer one axis from the other.
 - Keep tightly bounded work with `/root` when direct completion costs less context than delegation and handoff. Delegate a concrete, bounded assignment when work is expected to require more than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or specialized expertise. Skill loading, planning, messaging, status updates, and agent-management calls do not count.
 - If initially simple work expands, delegate the remaining bounded assignment instead of continuing extensive discovery.
 - Choose `basix_researcher` for current or external facts and website inspection, `basix_file_explorer` for extensive local evidence discovery, `basix_pager` for nontrivial web frontend, backend, UI/UX, fullstack, or integration work, and `basix_verifier` for independent read-only inspection of one frozen result.
+- Seniors and principals may optionally consult `basix_miraculix` for a bounded second opinion. Consultation is strongly recommended under extreme uncertainty; the spawning parent supplies the complete goal and questions and retains the decision.
 - Spawn every Basix agent with `fork_turns="none"`, a fresh and unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
 - Keep researchers and file explorers read-only. Do not substitute generic web access when required research fails, and do not continue extended local discovery when the required file explorer fails.
 - Native agents derive their spawn authority only from their level and this table.

@@ -73,6 +73,7 @@
 - Route extensive local evidence discovery to the read-only `basix_file_explorer`, preferably before discovery begins; stop extended discovery if it is unavailable.
 - Route nontrivial web frontend, backend, UI/UX, fullstack, and integration work to `basix_pager`. (This is for web development only)
 - Route independent inspection of a frozen result to the read-only `basix_verifier`.
+- Seniors and principals may optionally consult the read-only `basix_miraculix` for a bounded second opinion. Consultation is strongly recommended under extreme uncertainty; the spawning parent supplies complete context and retains the decision.
 - Spawn every Basix agent with `fork_turns="none"`, a fresh unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
 - Native agents derive spawn authority only from the complete agent-level table and level rules in the `basix` router.
 - Every spawned Basix agent must load and follow the complete communication contract referenced by the `basix` router before planning, messages, tools, or domain work. If the router or contract is unreadable, the spawn fails closed.

@@ -23,6 +23,7 @@ LEVELS = {"junior", "senior", "principal"}
 CANONICAL_LEVELS = {
     "basix_file_explorer": "junior",
     "basix_researcher": "junior",
+    "basix_miraculix": "junior",
     "basix_pager": "senior",
     "basix_verifier": "senior",
 }
@@ -302,6 +303,8 @@ def validate_agent(path: Path) -> None:
         need(isinstance(parsed.get(key), str) and bool(parsed[key].strip()), f"{path}: missing string field {key}")
     need(parsed["description"].startswith("Basix-Agent: "),
          f"{path}: description must begin with 'Basix-Agent: '")
+    need(parsed["name"].startswith("basix_"),
+         f"{path}: native agent name must begin with 'basix_'")
     expected_level = CANONICAL_LEVELS.get(parsed["name"])
     if expected_level:
         need(metadata["level"] == expected_level,
@@ -337,6 +340,13 @@ def validate_agent(path: Path) -> None:
              f"{path}: basix_researcher must use gpt-5.6-luna without override")
         need(parsed["model_reasoning_effort"] == "medium",
              f"{path}: basix_researcher must use medium reasoning effort")
+    if parsed["name"] == "basix_miraculix":
+        need(override and parsed["model"] == "gpt-5.6-sol",
+             f"{path}: basix_miraculix must use explicitly overridden gpt-5.6-sol")
+        need(parsed["model_reasoning_effort"] == "low",
+             f"{path}: basix_miraculix must use low reasoning effort")
+        need(parsed["sandbox_mode"] == "read-only",
+             f"{path}: basix_miraculix must remain read-only")
     if parsed["name"] == "basix_pager":
         need(not override and parsed["model"] == "gpt-5.6-luna",
              f"{path}: basix_pager must use classified gpt-5.6-luna without an override")

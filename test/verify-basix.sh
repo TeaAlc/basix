@@ -4,6 +4,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 suites=(
   test/agents/basix-file-explorer/test-basix-file-explorer.sh
   test/agents/basix-researcher/test-basix-researcher.sh
+  test/agents/basix-miraculix/test-basix-miraculix.sh
   test/agents/basix-pager/test-basix-pager.sh
   test/agents/basix-verifier/test-basix-verifier.sh
   test/skills/basix/test-basix.sh

@@ -15,6 +15,7 @@ BOOTSTRAP_REFERENCE = ROOT / "references" / "native-agent-bootstrap.md"
 CONTRACT_REFERENCE = ROOT.parent / "basix" / "references" / "agent-communication-contract.md"
 PAGER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-pager.toml"
 VERIFIER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-verifier.toml"
+MIRACULIX_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-miraculix.toml"
 SPEC = importlib.util.spec_from_file_location("authoring_validate", SCRIPT)
 validator = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
@@ -300,6 +301,32 @@ class StreamTests(unittest.TestCase):
 
 
 class AgentTests(unittest.TestCase):
+    def test_canonical_miraculix_definition_and_prompt(self):
+        validator.validate_agent(MIRACULIX_NATIVE)
+        text = MIRACULIX_NATIVE.read_text()
+        agent = tomllib.loads(text)
+        self.assertEqual(agent["name"], "basix_miraculix")
+        self.assertEqual(agent["model"], "gpt-5.6-sol")
+        self.assertEqual(agent["model_reasoning_effort"], "low")
+        self.assertEqual(agent["sandbox_mode"], "read-only")
+        model_line = text.splitlines().index('model = "gpt-5.6-sol"')
+        self.assertEqual(text.splitlines()[model_line - 1], validator.OVERRIDE)
+        instructions = agent["developer_instructions"]
+        for phrase in (
+            "one or more non-empty string values", "combined length of only the",
+            "question values, counting", "question values",
+            "1024 Unicode characters", "inherit no parent state",
+            "use no domain tools, files, web access, or subagents",
+            "Prior answers from your own explicitly authorized",
+            "spawning parent\nalone decides", "a new topic requires a new,\nfresh agent",
+            "`final_result` whose `data.answer`", "Answer every question in its\nlanguage",
+            "complete answer\nmust be exactly `Das weiß ich nicht`",
+            "Multiple questions may therefore mix safe\nanswers",
+            "time-sensitive answers", "very strongly supported",
+            "code is `invalid_request`",
+        ):
+            self.assertIn(phrase, instructions)
+
     def test_canonical_pager_definition_and_profiles(self):
         validator.validate_agent(PAGER_NATIVE)
         agent = tomllib.loads(PAGER_NATIVE.read_text())
@@ -344,7 +371,7 @@ class AgentTests(unittest.TestCase):
             validator.validate_agent(path)
 
     def write_agent(self, model="gpt-5.6-luna", effort="medium", marker="", block=True,
-                    description="Basix-Agent: Test agent", name="agent", sandbox="read-only",
+                    description="Basix-Agent: Test agent", name="basix_agent", sandbox="read-only",
                     sandbox_marker="", preamble=None, level=None, author="Basix",
                     principal_marker=False):
         reference = BOOTSTRAP_REFERENCE.read_text()
@@ -412,11 +439,15 @@ class AgentTests(unittest.TestCase):
         for name, level in validator.CANONICAL_LEVELS.items():
             wrong = "senior" if level == "junior" else "junior"
             effort = {"basix_file_explorer": "low", "basix_researcher": "medium",
+                      "basix_miraculix": "low",
                       "basix_pager": "xhigh", "basix_verifier": "xhigh"}[name]
             sandbox = "workspace-write" if name == "basix_pager" else "read-only"
             sandbox_marker = validator.SANDBOX_OVERRIDE + "\n" if name == "basix_pager" else ""
+            model = "gpt-5.6-sol" if name == "basix_miraculix" else "gpt-5.6-luna"
+            marker = validator.OVERRIDE + "\n" if name == "basix_miraculix" else ""
             directory, path = self.write_agent(name=name, level=wrong, effort=effort,
-                                                sandbox=sandbox, sandbox_marker=sandbox_marker)
+                                                model=model, marker=marker, sandbox=sandbox,
+                                                sandbox_marker=sandbox_marker)
             with directory, self.assertRaisesRegex(validator.Invalid, "must use"):
                 validator.validate_agent(path)
 
@@ -483,6 +514,11 @@ class AgentTests(unittest.TestCase):
             directory, path = self.write_agent(description=description)
             with directory, self.assertRaisesRegex(validator.Invalid, "description must begin"):
                 validator.validate_agent(path)
+
+    def test_native_name_requires_basix_prefix(self):
+        directory, path = self.write_agent(name="agent")
+        with directory, self.assertRaisesRegex(validator.Invalid, "must begin with 'basix_'"):
+            validator.validate_agent(path)
 
     def test_non_luna_requires_adjacent_override(self):
         directory, path = self.write_agent(model="custom")
@@ -564,13 +600,13 @@ class AgentTests(unittest.TestCase):
 
     def test_sandbox_override_is_reserved_for_pager(self):
         directory, path = self.write_agent(
-            name="agent", sandbox="workspace-write", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+            name="basix_agent", sandbox="workspace-write", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
         )
         with directory, self.assertRaisesRegex(validator.Invalid, "reserved for basix_pager"):
             validator.validate_agent(path)
 
         directory, path = self.write_agent(
-            name="agent", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
+            name="basix_agent", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
         )
         with directory, self.assertRaisesRegex(validator.Invalid, "reserved for basix_pager"):
             validator.validate_agent(path)
@@ -620,6 +656,23 @@ class AgentTests(unittest.TestCase):
         with directory, self.assertRaisesRegex(validator.Invalid, "Scrapling researcher policy"):
             validator.validate_agent(path)
 
+    def test_miraculix_configuration_is_fixed(self):
+        directory, path = self.write_agent(
+            name="basix_miraculix", model="gpt-5.6-sol", effort="low",
+            marker=validator.OVERRIDE + "\n",
+        )
+        with directory:
+            validator.validate_agent(path)
+        cases = (
+            {"model": "gpt-5.6-luna", "marker": ""},
+            {"model": "gpt-5.6-sol", "marker": ""},
+            {"model": "gpt-5.6-sol", "effort": "medium", "marker": validator.OVERRIDE + "\n"},
+        )
+        for kwargs in cases:
+            directory, path = self.write_agent(name="basix_miraculix", **kwargs)
+            with directory, self.assertRaises(validator.Invalid):
+                validator.validate_agent(path)
+
 
 class RepositoryPolicyTests(unittest.TestCase):
     def test_native_agents_use_only_canonical_bootstrap_and_validate(self):
@@ -631,6 +684,7 @@ class RepositoryPolicyTests(unittest.TestCase):
             self.assertEqual(text.count(validator.BOOTSTRAP_START), 1, path)
             self.assertEqual(text.count(validator.BOOTSTRAP_END), 1, path)
             self.assertNotIn(validator.CONTRACT_START, text, path)
+            self.assertTrue(tomllib.loads(text)["name"].startswith("basix_"), path)
             validator.validate_agent(path)
 
         contract = (repository / "src/skills/basix/references/agent-communication-contract.md").read_text()

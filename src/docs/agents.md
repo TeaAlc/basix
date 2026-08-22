@@ -40,8 +40,8 @@ that conflicts with an active ADR pause for explicit user confirmation.
 The native agents are discovered from every TOML under `src/agents/native/`:
 
 Agent level is independent of model and reasoning effort. `/root` is the fixed
-principal; `basix_pager` and `basix_verifier` are seniors; `basix_file_explorer`
-and `basix_researcher` are juniors. Every native TOML begins with commented,
+principal; `basix_pager` and `basix_verifier` are seniors; `basix_file_explorer`,
+`basix_researcher`, and `basix_miraculix` are juniors. Every native TOML begins with commented,
 machine-readable `author` and `level` metadata. Juniors never spawn children;
 seniors may spawn every native type that the router table identifies as junior,
 but no generic agents. Principals may spawn native or generic juniors and seniors;
@@ -86,6 +86,16 @@ The native read-only agents are:
   require the main agent to delegate broad evidence discovery, preferably before it begins; the Basix
   skill supplies fresh-context and bounded-assignment orchestration. The explorer discovers evidence read-only; implementation
   and final code analysis remain the main agent's responsibility.
+- `basix_miraculix` uses an explicit `gpt-5.6-sol` override with low reasoning
+  for a short, independent second opinion. A senior or principal may consult it,
+  and consultation is strongly recommended under extreme uncertainty. Its fresh
+  assignment contains one goal and bundled question values totaling at most 1024
+  Unicode characters; the goal does not count toward that limit. It has no inherited
+  state or domain-tool access. It answers each question separately in its language
+  through `final_result.data.answer`, uses exactly `Das weiß ich nicht` as the
+  complete per-question answer under material doubt, qualifies time-sensitive
+  knowledge, and stays within 1024 Unicode characters. The parent alone decides whether an explicit
+  continuation is the same topic; a new topic requires a fresh agent.
 
 Every native TOML contains one exact managed bootstrap rather than the complete
 contract. It loads the router, persistent developer instructions, and the router-owned
