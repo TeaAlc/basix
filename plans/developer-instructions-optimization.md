@@ -20,6 +20,10 @@ needed.
   words. `## Basix agent spawning` is 2,974 characters and 429 words and is
   excluded from all savings estimates.
 - The current active plan is this file; archive it after successful review.
+- After this optimization is implemented, reviewed, and committed, execute the
+  independent deferred follow-up in
+  `plans/developer-instruction-plan-numbering-001.md`. Do not combine its source,
+  test, or review changes with this optimization.
 
 ## Candidate wording for implementation
 
