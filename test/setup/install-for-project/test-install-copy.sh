@@ -15,23 +15,31 @@ SH
 chmod +x "$mock/codex"; export PATH="$mock:$PATH"
 
 project="$case_dir/project"
-if "$ROOT/setup/install_for_project.sh" "$project" >/dev/null &&
-   [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix/references/agent-communication-contract.md && -f $project/.agents/skills/basix-experience/scripts/collect-token-usage.py && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
+first_output=$("$ROOT/setup/install_for_project.sh" "$project")
+if [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix/references/agent-communication-contract.md && -f $project/.agents/skills/basix-experience/scripts/collect-token-usage.py && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
    [[ ! -e $project/.basix ]] &&
    ! find "$project/.agents/skills" "$project/.codex/basix" -type l -print -quit | grep -q . &&
    ! cut -f1 "$project/.codex/.basix-install-state" | grep -Ev '^(copy|dircopy|dirfile)$' | grep -q .; then ok 'fresh project install copies complete trees without ADR artifacts'; else bad 'fresh project install copies complete trees without ADR artifacts'; fi
+for agent in "$ROOT"/agents/native/*.toml; do
+  check "project install reports $(basename "$agent") as installed" grep -Fq "$(basename "$agent") — installed" <<<"$first_output"
+done
 check 'project install preserves token collector bytes' cmp -s "$ROOT/skills/basix-experience/scripts/collect-token-usage.py" "$project/.agents/skills/basix-experience/scripts/collect-token-usage.py"
 for agent in "$ROOT"/agents/native/*.toml; do
   check "project install preserves $(basename "$agent") bytes" cmp -s "$agent" "$project/.codex/basix/agents/$(basename "$agent")"
 done
 before=$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml")
-"$ROOT/setup/install_for_project.sh" "$project" >/dev/null
+second_output=$("$ROOT/setup/install_for_project.sh" "$project")
+for agent in "$ROOT"/agents/native/*.toml; do
+  check "project reinstall reports $(basename "$agent") as unchanged" grep -Fq "$(basename "$agent") — unchanged" <<<"$second_output"
+done
 check 'project reinstall is idempotent' test "$before" = "$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml")"
 
 source_copy="$case_dir/source"; cp -R "$ROOT" "$source_copy"; update="$case_dir/update"
 "$source_copy/setup/install_for_project.sh" "$update" >/dev/null
 printf '\ncopy-update\n' >>"$source_copy/skills/basix/SKILL.md"
-"$source_copy/setup/install_for_project.sh" "$update" >/dev/null
+printf '\n# report-update\n' >>"$source_copy/agents/native/basix-pager.toml"
+update_output=$("$source_copy/setup/install_for_project.sh" "$update")
+check 'project reinstall reports changed agent as updated' grep -Fq 'basix-pager.toml — updated' <<<"$update_output"
 check 'reinstall synchronizes source updates' grep -Fq copy-update "$update/.agents/skills/basix/SKILL.md"
 for agent in "$source_copy"/agents/native/*.toml; do
   check "project reinstall preserves $(basename "$agent") bytes" cmp -s "$agent" "$update/.codex/basix/agents/$(basename "$agent")"

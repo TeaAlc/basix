@@ -33,7 +33,7 @@ while IFS= read -r -d '' source; do preflight_tree "$source" "$TARGET/.agents/sk
 preflight_tree "$ROOT/agents/native" "$AGENT_DIR"
 STATE_TMP=$(mktemp); trap 'rm -f "$STATE_TMP"' EXIT
 report_group 'Skills'; while IFS= read -r -d '' source; do skill=$(basename "$source"); install_tree "$source" "$TARGET/.agents/skills/$skill"; report_point "$INSTALL_RESULT" "$skill" "$INSTALL_RESULT"; done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
-report_group 'Agents'; install_tree "$ROOT/agents/native" "$AGENT_DIR"; report_point "$INSTALL_RESULT" 'Private agents' "$INSTALL_RESULT"
+report_group 'Agents'; prepare_agent_tree_report "$ROOT/agents/native" "$AGENT_DIR"; install_tree "$ROOT/agents/native" "$AGENT_DIR"; report_agent_tree
 STALE_CHANGED=false; reconcile_stale_targets "$STATE" "$STATE_TMP" "$TARGET/.agents/skills" "$TARGET/.codex/basix"; report_point "$([[ $STALE_CHANGED == true ]] && printf changed || printf unchanged)" 'Stale cleanup'
 report_group 'Developer Instructions'; args=(add --config "$CONFIG" --instructions "$INSTRUCTIONS" --status-json); [[ $DRY_RUN == false ]] || args+=(--dry-run); json=$(python3 "$HELPER" "${args[@]}") || die; status=$(python3 -c 'import json,sys;print(json.load(sys.stdin)["status"])' <<<"$json"); report_point "$status" 'Developer instructions' "$status"
 report_group 'Agent configuration'; args=(agent-add --config "$CONFIG" --agents-source "$ROOT/agents/native" --agents-dir "$AGENT_DIR" --status-json); [[ $DRY_RUN == false ]] || args+=(--dry-run); json=$(python3 "$HELPER" "${args[@]}") || die; status=$(python3 -c 'import json,sys;print(json.load(sys.stdin)["status"])' <<<"$json"); report_point "$status" 'Agent configuration' "$status"

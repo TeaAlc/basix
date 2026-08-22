@@ -178,3 +178,8 @@ insight = "Every persistent function, whether in an MCP server or script, must d
 date = "2026-08-22"
 category = "Repository"
 insight = "Native agent TOMLs are auto-discovered by installers and setup copy tests; adding one needs no installer logic change, but requires deterministic agent and aggregate coverage."
+
+[[entries]]
+date = "2026-08-22"
+category = "Repository"
+insight = "Project and global installers share src/setup/lib/common.sh; per-agent install reports should use the canonical native TOML filenames and compare targets before copying to distinguish installed from updated."

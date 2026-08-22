@@ -32,7 +32,7 @@ python3 "$HELPER" agent-check --config "$CONFIG" --agents-source "$ROOT/agents/n
 preflight_file "$ROOT/plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/plugin.json"; preflight_file "$ROOT/plugin/marketplace.json" "$PLUGIN_ROOT/.agents/plugins/marketplace.json"
 preflight_tree "$ROOT/agents/native" "$AGENT_DIR"; while IFS= read -r -d '' source; do preflight_tree "$source" "$PLUGIN_ROOT/skills/$(basename "$source")"; done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
 STATE_TMP=$(mktemp); trap 'rm -f "$STATE_TMP"' EXIT
-report_group 'Agents'; install_tree "$ROOT/agents/native" "$AGENT_DIR"; report_point "$INSTALL_RESULT" 'Private agents' "$INSTALL_RESULT"
+report_group 'Agents'; prepare_agent_tree_report "$ROOT/agents/native" "$AGENT_DIR"; install_tree "$ROOT/agents/native" "$AGENT_DIR"; report_agent_tree
 report_group 'Plugin bundle'; bundle_changed=false; install_file "$ROOT/plugin/plugin.json" "$PLUGIN_ROOT/.codex-plugin/plugin.json"; [[ $INSTALL_RESULT == changed ]] && bundle_changed=true; install_file "$ROOT/plugin/marketplace.json" "$PLUGIN_ROOT/.agents/plugins/marketplace.json"; [[ $INSTALL_RESULT == changed ]] && bundle_changed=true
 while IFS= read -r -d '' source; do install_tree "$source" "$PLUGIN_ROOT/skills/$(basename "$source")"; [[ $INSTALL_RESULT == changed ]] && bundle_changed=true; done < <(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
 STALE_CHANGED=false; reconcile_stale_targets "$STATE" "$STATE_TMP" "$PLUGIN_ROOT" "$CODEX_HOME/basix"; [[ $STALE_CHANGED == true ]] && bundle_changed=true; report_point "$([[ $bundle_changed == true ]] && printf changed || printf unchanged)" 'Plugin bundle'

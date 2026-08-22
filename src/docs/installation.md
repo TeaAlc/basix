@@ -61,4 +61,5 @@ causes a safe exit before filesystem or MCP changes.
 ## Reports
 
 Both installers report the target and dry-run state, followed by grouped results.
-They do not report a mode or a Lumen phase.
+The Agents group lists every native agent and marks it as installed, updated, or
+unchanged. They do not report a mode or a Lumen phase.

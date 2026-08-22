@@ -17,6 +17,29 @@ report_point() {
   case $status in changed) symbol='✓'; color=32; ((REPORT_CHANGED+=1)) ;; unchanged) symbol='-'; color=33; ((REPORT_UNCHANGED+=1)) ;; failed) symbol='✗'; color=31; ((REPORT_FAILED+=1)) ;; esac
   printf '  '; report_paint "$color" "$symbol"; printf ' %s' "$label"; [[ -z $detail ]] || printf ' — %s' "$detail"; printf '\n'
 }
+prepare_agent_tree_report() {
+  local source=$1 target=$2 agent name detail
+  AGENT_REPORT_NAMES=() AGENT_REPORT_DETAILS=()
+  while IFS= read -r -d '' agent; do
+    name=$(basename "$agent")
+    if [[ ! -e "$target/$name" ]]; then
+      detail=installed
+    elif cmp -s "$agent" "$target/$name"; then
+      detail=unchanged
+    else
+      detail=updated
+    fi
+    AGENT_REPORT_NAMES+=("$name") AGENT_REPORT_DETAILS+=("$detail")
+  done < <(find "$source" -mindepth 1 -maxdepth 1 -type f -name '*.toml' -print0 | sort -z)
+}
+report_agent_tree() {
+  local index detail status
+  for index in "${!AGENT_REPORT_NAMES[@]}"; do
+    detail=${AGENT_REPORT_DETAILS[index]}
+    [[ $detail == unchanged ]] && status=unchanged || status=changed
+    report_point "$status" "${AGENT_REPORT_NAMES[index]}" "$detail"
+  done
+}
 report_result() { report_group 'Result'; if ((REPORT_FAILED)); then report_paint 31 '✗ Failed'; else report_paint 32 '✓ Complete'; fi; printf ' — %d changed, %d unchanged, %d failed\n' "$REPORT_CHANGED" "$REPORT_UNCHANGED" "$REPORT_FAILED"; }
 die() { if [[ $REPORT_ACTIVE == true ]]; then report_point failed "$REPORT_POINT" 'Failed safely'; report_result; else printf 'error: invalid request\n' >&2; fi; exit 1; }
 note() { printf '%s\n' "$*"; }
