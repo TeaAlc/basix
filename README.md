@@ -158,9 +158,10 @@ The installer copies complete skill directories under
 `.agents/skills/`, stores native agents privately under `.codex/basix/agents/`,
 and registers them with managed `[agents.<name>].config_file` entries in
 `.codex/config.toml`. It never writes Basix TOMLs into the shared
-`.codex/agents/` directory and never creates or manages project `.basix`; that
-directory is reserved for project-owned memory and credential files. Only load
-project-level Codex configuration from projects you trust.
+`.codex/agents/` directory and never creates or manages project `.basix`. In
+particular, installers do not create `.basix/adrs/`, ADR templates, or an initial
+ADR; agents create the ADR structure only when the first qualifying decision is
+recorded. Only load project-level Codex configuration from projects you trust.
 
 Useful variants:
 
@@ -286,6 +287,10 @@ and persistent instructions are loaded. Basix then supplies:
   expected to need more than two substantive domain-tool calls to a Basix agent;
 - automatic Conventional Commits for Root's task changes in Git repositories, but
   only after every running verification and test completes successfully;
+- binding ADR governance for durable, hard-to-reverse, cross-subsystem decisions:
+  agents read the active ADR index before planning or implementation, create the
+  project-owned `.basix/adrs/` structure on first use, and pause for explicit user
+  confirmation before conflicting work or lifecycle changes;
 - agent-owned persistent memory in `.basix/memory.toml`, read once at session start
   and after each context compaction, actively applied to reduce work and prevent
   repeated mistakes, and autonomously curated without user approval at natural

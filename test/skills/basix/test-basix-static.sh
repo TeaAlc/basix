@@ -359,6 +359,87 @@ for phrase in (
 ):
     assert planning_section.count(phrase) == 1, phrase
 
+adr_section = re.search(r"(?ms)^## Architecture Decision Records \(ADRs\)\n.*?(?=^## )", policy).group(0)
+assert policy.count("## Architecture Decision Records (ADRs)") == 1
+assert policy.index("## Planning") < policy.index("## Architecture Decision Records (ADRs)") < policy.index("## Agent Memory")
+for phrase in (
+    "Before planning or implementation, read the active index `.basix/adrs/ADR.md`",
+    "load only the active ADRs relevant to the work",
+    "Active ADRs are binding",
+    "durable decision that is difficult to reverse",
+    "crosses subsystem boundaries",
+    "long-term architecture, security, data, or workflow commitment",
+    "`.basix/adrs/ADR_NNNN_<descriptive-name>.md`",
+    "descriptive English kebab-case name",
+    "globally increasing number across active and archived ADRs",
+    "zero-padded to at least four digits",
+    "never reuse a number",
+    "`Status`, `Context`, `Decision`, and `Consequences`",
+    "including Markdown and whitespace",
+    "512 Unicode characters",
+    "`.basix/adrs/ADR.md` lists only active ADRs",
+    "`.basix/adrs/archive/ADR.md` lists only archived ADRs",
+    "states its status or successor",
+    "index files are exempt from the 512-character limit",
+    "Editorial corrections may update an existing ADR",
+    "A new or changed decision requires a new ADR",
+    "Superseding, merging, or archiving without replacement requires prior user confirmation",
+    "successor must name the ADR it supersedes",
+    "allocate the next number to the new ADR",
+    "name every merged ADR",
+    "make only the new ADR binding",
+    "move all source ADRs to the archive",
+    "Only the mandatory `Merged ADRs: ...` line in a merge ADR is exempt",
+    "Give every archived ADR an appropriate status",
+    "update both indexes atomically",
+    "pause before implementation",
+    '`<div style="color:red">…</div>`',
+    "understandable without requiring the user to read the ADR",
+    "binding decision, planned deviation, exact conflict, and impact",
+    "comply with the ADR",
+    "replace it with a user-confirmed successor",
+    "replan the scope to avoid the conflict",
+    "Continue only after explicit user confirmation",
+    "Agents create `.basix/adrs/` and its indexes when the first ADR is required",
+    "Basix installers must not create the directory, templates, or an initial ADR",
+):
+    assert adr_section.count(phrase) == 1, phrase
+assert adr_section.count("description of at most 64 Unicode characters") == 2
+
+def validate_adr(body, merged_line=None):
+    """Model required fields and Unicode character limits."""
+    for field in ("Status", "Context", "Decision", "Consequences"):
+        assert re.search(rf"(?m)^## {field}$", body), field
+    measured = body
+    if merged_line is not None:
+        assert merged_line.startswith("Merged ADRs: ")
+        assert body.count(merged_line) == 1
+        measured = body.replace(merged_line, "", 1)
+    assert len(measured) <= 512
+
+base_adr = "## Status\nActive\n## Context\nC\n## Decision\nD\n## Consequences\n"
+validate_adr(base_adr + "ü" * (512 - len(base_adr)))
+try:
+    validate_adr(base_adr + "ü" * (513 - len(base_adr)))
+except AssertionError:
+    pass
+else:
+    raise AssertionError("ADR Unicode character limit must be enforced")
+merge_line = "Merged ADRs: ADR_0001_a.md, ADR_0002_b.md"
+validate_adr(base_adr + "x" * (512 - len(base_adr)) + merge_line, merge_line)
+
+adr_name = re.compile(r"^ADR_(\d{4,})_([a-z0-9]+(?:-[a-z0-9]+)*)\.md$")
+assert adr_name.fullmatch("ADR_0001_descriptive-name.md")
+assert not adr_name.fullmatch("ADR_001_Bad_Name.md")
+active_numbers = {1, 4}
+archived_numbers = {2, 3}
+assert max(active_numbers | archived_numbers) + 1 == 5
+active_entries = [("ADR_0001_a.md", "ü" * 64)]
+archive_entries = [("ADR_0002_b.md", "Superseded by ADR_0004", "x" * 64)]
+assert all(len(description) <= 64 for _, description in active_entries)
+assert all(len(description) <= 64 and status for _, status, description in archive_entries)
+assert not ({name for name, _ in active_entries} & {name for name, _, _ in archive_entries})
+
 def next_plan_basename(stem, active_files, archived_files):
     """Model direct-file scanning and canonical highest-plus-one allocation."""
     suffixes = []
@@ -555,8 +636,18 @@ for phrase in (
     "early insights should shrink later context",
     "correctness, safety, and mandatory dependencies remain authoritative",
     "Contract 1.4 exclusively owns",
+    "ADR governance",
+    "read the project-owned active ADR index",
+    "Installers never create that directory, an ADR template, or an initial ADR",
 ):
     assert phrase in architecture, phrase
+
+installation = (root / "docs/installation.md").read_text()
+assert "Installers never create `.basix/adrs/`, ADR" in installation
+assert "agents create the directory and indexes only when" in installation
+for installer in (root / "setup/install_as_plugin.sh", root / "setup/install_for_project.sh"):
+    installer_text = installer.read_text()
+    assert ".basix/adrs" not in installer_text and "ADR_" not in installer_text, installer
 
 description_requirements = {
     "basix-file-explorer.toml": ("file explorer", "read-only", "assign"),
@@ -590,6 +681,10 @@ for phrase in (
 
 agent_docs = " ".join((root / "docs/agents.md").read_text().split())
 for phrase in (
+    "Before planning or implementation, agents read `.basix/adrs/ADR.md`",
+    "globally increasing numbers across active and archived records",
+    "installers never create ADR artifacts",
+    "pause for explicit user confirmation",
     "Verification assignment and lifecycle",
     "basix_verifier",
     "immutable",
@@ -613,6 +708,15 @@ for phrase in (
     "Quality gates remain forbidden from inspecting `.basix/`",
 ):
     assert phrase in agent_docs, phrase
+
+readme = " ".join((root.parent / "README.md").read_text().split())
+for phrase in (
+    "installers do not create `.basix/adrs/`, ADR templates, or an initial ADR",
+    "agents create the ADR structure only when the first qualifying decision is recorded",
+    "binding ADR governance for durable, hard-to-reverse, cross-subsystem decisions",
+    "pause for explicit user confirmation before conflicting work or lifecycle changes",
+):
+    assert phrase in readme, phrase
 
 heartbeat = (root / "skills/basix/references/agent-communication-contract.md").read_text()
 heartbeat_flat = " ".join(heartbeat.split())

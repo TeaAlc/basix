@@ -24,6 +24,19 @@
 - Estimate total effort before work begins. Above 5 million expected tokens, ask whether to compact after every phase. If enabled, each phase closure must preserve, compactly but completely, everything needed to continue: findings, decisions, dependencies, and discovery results.
 - Ask clarifying questions only when answers can materially affect scope, architecture, priorities, or implementation. Resolve material uncertainty iteratively; otherwise make and document reasoned assumptions.
 
+## Architecture Decision Records (ADRs)
+
+- Before planning or implementation, read the active index `.basix/adrs/ADR.md`, then load only the active ADRs relevant to the work. Active ADRs are binding.
+- Create an ADR only for a durable decision that is difficult to reverse, crosses subsystem boundaries, or creates a long-term architecture, security, data, or workflow commitment.
+- Store ADRs as `.basix/adrs/ADR_NNNN_<descriptive-name>.md`. Use a descriptive English kebab-case name. Allocate one globally increasing number across active and archived ADRs, zero-padded to at least four digits, and never reuse a number.
+- Every ADR must contain `Status`, `Context`, `Decision`, and `Consequences`. The entire file, including Markdown and whitespace, must not exceed 512 Unicode characters.
+- `.basix/adrs/ADR.md` lists only active ADRs; each entry links to one ADR and has a description of at most 64 Unicode characters. `.basix/adrs/archive/ADR.md` lists only archived ADRs; each entry links to one ADR, states its status or successor, and has a description of at most 64 Unicode characters. The two index files are exempt from the 512-character limit.
+- Editorial corrections may update an existing ADR. A new or changed decision requires a new ADR.
+- Superseding, merging, or archiving without replacement requires prior user confirmation. A successor must name the ADR it supersedes. For a merge, allocate the next number to the new ADR, name every merged ADR, make only the new ADR binding, and move all source ADRs to the archive. Only the mandatory `Merged ADRs: ...` line in a merge ADR is exempt from the 512-character limit.
+- Give every archived ADR an appropriate status and update both indexes atomically with the lifecycle change.
+- If planned work conflicts with an active ADR, pause before implementation and render the entire notice in red as `<div style="color:red">…</div>`. Make the notice understandable without requiring the user to read the ADR: state the binding decision, planned deviation, exact conflict, and impact. Offer exactly three concrete options: comply with the ADR, replace it with a user-confirmed successor, or replan the scope to avoid the conflict. Continue only after explicit user confirmation.
+- Agents create `.basix/adrs/` and its indexes when the first ADR is required. Basix installers must not create the directory, templates, or an initial ADR.
+
 ## Agent Memory
 
 - `.basix/memory.toml` is agent-owned memory, not a user log. Autonomously create, update, merge, or delete it; never request user approval for memory operations.

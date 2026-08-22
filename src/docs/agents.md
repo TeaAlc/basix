@@ -28,6 +28,15 @@ result evaluation, or status interpretation. It may preserve meaning while rewri
 an accepted proposal to 32 words, and stores every accepted insight separately.
 Updated memory is committed with task changes unless `.basix` is ignored.
 
+Before planning or implementation, agents read `.basix/adrs/ADR.md` and load only
+relevant active ADRs, which are binding. ADRs are reserved for durable,
+hard-to-reverse, cross-subsystem architecture, security, data, or workflow
+decisions. Agents allocate globally increasing numbers across active and archived
+records and create `.basix/adrs/` plus its active and archive indexes only when the
+first ADR is required; installers never create ADR artifacts. Decision changes use
+a new ADR, while superseding, merging, archiving without replacement, and work
+that conflicts with an active ADR pause for explicit user confirmation.
+
 The native agents are discovered from every TOML under `src/agents/native/`:
 
 Agent level is independent of model and reasoning effort. `/root` is the fixed

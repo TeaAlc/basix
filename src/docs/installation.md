@@ -16,7 +16,9 @@ directory when `TARGET` is omitted.
 Native agents live at `$CODEX_HOME/basix/agents` globally or
 `TARGET/.codex/basix/agents` in a project. Managed configuration entries point to
 those private copies; shared agent directories are not used. Project installation
-does not create or manage `.basix`.
+does not create or manage `.basix`. Installers never create `.basix/adrs/`, ADR
+templates, or an initial ADR; agents create the directory and indexes only when a
+project first needs a qualifying ADR.
 
 ## Updates and safety
 
