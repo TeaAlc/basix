@@ -167,6 +167,12 @@ for phrase in (
     "frozen review evidence",
     "--impact configure-tmux",
     "release-gate-podman.sh",
+    "Quality gates exclude `.basix/` entirely",
+    "filter them from automatic change discovery",
+    "reject explicit `.basix/` paths",
+    "explicitly provide read-only paths to the plan or ADR files",
+    "the verifier reads only those named context files",
+    "the parent decides which paths are relevant",
 ):
     assert phrase in development_flat, phrase
 standard_aggregate = (root.parent / "test/verify-basix.sh").read_text()
@@ -255,7 +261,13 @@ verifier = tomllib.loads(verifier_path.read_text())
 assert verifier["name"] == "basix_verifier"
 assert verifier["model"] == "gpt-5.6-luna" and verifier["model_reasoning_effort"] == "xhigh"
 assert verifier["sandbox_mode"] == "read-only"
-for phrase in ("immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent", "write freeze"):
+for phrase in (
+    "immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent", "write freeze",
+    "explicit read-only paths to plan or ADR files",
+    "The parent decides which context files are relevant",
+    "Never scan `.basix/`",
+    "evidence context rather than mutable",
+):
     assert phrase in verifier["developer_instructions"], phrase
 for phrase in ("Fingerprint", "target drift", "cycle_revision", "followup_task", "send exactly one `final_result`"):
     assert phrase not in verifier["developer_instructions"], phrase
@@ -313,8 +325,26 @@ for phrase in (
     "maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies",
     "Delegate token-intensive, bounded work when its result outweighs the added context",
     "`(Subagent Task: <subagent_type>)`",
-    "active plan as `plans/<name>.md`",
-    "completed plans to `plans/archive/`",
+    "Save every new plan as `.basix/plans/<stem>-NNN.md`",
+    "canonical decimal suffix of at least three digits",
+    "zero-padded to a minimum width of three without redundant leading zeros",
+    "starting at `001` (for example `001`, `010`, `999`, `1000`; not `000`, `01`, or `0001`)",
+    "inspect only direct files in the active `.basix/plans/` directory and `.basix/plans/archive/`",
+    "ignore other nested directories",
+    "logical stem by removing a final `-NNN.md` from the basename",
+    "If no matching numbered file exists for that stem, use `001`",
+    "one greater than the highest existing valid suffix",
+    "Never reuse a lower number or overwrite any existing path",
+    "Existing unsuffixed plans are legacy",
+    "do not rename them",
+    "never create another unsuffixed plan",
+    "starts at `001` unless numbered successors exist",
+    "Treat malformed suffixes as legacy",
+    "preserve them",
+    "exclude them from numbering",
+    "without silently overwriting them",
+    "Number each logical stem independently",
+    "Move a replaced or completed plan to `.basix/plans/archive/` with its exact numbered basename",
     "After each phase, update the remaining plan from its results",
     "At each phase, change affected parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens; keep the overall goal authoritative",
     "new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens",
@@ -328,6 +358,62 @@ for phrase in (
     "otherwise make and document reasoned assumptions",
 ):
     assert planning_section.count(phrase) == 1, phrase
+
+def next_plan_basename(stem, active_files, archived_files):
+    """Model direct-file scanning and canonical highest-plus-one allocation."""
+    suffixes = []
+    occupied = set(active_files) | set(archived_files)
+    pattern = re.compile(rf"^{re.escape(stem)}-(\d+)\.md$")
+    for pathname in occupied:
+        if "/" in pathname:
+            continue
+        basename = pathname
+        match = pattern.fullmatch(basename)
+        if not match:
+            continue
+        suffix = match.group(1)
+        if (
+            len(suffix) >= 3
+            and int(suffix) >= 1
+            and suffix == str(int(suffix)).zfill(3)
+        ):
+            suffixes.append(int(suffix))
+    next_number = max(suffixes, default=0) + 1
+    candidate = f"{stem}-{next_number:03d}.md"
+    assert candidate not in occupied
+    return candidate
+
+release_active = [
+    "release-gate-001.md", "release-gate-003.md", "release-gate.md",
+    "release-gate-000.md", "release-gate-01.md", "release-gate-0001.md",
+    "nested/release-gate-998.md",
+]
+release_archive = [
+    "release-gate-004.md", "unrelated-099.md", "nested/release-gate-999.md",
+]
+assert next_plan_basename("release-gate", release_active, release_archive) == "release-gate-005.md"
+assert next_plan_basename(
+    "new-plan", ["new-plan.md", "new-plan-000.md", "new-plan-01.md", "new-plan-0001.md"], []
+) == "new-plan-001.md"
+assert next_plan_basename("unrelated", ["unrelated-002.md"], []) == "unrelated-003.md"
+assert next_plan_basename("release-gate", ["release-gate-999.md"], []) == "release-gate-1000.md"
+
+def move_to_archive(active_files, archived_files, basename):
+    assert basename in active_files
+    if basename in archived_files:
+        raise FileExistsError(basename)
+    return [name for name in active_files if name != basename], archived_files + [basename]
+
+remaining, archived = move_to_archive(
+    ["release-gate-005.md"], ["release-gate-004.md"], "release-gate-005.md"
+)
+assert remaining == [] and archived[-1] == "release-gate-005.md"
+try:
+    move_to_archive(["release-gate-005.md"], ["release-gate-005.md"], "release-gate-005.md")
+except FileExistsError:
+    pass
+else:
+    raise AssertionError("archive collision must not overwrite an existing path")
 assert "Run Python with `PYTHONDONTWRITEBYTECODE=1`" in policy
 for phrase in (
     "## Basix conventions",
@@ -521,6 +607,10 @@ for phrase in (
     "direct spawning parent",
     "never forwards a child message automatically",
     "Contract 1.4 is the sole source for runtime communication",
+    "explicit read-only paths to plan or ADR files",
+    "the parent chooses those paths",
+    "never scans `.basix/`",
+    "Quality gates remain forbidden from inspecting `.basix/`",
 ):
     assert phrase in agent_docs, phrase
 

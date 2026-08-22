@@ -94,18 +94,18 @@ if ((${#CHANGED_FILES[@]} == 0)); then
   if [[ -n $BASE ]]; then
     git -C "$ROOT" rev-parse --verify "$BASE^{commit}" >/dev/null 2>&1 || die "base revision is invalid: $BASE"
     while IFS= read -r path; do
-      [[ -z $path ]] || CHANGED_FILES+=("$(normalize_path "$path")")
+      [[ -z $path || $path == .basix || $path == .basix/* ]] || CHANGED_FILES+=("$(normalize_path "$path")")
     done < <(git -C "$ROOT" diff --name-only "$BASE" --)
   else
     while IFS= read -r path; do
-      [[ -z $path ]] || CHANGED_FILES+=("$(normalize_path "$path")")
+      [[ -z $path || $path == .basix || $path == .basix/* ]] || CHANGED_FILES+=("$(normalize_path "$path")")
     done < <(git -C "$ROOT" diff --name-only --)
     while IFS= read -r path; do
-      [[ -z $path ]] || CHANGED_FILES+=("$(normalize_path "$path")")
+      [[ -z $path || $path == .basix || $path == .basix/* ]] || CHANGED_FILES+=("$(normalize_path "$path")")
     done < <(git -C "$ROOT" diff --cached --name-only --)
   fi
   while IFS= read -r path; do
-    [[ -z $path ]] || CHANGED_FILES+=("$(normalize_path "$path")")
+    [[ -z $path || $path == .basix || $path == .basix/* ]] || CHANGED_FILES+=("$(normalize_path "$path")")
   done < <(git -C "$ROOT" ls-files --others --exclude-standard)
 fi
 ((${#CHANGED_FILES[@]} > 0)) || die 'no changed paths supplied or found; fail-closed scope selection'
@@ -118,6 +118,7 @@ for path in "${CHANGED_FILES[@]}"; do
   seen[$path]=1
   case $path in
     .agents/*|.codex/*) die "runtime-managed path is outside source scope: $path" ;;
+    .basix|.basix/*) die "quality-gate scope excludes .basix paths: $path" ;;
   esac
   if [[ ! -e $ROOT/$path ]] && ! git -C "$ROOT" ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
     die "changed path is neither present nor tracked: $path"
@@ -163,6 +164,9 @@ declare -A before_hash=()
 for spec in "${IMMUTABLES[@]}"; do
   [[ $spec == *=* ]] || die "immutable value must be FILE=SHA256: $spec"
   file=${spec%%=*}; expected=${spec#*=}; file=$(normalize_path "$file")
+  case $file in
+    .basix|.basix/*) die "quality-gate scope excludes .basix paths: $file" ;;
+  esac
   [[ $expected =~ ^[[:xdigit:]]{64}$ ]] || die "immutable hash must be 64 hexadecimal characters: $spec"
   [[ -f $ROOT/$file ]] || die "immutable file does not exist: $file"
   actual=$(sha256sum "$ROOT/$file" | awk '{print $1}')

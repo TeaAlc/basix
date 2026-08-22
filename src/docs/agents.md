@@ -127,6 +127,11 @@ completes the change, and starts a fresh verifier. A final report contains scope
 checks, evidence-backed findings, unverified checks, worker-claim mismatches,
 concrete actions, and whether fresh re-verification is required.
 
+The parent may also provide explicit read-only paths to plan or ADR files needed as
+verification context; the parent chooses those paths. The verifier reads only the
+named files, never scans `.basix/`, and treats them as context rather than mutable
+targets. Quality gates remain forbidden from inspecting `.basix/`.
+
 Use this complete verifier start-assignment shape (fill every field before spawning):
 
 ```text

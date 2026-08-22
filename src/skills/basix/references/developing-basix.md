@@ -55,6 +55,13 @@ overlap mutable writers or a verifier with a mutable target. After a correction,
 rerun focused gates and restart the frozen review; run expensive aggregates once
 the final diff is frozen.
 
+Quality gates exclude `.basix/` entirely: do not include its paths in discovered
+scope, diff checks, or gate commands; filter them from automatic change discovery
+and reject explicit `.basix/` paths. A verifier is separate: its spawning parent
+may explicitly provide read-only paths to the plan or ADR files needed for the
+result, and the verifier reads only those named context files rather than scanning
+`.basix/`; the parent decides which paths are relevant.
+
 Capture complete output in a recoverable log directory and report only the
 selected reason, status, duration, and concise failure context. The reusable
 selector is `src/scripts/run-quality-gates.sh`; repository-specific paths,

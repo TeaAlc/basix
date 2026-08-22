@@ -61,6 +61,9 @@ qg_classify_path() {
       QG_KNOWN=1
       QG_REQUIRED_GATES=(static-policy basix-aggregate)
       ;;
+    .basix/*)
+      QG_KNOWN=0
+      ;;
     src/docs/*|plans/*|*.md|*.txt)
       QG_KNOWN=1
       ;;

@@ -6,7 +6,7 @@ RUNNER="$ROOT/src/scripts/run-quality-gates.sh"
 PROFILE="$ROOT/src/scripts/quality-gates/basix.sh"
 CUSTOM_PROFILE="$ROOT/src/scripts/quality-gates/custom.sh"
 tmp=$(mktemp -d)
-untracked="$ROOT/plans/.quality-gate-trailing.txt"
+untracked="$ROOT/src/docs/.quality-gate-trailing.txt"
 trap 'rm -rf "$tmp" "$untracked" "$CUSTOM_PROFILE"' EXIT
 
 bash -n "$RUNNER" "$PROFILE"
@@ -52,7 +52,24 @@ set -e
 [[ $status -eq 2 ]]
 grep -Fq 'require an explicit --impact' "$tmp/unknown.err"
 
-docs=$($RUNNER --changed-file plans/developer-instruction-quality-gates-001.md --impact docs --log-dir "$tmp/docs-logs")
+set +e
+$RUNNER --changed-file .basix/memory.toml --dry-run >"$tmp/basix.out" 2>"$tmp/basix.err"
+status=$?
+set -e
+[[ $status -eq 2 ]]
+grep -Fq 'quality-gate scope excludes .basix paths' "$tmp/basix.err"
+
+set +e
+$RUNNER \
+  --changed-file src/docs/architecture.md \
+  --immutable ".basix/memory.toml=0000000000000000000000000000000000000000000000000000000000000000" \
+  --dry-run >"$tmp/basix-immutable.out" 2>"$tmp/basix-immutable.err"
+status=$?
+set -e
+[[ $status -eq 2 ]]
+grep -Fq 'quality-gate scope excludes .basix paths' "$tmp/basix-immutable.err"
+
+docs=$($RUNNER --changed-file src/docs/architecture.md --impact docs --log-dir "$tmp/docs-logs")
 grep -Fq 'selected=scope diff-check' <<<"$docs"
 grep -Fq 'all automated gates passed' <<<"$docs"
 if grep -Fq 'All deterministic' <<<"$docs"; then exit 1; fi
@@ -72,7 +89,7 @@ grep -Fq 'all automated gates passed' <<<"$policy"
 
 set +e
 $RUNNER \
-  --changed-file plans/developer-instruction-quality-gates-001.md \
+  --changed-file src/docs/architecture.md \
   --impact docs \
   --immutable "src/setup/developer_instruction.md=0000000000000000000000000000000000000000000000000000000000000000" \
   --log-dir "$tmp/failure-logs" >"$tmp/failure.out" 2>"$tmp/failure.err"
@@ -83,7 +100,7 @@ grep -Fq 'immutable target changed before gates' "$tmp/failure.err"
 
 set +e
 $RUNNER \
-  --changed-file plans/developer-instruction-quality-gates-001.md \
+  --changed-file src/docs/architecture.md \
   --immutable "src/setup/developer_instruction.md=bad" \
   --dry-run >"$tmp/bad-immutable.out" 2>"$tmp/bad-immutable.err"
 status=$?
@@ -93,7 +110,7 @@ grep -Fq 'immutable hash must be 64 hexadecimal characters' "$tmp/bad-immutable.
 
 printf 'bad trailing  \n' >"$untracked"
 set +e
-$RUNNER --changed-file plans/.quality-gate-trailing.txt --impact docs --log-dir "$tmp/untracked-logs" >"$tmp/untracked.out" 2>"$tmp/untracked.err"
+$RUNNER --changed-file src/docs/.quality-gate-trailing.txt --impact docs --log-dir "$tmp/untracked-logs" >"$tmp/untracked.out" 2>"$tmp/untracked.err"
 status=$?
 set -e
 [[ $status -eq 1 ]]
@@ -110,9 +127,9 @@ printf '%s\n' \
   "qg_gate_command() { [[ \$1 == smoke-gate ]] || return 2; QG_COMMAND=(bash -c 'printf custom-gate\\\\n'); }" \
   "qg_gate_reason() { [[ \$1 == smoke-gate ]] || return 2; printf 'custom profile gate'; }" \
   >"$CUSTOM_PROFILE"
-custom=$($RUNNER --profile custom --changed-file plans/developer-instruction-quality-gates-001.md --impact smoke --dry-run)
+custom=$($RUNNER --profile custom --changed-file src/docs/architecture.md --impact smoke --dry-run)
 grep -Fq 'selected=scope diff-check smoke-gate' <<<"$custom"
-custom_run=$($RUNNER --profile custom --changed-file plans/developer-instruction-quality-gates-001.md --impact smoke --log-dir "$tmp/custom-logs")
+custom_run=$($RUNNER --profile custom --changed-file src/docs/architecture.md --impact smoke --log-dir "$tmp/custom-logs")
 grep -Fq 'PASS smoke-gate' <<<"$custom_run"
 
 printf 'ok - quality-gate selection, fail-closed scope, logging, and frozen evidence\n'
