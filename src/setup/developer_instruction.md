@@ -2,11 +2,11 @@
 
 ## Basix conventions
 
-- Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`.
+- Run Python with `PYTHONDONTWRITEBYTECODE=1`.
 - Do not use gender-inclusive language unless the user explicitly requests it.
-- Before using a Basix agent or specialized Basix skill, first read the available `basix` router skill completely.
-- Before spawning a Basix agent, also read the router's referenced communication contract completely.
-- Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it.
+- Before using a Basix agent or specialized Basix skill, read the complete `basix` router skill.
+- Before spawning a Basix agent, read the complete communication contract referenced by the router.
+- Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it.
 - For Scrapling MCP tool calls, the calling agent is the MCP client: generate a canonical RFC 4122 UUID v4 from a cryptographically secure system source and pass it as `client_id` on every tool call. Reuse the same ID for related session calls and give it to a subagent only when deliberately sharing that session capability; never log it or substitute `default`, a `session_id`, or a server-generated placeholder.
 
 ## Planning
@@ -16,10 +16,9 @@
   - **Goal:** Required end state.
   - **Work:** Work packages and dependencies.
   - **QS:** Concrete completion checks.
-  - **Learnings:** New findings, assumptions, risks, and decisions. Assess durable insights for `memory.toml` and retain qualifying ones under the memory rules.
+  - **Learnings:** New findings, assumptions, risks, and decisions; assess durable insights for `memory.toml` and retain qualifying ones under the memory rules.
 - Order work for maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies. Delegate token-intensive, bounded work when its result outweighs the added context, marking it `(Subagent Task: <subagent_type>)`.
-- Store the active plan as `plans/<name>.md`; move replaced or completed plans to `plans/archive/`. After each phase, update the remaining plan from its results.
-- After each phase, change affected plan parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens. Keep the overall goal authoritative.
+- Store the active plan as `plans/<name>.md`; move replaced or completed plans to `plans/archive/`. After each phase, update the remaining plan from its results. At each phase, change affected parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens; keep the overall goal authoritative.
 - Estimate total effort before work begins. Above 5 million expected tokens, ask whether to compact after every phase. If enabled, each phase closure must preserve, compactly but completely, everything needed to continue: findings, decisions, dependencies, and discovery results.
 - Ask clarifying questions only when answers can materially affect scope, architecture, priorities, or implementation. Resolve material uncertainty iteratively; otherwise make and document reasoned assumptions.
 
@@ -45,9 +44,7 @@
 
 ## Completion and commits
 
-- After `/root` finishes its changes, wait for every running verification and test to complete successfully.
-- If the work took place in a Git repository, `/root` must then commit only the task's changes using a Conventional Commits message.
-- Do not commit while any verification or test is still running, or if any verification or test failed.
+- After `/root` finishes its changes, wait for every running verification and test to finish successfully. In a Git repository, `/root` must then commit only the task's changes with a Conventional Commits message; never commit while any verification or test is running or has failed.
 
 ## Basix agent spawning
 

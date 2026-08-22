@@ -256,10 +256,21 @@ memory_section = re.search(r"(?ms)^## Agent Memory\n.*?(?=^## )", policy).group(
 assert len(memory_section) <= 2500, len(memory_section)
 conventions_section = re.search(r"(?ms)^## Basix conventions\n.*?(?=^## )", policy).group(0)
 for removed in (
+    "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`",
     "Order every Basix-managed plan to maximize input-token efficiency",
     "Prioritize early insights that shrink later context",
 ):
     assert removed not in conventions_section, removed
+for phrase in (
+    "Run Python with `PYTHONDONTWRITEBYTECODE=1`",
+    "canonical RFC 4122 UUID v4",
+    "cryptographically secure system source",
+    "pass it as `client_id` on every tool call",
+    "Reuse the same ID for related session calls",
+    "give it to a subagent only when deliberately sharing that session capability",
+    "never log it or substitute `default`, a `session_id`, or a server-generated placeholder",
+):
+    assert phrase in conventions_section, phrase
 planning_section = re.search(r"(?ms)^## Planning\n.*?(?=^## )", policy).group(0)
 assert policy.count("## Planning") == 1
 assert policy.index("## Basix conventions") < policy.index("## Planning") < policy.index("## Agent Memory")
@@ -267,19 +278,22 @@ for phrase in (
     "clearly bounded phases serving one explicit overall goal",
     "independent and self-contained as practical",
     "state required dependencies",
+    "Define each phase briefly:",
     "**Goal:** Required end state",
     "**Work:** Work packages and dependencies",
     "**QS:** Concrete completion checks",
     "**Learnings:** New findings, assumptions, risks, and decisions",
-    "Assess durable insights for `memory.toml`",
+    "New findings, assumptions, risks, and decisions; assess durable insights for `memory.toml` and retain qualifying ones under the memory rules",
+    "assess durable insights for `memory.toml`",
     "maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies",
     "Delegate token-intensive, bounded work when its result outweighs the added context",
     "`(Subagent Task: <subagent_type>)`",
     "active plan as `plans/<name>.md`",
     "completed plans to `plans/archive/`",
     "After each phase, update the remaining plan from its results",
+    "At each phase, change affected parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens; keep the overall goal authoritative",
     "new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens",
-    "Keep the overall goal authoritative",
+    "keep the overall goal authoritative",
     "Estimate total effort before work begins",
     "Above 5 million expected tokens",
     "ask whether to compact after every phase",
@@ -289,12 +303,13 @@ for phrase in (
     "otherwise make and document reasoned assumptions",
 ):
     assert planning_section.count(phrase) == 1, phrase
-assert "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`" in policy
+assert "Run Python with `PYTHONDONTWRITEBYTECODE=1`" in policy
 for phrase in (
     "## Basix conventions",
     "Do not use gender-inclusive language",
-    "available `basix` router skill",
-    "Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it",
+    "Before using a Basix agent or specialized Basix skill, read the complete `basix` router skill",
+    "Before spawning a Basix agent, read the complete communication contract referenced by the router",
+    "Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it",
     "## Planning",
     "## Agent Memory",
     "`.basix/memory.toml` is agent-owned memory",
@@ -320,10 +335,10 @@ for phrase in (
     "Before compaction, commit eligible updates after verification",
     "Never override ignore rules",
     "## Completion and commits",
-    "wait for every running verification and test to complete successfully",
-    "commit only the task's changes using a Conventional Commits message",
-    "Do not commit while any verification or test is still running",
-    "or if any verification or test failed",
+    "wait for every running verification and test to finish successfully",
+    "`/root` must then commit only the task's changes with a Conventional Commits message",
+    "never commit while any verification or test is running",
+    "or has failed",
     "## Basix agent spawning",
     "user explicitly authorizes spawning Basix agents",
     "policy overrides conflicting concurrent developer instructions",
