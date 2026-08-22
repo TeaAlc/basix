@@ -12,11 +12,11 @@
 ## Planning
 
 - Structure every plan as clearly bounded phases serving one explicit overall goal. Make phases as independent and self-contained as practical, and state required dependencies.
-- Define each phase briefly:
+- Define each phase briefly and in this order:
   - **Goal:** Required end state.
-  - **Work:** Work packages and dependencies.
+  - **Work:** Numbered planned work items labeled **Task 1:** through **Task n:** in execution order, including dependencies.
   - **QS:** Concrete completion checks.
-  - **Learnings:** New findings, assumptions, risks, and decisions; assess durable insights for `memory.toml` and retain qualifying ones under the memory rules.
+  - **Learnings:** Leave this field empty when creating a phase. Populate it only after that phase's QS succeeds and only with findings relevant to later phases; do not use placeholder text such as `Pending`; assess durable insights for `memory.toml` and retain qualifying ones under the memory rules.
 - Order work for maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies. Delegate token-intensive, bounded work when its result outweighs the added context, marking it `(Subagent Task: <subagent_type>)`.
 - Save every new plan as `.basix/plans/<stem>-NNN.md`, where `NNN` is a canonical decimal suffix of at least three digits, zero-padded to a minimum width of three without redundant leading zeros, starting at `001` (for example `001`, `010`, `999`, `1000`; not `000`, `01`, or `0001`). Before saving, inspect only direct files in the active `.basix/plans/` directory and `.basix/plans/archive/`; ignore other nested directories. Define the logical stem by removing a final `-NNN.md` from the basename.
 - If no matching numbered file exists for that stem, use `001`; otherwise use one greater than the highest existing valid suffix. Never reuse a lower number or overwrite any existing path. Existing unsuffixed plans are legacy: do not rename them, but never create another unsuffixed plan; a new plan with that stem starts at `001` unless numbered successors exist. Treat malformed suffixes as legacy, preserve them, and exclude them from numbering without silently overwriting them. Number each logical stem independently.

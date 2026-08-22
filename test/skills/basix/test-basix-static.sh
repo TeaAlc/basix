@@ -315,12 +315,15 @@ for phrase in (
     "clearly bounded phases serving one explicit overall goal",
     "independent and self-contained as practical",
     "state required dependencies",
-    "Define each phase briefly:",
+    "Define each phase briefly and in this order:",
     "**Goal:** Required end state",
-    "**Work:** Work packages and dependencies",
+    "**Work:** Numbered planned work items labeled **Task 1:** through **Task n:** in execution order, including dependencies",
+    "**Task 1:** through **Task n:**",
     "**QS:** Concrete completion checks",
-    "**Learnings:** New findings, assumptions, risks, and decisions",
-    "New findings, assumptions, risks, and decisions; assess durable insights for `memory.toml` and retain qualifying ones under the memory rules",
+    "**Learnings:** Leave this field empty when creating a phase",
+    "Populate it only after that phase's QS succeeds",
+    "only with findings relevant to later phases",
+    "do not use placeholder text such as `Pending`",
     "assess durable insights for `memory.toml`",
     "maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies",
     "Delegate token-intensive, bounded work when its result outweighs the added context",
@@ -358,6 +361,18 @@ for phrase in (
     "otherwise make and document reasoned assumptions",
 ):
     assert planning_section.count(phrase) == 1, phrase
+
+phase_fields = (
+    "  - **Goal:** Required end state.",
+    "  - **Work:** Numbered planned work items labeled **Task 1:** through **Task n:** in execution order, including dependencies.",
+    "  - **QS:** Concrete completion checks.",
+    "  - **Learnings:** Leave this field empty when creating a phase.",
+)
+assert all(field in planning_section for field in phase_fields)
+assert [planning_section.index(field) for field in phase_fields] == sorted(
+    planning_section.index(field) for field in phase_fields
+)
+assert "initially `Pending`" not in planning_section
 
 adr_section = re.search(r"(?ms)^## Architecture Decision Records \(ADRs\)\n.*?(?=^## )", policy).group(0)
 assert policy.count("## Architecture Decision Records (ADRs)") == 1
