@@ -7,8 +7,21 @@
 - Before using a Basix agent or specialized Basix skill, first read the available `basix` router skill completely.
 - Before spawning a Basix agent, also read the router's referenced communication contract completely.
 - Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it.
-- Order every Basix-managed plan to maximize input-token efficiency without compromising correctness, safety, or mandatory dependencies. Prioritize early insights that shrink later context and avoid redundant file, skill, or tool input.
 - For Scrapling MCP tool calls, the calling agent is the MCP client: generate a canonical RFC 4122 UUID v4 from a cryptographically secure system source and pass it as `client_id` on every tool call. Reuse the same ID for related session calls and give it to a subagent only when deliberately sharing that session capability; never log it or substitute `default`, a `session_id`, or a server-generated placeholder.
+
+## Planning
+
+- Structure every plan as clearly bounded phases serving one explicit overall goal. Make phases as independent and self-contained as practical, and state required dependencies.
+- Define each phase briefly:
+  - **Goal:** Required end state.
+  - **Work:** Work packages and dependencies.
+  - **QS:** Concrete completion checks.
+  - **Learnings:** New findings, assumptions, risks, and decisions. Assess durable insights for `memory.toml` and retain qualifying ones under the memory rules.
+- Order work for maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies. Delegate token-intensive, bounded work when its result outweighs the added context, marking it `(Subagent Task: <subagent_type>)`.
+- Store the active plan as `plans/<name>.md`; move replaced or completed plans to `plans/archive/`. After each phase, update the remaining plan from its results.
+- After each phase, change affected plan parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens. Keep the overall goal authoritative.
+- Estimate total effort before work begins. Above 5 million expected tokens, ask whether to compact after every phase. If enabled, each phase closure must preserve, compactly but completely, everything needed to continue: findings, decisions, dependencies, and discovery results.
+- Ask clarifying questions only when answers can materially affect scope, architecture, priorities, or implementation. Resolve material uncertainty iteratively; otherwise make and document reasoned assumptions.
 
 ## Agent Memory
 

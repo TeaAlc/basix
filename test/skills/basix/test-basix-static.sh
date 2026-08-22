@@ -254,16 +254,48 @@ for phrase in ("`/root` is the fixed principal", "sets `agent_level`",
     assert phrase in policy, phrase
 memory_section = re.search(r"(?ms)^## Agent Memory\n.*?(?=^## )", policy).group(0)
 assert len(memory_section) <= 2500, len(memory_section)
+conventions_section = re.search(r"(?ms)^## Basix conventions\n.*?(?=^## )", policy).group(0)
+for removed in (
+    "Order every Basix-managed plan to maximize input-token efficiency",
+    "Prioritize early insights that shrink later context",
+):
+    assert removed not in conventions_section, removed
+planning_section = re.search(r"(?ms)^## Planning\n.*?(?=^## )", policy).group(0)
+assert policy.count("## Planning") == 1
+assert policy.index("## Basix conventions") < policy.index("## Planning") < policy.index("## Agent Memory")
+for phrase in (
+    "clearly bounded phases serving one explicit overall goal",
+    "independent and self-contained as practical",
+    "state required dependencies",
+    "**Goal:** Required end state",
+    "**Work:** Work packages and dependencies",
+    "**QS:** Concrete completion checks",
+    "**Learnings:** New findings, assumptions, risks, and decisions",
+    "Assess durable insights for `memory.toml`",
+    "maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies",
+    "Delegate token-intensive, bounded work when its result outweighs the added context",
+    "`(Subagent Task: <subagent_type>)`",
+    "active plan as `plans/<name>.md`",
+    "completed plans to `plans/archive/`",
+    "After each phase, update the remaining plan from its results",
+    "new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens",
+    "Keep the overall goal authoritative",
+    "Estimate total effort before work begins",
+    "Above 5 million expected tokens",
+    "ask whether to compact after every phase",
+    "findings, decisions, dependencies, and discovery results",
+    "Ask clarifying questions only when answers can materially affect scope, architecture, priorities, or implementation",
+    "Resolve material uncertainty iteratively",
+    "otherwise make and document reasoned assumptions",
+):
+    assert planning_section.count(phrase) == 1, phrase
 assert "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`" in policy
 for phrase in (
     "## Basix conventions",
     "Do not use gender-inclusive language",
     "available `basix` router skill",
     "Do not reread skill, agent, or reference instructions that you already have in context unless the user explicitly requests it",
-    "Order every Basix-managed plan to maximize input-token efficiency",
-    "without compromising correctness, safety, or mandatory dependencies",
-    "Prioritize early insights that shrink later context",
-    "avoid redundant file, skill, or tool input",
+    "## Planning",
     "## Agent Memory",
     "`.basix/memory.toml` is agent-owned memory",
     "Autonomously create, update, merge, or delete it",
