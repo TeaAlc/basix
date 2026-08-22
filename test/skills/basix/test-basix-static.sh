@@ -145,8 +145,33 @@ development_path = root / "skills/basix/references/developing-basix.md"
 assert development_path.is_file()
 development = development_path.read_text()
 development_flat = " ".join(development.split())
+quality_runner = root / "scripts/run-quality-gates.sh"
+quality_profile = root / "scripts/quality-gates/basix.sh"
+assert quality_runner.is_file() and quality_profile.is_file()
+assert "## Risk-based quality gates" in development
+for phrase in (
+    "smallest gate set proven sufficient",
+    "failure surface",
+    "syntax or format checks",
+    "frozen independent review",
+    "Never omit a gate merely because it is slow",
+    "Fail closed when scope, base",
+    "independent read-only gates concurrently",
+    "recoverable log directory",
+    "run-quality-gates.sh",
+    "quality-gates/",
+    "test-basix-static.sh",
+    "test-setup-support.sh",
+    "verify-basix.sh",
+    "test-setup.sh",
+    "frozen review evidence",
+    "--impact configure-tmux",
+    "release-gate-podman.sh",
+):
+    assert phrase in development_flat, phrase
 standard_aggregate = (root.parent / "test/verify-basix.sh").read_text()
 assert "test/skills/configure-tmux/test-configure-tmux-suite.sh" not in standard_aggregate
+assert "test/scripts/test-run-quality-gates.sh" in standard_aggregate
 assert "Follow all active instructions inside the managed" in router
 assert "`basix:developer-instructions` block" in router
 assert "does not replace or override them" in router

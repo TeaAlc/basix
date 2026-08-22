@@ -20,6 +20,11 @@ assert "[developing-basix.md](references/developing-basix.md) completely" in rou
 assert "Do not load that reference merely because" in router_flat
 development = (root / "src/skills/basix/references/developing-basix.md").read_text()
 development_flat = " ".join(development.split())
+assert (root / "src/scripts/run-quality-gates.sh").is_file()
+assert (root / "src/scripts/quality-gates/basix.sh").is_file()
+assert "## Risk-based quality gates" in development
+assert "Fail closed when scope, base" in development_flat
+assert "run-quality-gates.sh" in development_flat
 assert "select tests" in development_flat and "changed components and their dependents" in development_flat
 assert "Run the selected test paths explicitly" in development_flat
 assert "report each command together with the change it covers" in development_flat
