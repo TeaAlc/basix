@@ -198,3 +198,13 @@ insight = "Marker ownership is insufficient for TOML safety: managed blocks must
 date = "2026-08-23"
 category = "Verification"
 insight = "Round-trip tests must compare exact LF/CRLF/no-final foreign bytes; managed insertion separators and assignment line endings need reversible ownership, not only semantic TOML equality."
+
+[[entries]]
+date = "2026-08-23"
+category = "Verification"
+insight = "Capability-specific permission installers must reject foreign network_proxy values even when only a Unix test socket is enabled; otherwise socket-only mode silently inherits broader network behavior."
+
+[[entries]]
+date = "2026-08-23"
+category = "Verification"
+insight = "Disabling all managed capabilities must still validate shared default, network_proxy, and profile ownership keys before returning unchanged; fail-closed removal is part of the safety contract."

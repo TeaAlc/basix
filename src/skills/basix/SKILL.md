@@ -13,6 +13,8 @@ and points source-repository work to its separate development guidance.
   it does not replace or override them.
 - In an installed skill, resolve skill-local scripts, references, and assets
   relative to the directory containing that skill's `SKILL.md`.
+- When a project is installed with the `test-socket` permission, tests may use
+  exactly `<repopath>/test/test.sock`; Basix does not allow any other Unix socket.
 - Write all technical content in English. Write user-facing chat messages in the
   language of the current conversation, inferred from the conversation rather than
   from repository content or quoted text.

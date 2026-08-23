@@ -426,6 +426,464 @@ def playwright_check_text(text: str, mode: str) -> str:
     raise ConfigError(f"unsupported Playwright check mode: {mode}")
 
 
+# The legacy Playwright implementation above remains available only to validate
+# and migrate configurations written by released Basix versions. New installs
+# use the purpose-oriented capability names below.
+CAPABILITY_DEFAULT_START = "# basix:local-access-default:start"
+CAPABILITY_DEFAULT_END = "# basix:local-access-default:end"
+CAPABILITY_FEATURE_START = "# basix:local-network-feature:start"
+CAPABILITY_FEATURE_END = "# basix:local-network-feature:end"
+CAPABILITY_PROFILE_START = "# basix:local-access-profile:start"
+CAPABILITY_PROFILE_END = "# basix:local-access-profile:end"
+CAPABILITY_SEPARATOR_MARKER = "# basix:local-access-separator:owned"
+
+LOCAL_NETWORK_PROFILE = "local-network"
+TEST_SOCKET_PROFILE = "test-socket"
+COMBINED_PROFILE = "local-network-test-socket"
+
+
+def capability_profile_name(local_network: bool, test_socket: bool) -> str | None:
+    """Return the one effective profile for the requested capabilities.
+
+    Args:
+        local_network: Whether loopback network permissions are requested.
+        test_socket: Whether the repository-local test socket is requested.
+    """
+    if local_network and test_socket:
+        return COMBINED_PROFILE
+    if local_network:
+        return LOCAL_NETWORK_PROFILE
+    if test_socket:
+        return TEST_SOCKET_PROFILE
+    return None
+
+
+def project_socket_path(project_root: Path) -> str:
+    """Return the canonical absolute test socket path for a project root.
+
+    Args:
+        project_root: Project root, which may not exist yet.
+    """
+    root = Path(os.path.realpath(os.fspath(project_root)))
+    if not root.is_absolute():
+        raise ConfigError("project root must be absolute")
+    return os.fspath(root / "test" / "test.sock")
+
+
+def capability_default_block(profile: str) -> str:
+    """Render the managed default permission assignment.
+
+    Args:
+        profile: Effective Basix permission profile name.
+    """
+    return (
+        f"{CAPABILITY_DEFAULT_START}\n"
+        f"default_permissions = {json.dumps(profile)}\n"
+        f"{CAPABILITY_DEFAULT_END}\n"
+    )
+
+
+def capability_feature_block() -> str:
+    """Render the managed local network proxy feature assignment."""
+    return (
+        f"{CAPABILITY_FEATURE_START}\n"
+        "network_proxy = true\n"
+        f"{CAPABILITY_FEATURE_END}\n"
+    )
+
+
+def capability_feature_dotted_block() -> str:
+    """Render the managed dotted local network proxy assignment."""
+    return (
+        f"{CAPABILITY_FEATURE_START}\n"
+        "features.network_proxy = true\n"
+        f"{CAPABILITY_FEATURE_END}\n"
+    )
+
+
+def capability_feature_table_block() -> str:
+    """Render the managed local network proxy table."""
+    return (
+        f"{CAPABILITY_FEATURE_START}\n"
+        "[features]\n"
+        "network_proxy = true\n"
+        f"{CAPABILITY_FEATURE_END}\n"
+    )
+
+
+def capability_profile_block(
+    local_network: bool, test_socket: bool, socket_path: str
+) -> str:
+    """Render one complete managed permission profile.
+
+    Args:
+        local_network: Whether to include loopback network permissions.
+        test_socket: Whether to include the exact Unix test socket permission.
+        socket_path: Absolute canonical repository test socket path.
+    """
+    profile = capability_profile_name(local_network, test_socket)
+    if profile is None:
+        raise ConfigError("at least one local access capability is required")
+    lines = [CAPABILITY_PROFILE_START, f"[permissions.{profile}]", 'extends = ":workspace"', ""]
+    if local_network:
+        lines.extend(
+            [
+                f"[permissions.{profile}.network]",
+                "enabled = true",
+                'mode = "limited"',
+                "allow_local_binding = true",
+                "",
+                f"[permissions.{profile}.network.domains]",
+                '"localhost" = "allow"',
+                '"127.0.0.1" = "allow"',
+                '"::1" = "allow"',
+            ]
+        )
+    if test_socket:
+        if local_network:
+            lines.append("")
+        lines.extend(
+            [
+                f"[permissions.{profile}.network.unix_sockets]",
+                f"{json.dumps(socket_path)} = \"allow\"",
+            ]
+        )
+    lines.extend([CAPABILITY_PROFILE_END, ""])
+    return "\n".join(lines)
+
+
+def capability_mark_block(
+    block: str, newline: str, marker: str = CAPABILITY_SEPARATOR_MARKER
+) -> str:
+    """Mark a capability block whose preceding separator is Basix-owned.
+
+    Args:
+        block: Complete marker-delimited block using ``newline`` endings.
+        newline: Physical line ending used by the surrounding configuration.
+        marker: Ownership marker inserted after the first line.
+    """
+    first, rest = block.split(newline, 1)
+    return f"{first}{newline}{marker}{newline}{rest}"
+
+
+def capability_marker_span(
+    text: str,
+    start: str,
+    end: str,
+    expected: str | tuple[str, ...] | None = None,
+) -> tuple[int, int] | None:
+    """Locate and validate one capability-owned marker pair.
+
+    Args:
+        text: Full TOML configuration text.
+        start: Opening marker line.
+        end: Closing marker line.
+        expected: Exact allowed rendered block(s), when available.
+    """
+    occurrences = text.count(start) + text.count(end)
+    if not occurrences:
+        return None
+    starts = [m for m in re.finditer(rf"(?m)^[ \t]*{re.escape(start)}[ \t]*\r?$", text)]
+    ends = [m for m in re.finditer(rf"(?m)^[ \t]*{re.escape(end)}[ \t]*\r?$", text)]
+    if len(starts) != 1 or len(ends) != 1 or starts[0].start() >= ends[0].start():
+        raise ConfigError("configuration contains damaged or duplicate local-access markers")
+    raw_start = starts[0].start()
+    block_end = ends[0].end()
+    if text.startswith("\r\n", block_end):
+        block_end += 2
+    elif block_end < len(text) and text[block_end] == "\n":
+        block_end += 1
+    actual = text[raw_start:block_end].replace("\r\n", "\n")
+    expected_values = (expected,) if isinstance(expected, str) else expected
+    if expected_values is not None and actual not in expected_values:
+        raise ConfigError("configuration contains a modified local-access block")
+    span_start = raw_start
+    if CAPABILITY_SEPARATOR_MARKER in actual:
+        if text.startswith("\r\n", raw_start - 2):
+            span_start -= 2
+        elif raw_start > 0 and text[raw_start - 1] == "\n":
+            span_start -= 1
+        else:
+            raise ConfigError("local-access separator marker is missing its owned newline")
+    return span_start, block_end
+
+
+def capability_append_block(text: str, block: str) -> str:
+    """Append a managed capability block without rewriting foreign bytes.
+
+    Args:
+        text: Existing configuration text.
+        block: Complete marker-delimited block ending in a newline.
+    """
+    newline = "\r\n" if "\r\n" in text else "\n"
+    rendered = block.replace("\r\n", "\n").replace("\n", newline)
+    separator = "" if not text or text.endswith(newline) else newline
+    if separator and rendered.startswith("# basix:"):
+        rendered = capability_mark_block(rendered, newline)
+    return text + separator + rendered
+
+
+def capability_append_top_level(text: str, block: str) -> str:
+    """Insert a managed block before the first TOML table.
+
+    Args:
+        text: Existing configuration text.
+        block: Complete marker-delimited block ending in a newline.
+    """
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        if re.match(r"^[ \t]*\[\[?[^\]]+\]\]?[ \t]*(?:#.*)?(?:\r?\n)?$", line):
+            prefix, suffix = text[:offset], text[offset:]
+            newline = "\r\n" if "\r\n" in text else "\n"
+            rendered = block.replace("\r\n", "\n").replace("\n", newline)
+            separator = "" if not prefix or prefix.endswith(newline) else newline
+            if separator and rendered.startswith("# basix:"):
+                rendered = capability_mark_block(rendered, newline)
+            return prefix + separator + rendered + suffix
+        offset += len(line)
+    return capability_append_block(text, block)
+
+
+def capability_feature_insert(text: str, parsed: dict) -> str:
+    """Insert the managed proxy feature in a TOML-safe location.
+
+    Args:
+        text: Existing configuration text.
+        parsed: Parsed top-level TOML mapping.
+    """
+    region = table_region(text, "features")
+    if region is not None:
+        start, end = region
+        insertion = text[start:end]
+        newline = "\r\n" if "\r\n" in text else "\n"
+        separator = "" if not insertion or insertion.endswith(newline) else newline
+        block = capability_feature_block().replace("\n", newline)
+        if separator:
+            block = capability_mark_block(block, newline)
+        return text[:end] + separator + block + text[end:]
+    if has_dotted_assignment(text, "features."):
+        return capability_append_top_level(text, capability_feature_dotted_block())
+    if "features" in parsed:
+        raise ConfigError("cannot safely extend foreign inline features configuration")
+    return capability_append_top_level(text, capability_feature_table_block())
+
+
+def capability_expected_spans(text: str, socket_path: str) -> dict[str, tuple[int, int] | None]:
+    """Validate and locate all new managed capability marker pairs.
+
+    Args:
+        text: Full configuration text.
+        socket_path: Absolute canonical repository test socket path.
+    """
+    defaults = tuple(capability_default_block(profile) for profile in (
+        LOCAL_NETWORK_PROFILE, TEST_SOCKET_PROFILE, COMBINED_PROFILE
+    ))
+    profiles = tuple(
+        capability_profile_block(local, socket, socket_path)
+        for local, socket in ((True, False), (False, True), (True, True))
+    )
+    spans = {
+        "default": capability_marker_span(
+            text, CAPABILITY_DEFAULT_START, CAPABILITY_DEFAULT_END,
+            tuple(block for base in defaults for block in (base, capability_mark_block(base, "\n"))),
+        ),
+        "feature": capability_marker_span(
+            text, CAPABILITY_FEATURE_START, CAPABILITY_FEATURE_END,
+            tuple(
+                block
+                for base in (
+                    capability_feature_block(),
+                    capability_feature_dotted_block(),
+                    capability_feature_table_block(),
+                )
+                for block in (base, capability_mark_block(base, "\n"))
+            ),
+        ),
+        "profile": capability_marker_span(
+            text, CAPABILITY_PROFILE_START, CAPABILITY_PROFILE_END,
+            tuple(block for base in profiles for block in (base, capability_mark_block(base, "\n"))),
+        ),
+    }
+    present = [span is not None for span in spans.values()]
+    if any(present) and spans["default"] is None or any(present) and spans["profile"] is None:
+        raise ConfigError("configuration contains incomplete local-access markers")
+    if spans["feature"] is not None:
+        feature_block = text[spans["feature"][0] : spans["feature"][1]].replace("\r\n", "\n")
+        if feature_block.startswith("\n"):
+            feature_block = feature_block[1:]
+        allowed = tuple(
+            block
+            for base in (
+                capability_feature_block(),
+                capability_feature_dotted_block(),
+                capability_feature_table_block(),
+            )
+            for block in (base, capability_mark_block(base, "\n"))
+        )
+        if feature_block not in allowed:
+            raise ConfigError("configuration contains a modified local-network feature block")
+    return spans
+
+
+def capability_profile_is_required(
+    profile: object, local_network: bool, test_socket: bool, socket_path: str
+) -> bool:
+    """Return whether a parsed profile exactly matches a requested combination.
+
+    Args:
+        profile: Parsed ``permissions.<profile>`` mapping.
+        local_network: Whether loopback network permissions are expected.
+        test_socket: Whether the exact Unix test socket is expected.
+        socket_path: Absolute canonical repository test socket path.
+    """
+    expected = tomllib.loads(
+        capability_profile_block(local_network, test_socket, socket_path)
+        .split(CAPABILITY_PROFILE_START + "\n", 1)[1]
+        .rsplit(CAPABILITY_PROFILE_END, 1)[0]
+    )["permissions"][capability_profile_name(local_network, test_socket)]
+    return profile == expected
+
+
+def capability_current_modes(parsed: dict, socket_path: str) -> tuple[bool, bool] | None:
+    """Return the modes represented by a managed effective profile.
+
+    Args:
+        parsed: Parsed TOML mapping.
+        socket_path: Absolute canonical repository test socket path.
+    """
+    default = parsed.get("default_permissions")
+    modes = {
+        LOCAL_NETWORK_PROFILE: (True, False),
+        TEST_SOCKET_PROFILE: (False, True),
+        COMBINED_PROFILE: (True, True),
+    }
+    if default not in modes:
+        return None
+    permissions = parsed.get("permissions")
+    profile = permissions.get(default) if isinstance(permissions, dict) else None
+    local_network, test_socket = modes[default]
+    if not capability_profile_is_required(profile, local_network, test_socket, socket_path):
+        raise ConfigError("local-access profile marker is not an effective managed profile")
+    features = parsed.get("features")
+    has_feature = isinstance(features, dict) and features.get("network_proxy") is True
+    if has_feature != local_network:
+        raise ConfigError("local-network feature marker does not match the effective profile")
+    return local_network, test_socket
+
+
+def capability_validate_foreign(
+    text: str,
+    parsed: dict,
+    spans: dict[str, tuple[int, int] | None],
+    local_network: bool,
+    test_socket: bool,
+    socket_path: str,
+) -> tuple[bool, bool] | None:
+    """Reject unmanaged values that overlap the requested capability boundary.
+
+    Args:
+        text: Full configuration text.
+        parsed: Parsed TOML mapping.
+        spans: New managed marker spans.
+        local_network: Requested loopback network mode.
+        test_socket: Requested Unix test socket mode.
+        socket_path: Absolute canonical repository test socket path.
+    """
+    managed = spans["default"] is not None or spans["profile"] is not None
+    if managed:
+        current = capability_current_modes(parsed, socket_path)
+        if current is None or spans["default"] is None or spans["profile"] is None:
+            raise ConfigError("local-access markers do not describe a managed profile")
+        if current[0] != (spans["feature"] is not None):
+            raise ConfigError("local-network markers are incomplete")
+        return current
+    if spans["feature"] is not None:
+        raise ConfigError("local-network feature marker is incomplete")
+    if "default_permissions" in parsed:
+        raise ConfigError("foreign default_permissions conflicts with Basix local-access settings")
+    features = parsed.get("features")
+    if features is not None and not isinstance(features, dict):
+        raise ConfigError("top-level features must be a table")
+    if isinstance(features, dict) and "network_proxy" in features:
+        raise ConfigError("foreign features.network_proxy conflicts with Basix local-access settings")
+    permissions = parsed.get("permissions")
+    if permissions is not None and not isinstance(permissions, dict):
+        raise ConfigError("top-level permissions must be a table")
+    names = {LOCAL_NETWORK_PROFILE, TEST_SOCKET_PROFILE, COMBINED_PROFILE}
+    conflicts = sorted(name for name in names if isinstance(permissions, dict) and name in permissions)
+    if conflicts:
+        raise ConfigError("foreign permissions profile conflicts with Basix: " + ", ".join(conflicts))
+    if re.search(r"(?m)^[ \t]*features\.network_proxy[ \t]*=", text):
+        raise ConfigError("foreign dotted features.network_proxy conflicts with Basix local-access settings")
+    if not (local_network or test_socket):
+        return None
+    return None
+
+
+def capability_add_text(
+    text: str, project_root: Path, local_network: bool, test_socket: bool
+) -> tuple[str, str]:
+    """Add, update, migrate, or remove the requested local-access settings.
+
+    Args:
+        text: Existing configuration text.
+        project_root: Canonical project root, which may not exist yet.
+        local_network: Whether loopback network permissions are requested.
+        test_socket: Whether the exact Unix test socket is requested.
+    """
+    socket_path = project_socket_path(project_root)
+    parsed = playwright_parse(text)
+    spans = capability_expected_spans(text, socket_path)
+    legacy = playwright_owned_spans(text)
+    if any(span is not None for span in spans.values()) and any(span is not None for span in legacy.values()):
+        raise ConfigError("configuration contains both legacy Playwright and local-access markers")
+    legacy_managed = all(span is not None for span in legacy.values()) and any(
+        span is not None for span in legacy.values()
+    )
+    if any(span is not None for span in legacy.values()) and not legacy_managed:
+        raise ConfigError("configuration contains incomplete legacy Playwright markers")
+    if legacy_managed:
+        playwright_validate_foreign(text, parsed, legacy)
+        current = None
+    else:
+        current = capability_validate_foreign(
+            text, parsed, spans, local_network, test_socket, socket_path
+        )
+    desired = (local_network, test_socket)
+    if current == desired and not legacy_managed:
+        return text, "unchanged"
+    if not local_network and not test_socket:
+        removals = [span for span in (*spans.values(), *legacy.values()) if span is not None]
+        result = text
+        for span in sorted(removals, reverse=True):
+            result = remove_span(result, span)
+        playwright_parse(result)
+        return result, "changed" if result != text else "unchanged"
+    result = text
+    removals = [span for span in (*spans.values(), *legacy.values()) if span is not None]
+    for span in sorted(removals, reverse=True):
+        result = remove_span(result, span)
+    profile = capability_profile_name(local_network, test_socket)
+    result = capability_append_top_level(result, capability_default_block(profile))
+    if local_network:
+        result = capability_feature_insert(result, playwright_parse(result))
+    result = capability_append_block(
+        result, capability_profile_block(local_network, test_socket, socket_path)
+    )
+    playwright_parse(result)
+    return result, "changed"
+
+
+def capability_remove_text(text: str, project_root: Path) -> tuple[str, str]:
+    """Remove only Basix-owned local-access or legacy Playwright settings.
+
+    Args:
+        text: Existing configuration text.
+        project_root: Canonical project root used to validate socket ownership.
+    """
+    return capability_add_text(text, project_root, False, False)
+
+
 def load_agents(source: Path, installed: Path) -> list[tuple[str, Path]]:
     agents: list[tuple[str, Path]] = []
     if not source.is_dir():
@@ -734,16 +1192,18 @@ def main() -> int:
             "agent-check",
             "agent-add",
             "agent-remove",
-            "playwright-check",
-            "playwright-add",
-            "playwright-remove",
+            "permissions-check",
+            "permissions-add",
+            "permissions-remove",
         ),
     )
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--instructions", type=Path)
     parser.add_argument("--agents-source", type=Path)
     parser.add_argument("--agents-dir", type=Path)
-    parser.add_argument("--playwright-mode", choices=("enable", "disable"))
+    parser.add_argument("--project-root", type=Path)
+    parser.add_argument("--local-network-mode", choices=("enable", "disable"))
+    parser.add_argument("--test-socket-mode", choices=("enable", "disable"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--remove-empty-file", action="store_true")
     parser.add_argument("--status-json", action="store_true")
@@ -758,31 +1218,40 @@ def main() -> int:
             original = handle.read()
     else:
         original = ""
-    if args.action.startswith("playwright-"):
-        if args.action == "playwright-check" and not args.playwright_mode:
-            parser.error("playwright-check requires --playwright-mode")
-        if args.action != "playwright-check" and args.playwright_mode:
-            parser.error(f"{args.action} does not accept --playwright-mode")
-        if args.action == "playwright-check":
-            status = playwright_check_text(original, args.playwright_mode)
+    if args.action.startswith("permissions-"):
+        if not args.project_root:
+            parser.error(f"{args.action} requires --project-root")
+        if args.action != "permissions-remove" and (
+            not args.local_network_mode or not args.test_socket_mode
+        ):
+            parser.error(
+                f"{args.action} requires --local-network-mode and --test-socket-mode"
+            )
+        if args.action == "permissions-remove":
+            if args.local_network_mode or args.test_socket_mode:
+                parser.error("permissions-remove does not accept capability modes")
+            updated, status = capability_remove_text(original, args.project_root)
+        else:
+            local_network = args.local_network_mode == "enable"
+            test_socket = args.test_socket_mode == "enable"
+            updated, status = capability_add_text(
+                original, args.project_root, local_network, test_socket
+            )
+        if args.action == "permissions-check":
             result = {"status": status, "action": args.action, "dry_run": True}
             if args.status_json:
                 print(json.dumps(result))
             else:
-                print(f"Playwright configuration check: {status}")
+                print(f"Local access configuration check: {status}")
             return 0
-        if args.action == "playwright-add":
-            updated, status = playwright_add_text(original)
-        else:
-            updated, status = playwright_remove_text(original)
         if status == "changed" and not args.dry_run:
-            if args.action == "playwright-remove" and args.remove_empty_file and not updated.strip():
+            if args.action == "permissions-remove" and args.remove_empty_file and not updated.strip():
                 args.config.unlink(missing_ok=True)
             else:
                 atomic_write(args.config, updated)
         elif (
             status == "unchanged"
-            and args.action == "playwright-remove"
+            and args.action == "permissions-remove"
             and args.remove_empty_file
             and not original.strip()
             and not args.dry_run
@@ -794,9 +1263,9 @@ def main() -> int:
             print(json.dumps(result))
         elif status == "changed":
             verb = "Would update" if args.dry_run else "Updated"
-            print(f"{verb} Basix Playwright configuration: {args.config}")
+            print(f"{verb} Basix local access configuration: {args.config}")
         else:
-            print(f"Basix Playwright configuration already current: {args.config}")
+            print(f"Basix local access configuration already current: {args.config}")
         return 0
     if args.action.startswith("agent-"):
         agents = load_agents(args.agents_source, args.agents_dir)

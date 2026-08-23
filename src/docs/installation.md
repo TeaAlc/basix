@@ -4,17 +4,19 @@ Python 3.11 or newer and the Codex CLI are required.
 
 ```bash
 ./src/setup/install_as_plugin.sh [--dry-run] [--uninstall]
-./src/setup/install_for_project.sh [TARGET] [--dry-run] [--playwright|--no-playwright]
+./src/setup/install_for_project.sh [TARGET] [--dry-run] [--local-network|--no-local-network] [--test-socket|--no-test-socket]
 ./src/setup/install_for_project.sh [TARGET] [--dry-run] --uninstall
 ```
 
 The global installer remains copy-only. The project installer copies every
 complete skill tree and the complete private native-agent tree, never creates
-symlinks, and optionally manages Playwright sandbox permissions in
-`TARGET/.codex/config.toml`. Interactive installs ask `Enable Playwright sandbox
-permissions? [y/N]`; noninteractive installs must explicitly choose
-`--playwright` or `--no-playwright`. `--no-playwright` removes only Basix-owned
-settings and fails closed on foreign overlapping values or damaged markers.
+symlinks, and optionally manages purpose-based local access permissions in
+`TARGET/.codex/config.toml`. Interactive installs ask separately about
+`local-network` and `test-socket`; noninteractive installs must explicitly choose
+one enable/disable flag for each capability. The `test-socket` permission allows
+tests to use exactly `TARGET/test/test.sock`. Disable options remove only
+Basix-owned settings and fail closed on foreign overlapping values or damaged
+markers.
 The global installer also copies plugin and marketplace metadata and registers
 the plugin. The project installer uses the current directory when `TARGET` is
 omitted.
@@ -40,16 +42,20 @@ hash. Locally modified files and foreign contents are preserved, and only empty
 managed directories are pruned. `--dry-run` applies the same checks without
 changing files, configuration, plugin registration, or state.
 
-Playwright permissions enable the `playwright` profile, limited network proxy
-support, and access to `localhost`, `127.0.0.1`, and `::1`. Local port binding is
-allowed for every local port because Codex has no port-level allowlist; the
-installer never promises per-port restriction. Permission changes apply only to
-newly started Codex sessions, so restart Codex after enabling or disabling them.
+`local-network` enables a limited network proxy, access to `localhost`,
+`127.0.0.1`, and `::1`, and local binding for every local port because Codex has
+no port-level allowlist; Playwright is one possible use. `test-socket` permits
+only the absolute project path `TARGET/test/test.sock` under
+`[permissions.<profile>.network.unix_sockets]`. Both options can be enabled
+together; the installer emits one combined effective profile. Permission changes
+apply only to newly started Codex sessions, so restart Codex after changing them.
 
-There is deliberately no legacy detection or migration. Existing Basix,
-Defaultwienix, link-mode, or older bundle installations must be removed with the
-installer version that created them before this version is installed. Unknown old
-state records and artifacts are neither recognized nor changed.
+Exact legacy Basix Playwright permission blocks are recognized and migrated to
+the purpose-based local-access names before mutation. Modified, partial, or
+foreign-overlapping legacy blocks fail closed. Existing Basix, Defaultwienix,
+link-mode, or older bundle installations must still be removed with the
+installer version that created them; unknown old state records and artifacts are
+neither recognized nor changed.
 
 ## Optional Lumen installation
 
@@ -74,5 +80,6 @@ causes a safe exit before filesystem or MCP changes.
 
 Both installers report the target and dry-run state, followed by grouped results.
 The Agents group lists every native agent and marks it as installed, updated, or
-unchanged. Project reports include the Playwright permission transition and its
-restart/local-port warning; the global installer has no Playwright phase.
+unchanged. Project reports include the local access transition and its
+restart/socket or local-port warning; the global installer has no local access
+phase.
