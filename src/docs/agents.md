@@ -18,14 +18,20 @@ work. It autonomously curates the smallest useful set without user approval,
 favoring prevention rules and proven efficiency gains while removing duplicates,
 contradictions, stale knowledge, and facts now durably documented. Memory is
 written at natural work checkpoints rather than through a reflection round after
-every turn. Entries use an ISO date, one of the fixed English categories, and an
-insight limited to three sentences and 32 words. Secrets, private personal data,
+every turn. Entries use an ISO date, one of the fixed English categories, an
+actionable insight limited to three sentences and 32 words, and a non-negative
+integer `usefulness` counter initialized to `0`. Secrets, private personal data,
 guesses, raw conversation history, and transient task status are excluded. A
 `Subagent Insight` entry additionally records the exact delegated role as
-`subagent_type`; other categories retain the legacy three-field shape. Root evaluates
-every final-result proposal for strong evidence and usefulness in future assignments,
-result evaluation, or status interpretation. It may preserve meaning while rewriting
-an accepted proposal to 32 words, and stores every accepted insight separately.
+`subagent_type`. At the final memory checkpoint before committing, Root increases
+`usefulness` exactly once by `+1` when an insight helped solve the session's work or
+prevented an error; apply the same rule at task completion when no commit is made.
+Multiple uses in one session count once, and unused entries are unchanged. When
+merging insights, set the merged counter to their arithmetic mean, rounded to the
+nearest non-negative integer with half values upward. Root evaluates every final-result proposal for strong evidence and
+usefulness in future assignments, result evaluation, or status interpretation. It
+may preserve meaning while rewriting an accepted proposal to 32 words, and stores
+every accepted insight separately.
 Updated memory is committed with task changes unless `.basix` is ignored.
 
 Before planning or implementation, agents read `.basix/adrs/ADR.md` and load only

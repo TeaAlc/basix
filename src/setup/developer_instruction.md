@@ -41,19 +41,19 @@
 - `.basix/memory.toml` is agent-owned memory, not a user log. Autonomously create, update, merge, or delete it; never request user approval for memory operations.
 - Read it exactly once at session start and after each context compaction; create it for the first qualifying insight.
 - Apply entries to reduce effort and prevent repeated mistakes; reading alone is insufficient.
-- Retain evidenced failure prevention, efficiency methods, stable repository knowledge, user instructions, and guidance.
-  - Write failures as prevention rules. Do not omit top insight after task success.
-  - Never store secrets, credentials, tokens, keys, private personal data, guesses, conversations, transient status, or documented facts; without evidence, store nothing.
-- Do not run a memory-reflection round after every turn. Write insights only before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
-  - Bundle updates with work; start no subagent, research, or tests solely for maintenance.
-  - Before every commit or task completion, keep at most 64 `[[entries]]` across all categories (including `Subagent Insight`). If exceeded, merge only semantically compatible or overlapping insights; preserve active user instructions and indispensable contract rules, with shortening/merging allowed; drop mixed-origin metadata if TOML is valid; delete least important until 64. Prioritize repository-error prevention over token/work savings; no automatic pruning helper or `.basix/memory.toml` edits.
-  - Consider existing knowledge first. Keep the smallest useful set, not a fixed count.
+- Retain evidenced failure prevention, efficiency methods, stable repository knowledge, user instructions, and guidance. Write failures as prevention rules.
+- Never store secrets, credentials, tokens, keys, private personal data, guesses, or transient status; without evidence, store nothing
+- Do not run a memory-reflection round after every turn; write insights before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
+- Before every commit or task completion, keep at most 64 `[[entries]]`; preserve active user instructions and indispensable contract rules, then merge or delete least important entries.
+- Consider existing knowledge first. Keep the smallest useful set, not a fixed count.
 - Keep this TOML contract:
   - Use `version = 1` and zero or more `[[entries]]` records.
-  - Records have exactly `date`, `category`, and `insight`; `Subagent Insight` also has `subagent_type`. Dates are quoted ISO 8601 `YYYY-MM-DD`.
+- Records have exactly `date`, `category`, `insight`, and non-negative integer `usefulness`; `usefulness` starts at `0` for new entries. `Subagent Insight` also has `subagent_type`. Dates are quoted ISO 8601 `YYYY-MM-DD`.
   - `category` is one of `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`; use `Other` only if none fits.
-  - `subagent_type` is the exact native role, exclusive to `Subagent Insight`; `insight` is actionable, at most three sentences and 32 words.
-  - Evaluate proposals for evidence and utility; Root may shorten; stores accepted subagent insights separately.
+- `subagent_type` is the exact native role, exclusive to `Subagent Insight`; `insight` is actionable, at most three sentences and 32 words.
+- Evaluate proposals for evidence and utility; Root may shorten; stores accepted subagent insights separately.
+- When merging insights, set merged `usefulness` to their arithmetic mean, rounded to the nearest non-negative integer (half up); do not otherwise increase it.
+- At the final memory checkpoint before committing, or at task completion when no commit is made, Root increases an insight's `usefulness` exactly once by `+1` when useful or error-preventing; Multiple uses in one session count once; unused entries remain unchanged.
 - Commit updates with task changes unless `.basix` is ignored. Before compaction, commit eligible updates after verification. Never override ignore rules.
 
 ## Completion and commits

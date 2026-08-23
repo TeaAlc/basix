@@ -532,6 +532,16 @@ for phrase in (
     "Consider existing knowledge first",
     "Keep the smallest useful set, not a fixed count",
     "Use `version = 1` and zero or more `[[entries]]`",
+    "non-negative integer `usefulness`",
+    "`usefulness` starts at `0` for new entries",
+    "final memory checkpoint before committing",
+    "task completion when no commit is made",
+    "When merging insights",
+    "arithmetic mean",
+    "rounded to the nearest non-negative integer",
+    "half up",
+    "increases an insight's `usefulness` exactly once by `+1`",
+    "Multiple uses in one session count once",
     "`Subagent Insight` also has `subagent_type`",
     "quoted ISO 8601 `YYYY-MM-DD`",
     "at most three sentences and 32 words",
@@ -585,13 +595,16 @@ categories = {
     "Verification", "Agent Collaboration", "Workflow", "Subagent Insight", "Other",
 }
 def validate_memory_entry(entry):
-    expected = {"date", "category", "insight"}
+    expected = {"date", "category", "insight", "usefulness"}
     if entry["category"] == "Subagent Insight":
         expected.add("subagent_type")
-        assert isinstance(entry["subagent_type"], str) and entry["subagent_type"].strip()
     assert set(entry) == expected
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry["date"])
     assert entry["category"] in categories
+    assert isinstance(entry["usefulness"], int) and not isinstance(entry["usefulness"], bool)
+    assert entry["usefulness"] >= 0
+    if entry["category"] == "Subagent Insight":
+        assert isinstance(entry["subagent_type"], str) and entry["subagent_type"].strip()
     assert len(re.findall(r"\b[\w.-]+\b", entry["insight"])) <= 32
     assert len(re.findall(r"[.!?]+(?:\s|$)", entry["insight"])) <= 3
 for entry in memory["entries"]:
@@ -603,11 +616,26 @@ verifier_insights = [
 assert any("Copy-tree uninstall" in entry["insight"] for entry in verifier_insights)
 workflow_insights = [entry for entry in memory["entries"] if entry["category"] == "Workflow"]
 assert any("focused negative tests" in entry["insight"] for entry in workflow_insights)
-validate_memory_entry({"date": "2026-01-01", "category": "Repository", "insight": "Legacy entry."})
+validate_memory_entry({
+    "date": "2026-01-01", "category": "Repository", "insight": "Legacy entry.", "usefulness": 0,
+})
 validate_memory_entry({
     "date": "2026-01-01", "category": "Subagent Insight", "subagent_type": "basix_file_explorer",
-    "insight": "Strongly evidenced reusable lesson.",
+    "insight": "Strongly evidenced reusable lesson.", "usefulness": 3,
 })
+for invalid in (
+    {"date": "2026-01-01", "category": "Repository", "insight": "Missing counter."},
+    {"date": "2026-01-01", "category": "Repository", "insight": "Boolean counter.", "usefulness": True},
+    {"date": "2026-01-01", "category": "Repository", "insight": "Negative counter.", "usefulness": -1},
+    {"date": "2026-01-01", "category": "Repository", "insight": "Float counter.", "usefulness": 1.5},
+    {"date": "2026-01-01", "category": "Repository", "insight": "String counter.", "usefulness": "1"},
+):
+    try:
+        validate_memory_entry(invalid)
+    except (AssertionError, KeyError):
+        pass
+    else:
+        raise AssertionError("invalid usefulness shape accepted")
 for removed in (
     "Subagent confirmations",
     "task_profile",

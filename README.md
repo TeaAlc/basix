@@ -294,9 +294,14 @@ and persistent instructions are loaded. Basix then supplies:
 - agent-owned persistent memory in `.basix/memory.toml`, read once at session start
   and after each context compaction, actively applied to reduce work and prevent
   repeated mistakes, and autonomously curated without user approval at natural
-  work checkpoints; concise dated insights use fixed English categories and are
-  committed with task changes unless `.basix` is ignored, while useful, strongly
-  evidenced subagent proposals retain their originating role;
+  work checkpoints; concise dated insights use fixed English categories, a
+  non-negative `usefulness` counter initialized to `0`, and are committed with task
+  changes unless `.basix` is ignored. At the final memory checkpoint before commit,
+  Root increments that counter exactly once when an insight helped solve the session
+  or prevented an error, applying the same rule at task completion when no commit is
+  made, while useful, strongly evidenced subagent proposals retain their originating
+  role. When insights are merged, their counters use the arithmetic mean, rounded
+  to the nearest non-negative integer with half values upward;
 - mandatory routing of extensive local evidence discovery to
   `basix_file_explorer`, preferably before discovery begins, while implementation
   and final code analysis remain with Root;
