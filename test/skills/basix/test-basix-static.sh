@@ -354,12 +354,9 @@ for phrase in (
     "new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens",
     "keep the overall goal authoritative",
     "Estimate total effort before work begins",
-    "Above 5 million expected tokens",
+    "Above 10 million expected input tokens",
     "ask whether to compact after every phase",
     "findings, decisions, dependencies, and discovery results",
-    "Ask clarifying questions only when answers can materially affect scope, architecture, priorities, or implementation",
-    "Resolve material uncertainty iteratively",
-    "otherwise make and document reasoned assumptions",
 ):
     assert planning_section.count(phrase) == 1, phrase
 

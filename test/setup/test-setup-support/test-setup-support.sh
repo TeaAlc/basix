@@ -8,3 +8,4 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/src/setup/lib/manage_developer_instruct
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/src/setup/lib/manage_developer_instructions.py" remove --config "$tmp/config.toml" --remove-empty-file >/dev/null
 [[ ! -e $tmp/config.toml ]]
 printf 'ok - setup support round trip\n'
+"$ROOT/test/setup/test-setup-support/test-playwright-config.sh"

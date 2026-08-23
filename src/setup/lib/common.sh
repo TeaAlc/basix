@@ -6,7 +6,7 @@ export PYTHONDONTWRITEBYTECODE=1
 
 REPORT_ACTIVE=false REPORT_CHANGED=0 REPORT_UNCHANGED=0 REPORT_FAILED=0 REPORT_POINT='Operation'
 report_color=false
-if [[ -t 1 && -z ${NO_COLOR:-} && -z ${CI:-} ]]; then report_color=true; fi
+if [[ -t 1 && -n ${TERM:-} && ${TERM:-} != dumb && -z ${NO_COLOR:-} && -z ${CI:-} ]]; then report_color=true; fi
 report_paint() { local code=$1 text=$2; if [[ $report_color == true ]]; then printf '\033[%sm%s\033[0m' "$code" "$text"; else printf '%s' "$text"; fi; }
 report_header() { REPORT_ACTIVE=true; printf 'Basix installation report\n'; }
 report_meta() { printf '%s: %s\n' "$1" "$2"; }

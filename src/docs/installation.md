@@ -4,14 +4,20 @@ Python 3.11 or newer and the Codex CLI are required.
 
 ```bash
 ./src/setup/install_as_plugin.sh [--dry-run] [--uninstall]
-./src/setup/install_for_project.sh [TARGET] [--dry-run] [--uninstall]
+./src/setup/install_for_project.sh [TARGET] [--dry-run] [--playwright|--no-playwright]
+./src/setup/install_for_project.sh [TARGET] [--dry-run] --uninstall
 ```
 
-Both installers are copy-only. They copy every complete skill tree and the
-complete private native-agent tree, never create symlinks, and never prompt for
-an installation mode. The global installer also copies plugin and marketplace
-metadata and registers the plugin. The project installer uses the current
-directory when `TARGET` is omitted.
+The global installer remains copy-only. The project installer copies every
+complete skill tree and the complete private native-agent tree, never creates
+symlinks, and optionally manages Playwright sandbox permissions in
+`TARGET/.codex/config.toml`. Interactive installs ask `Enable Playwright sandbox
+permissions? [y/N]`; noninteractive installs must explicitly choose
+`--playwright` or `--no-playwright`. `--no-playwright` removes only Basix-owned
+settings and fails closed on foreign overlapping values or damaged markers.
+The global installer also copies plugin and marketplace metadata and registers
+the plugin. The project installer uses the current directory when `TARGET` is
+omitted.
 
 Native agents live at `$CODEX_HOME/basix/agents` globally or
 `TARGET/.codex/basix/agents` in a project. Managed configuration entries point to
@@ -33,6 +39,12 @@ Uninstall removes only files whose current hash matches their recorded install
 hash. Locally modified files and foreign contents are preserved, and only empty
 managed directories are pruned. `--dry-run` applies the same checks without
 changing files, configuration, plugin registration, or state.
+
+Playwright permissions enable the `playwright` profile, limited network proxy
+support, and access to `localhost`, `127.0.0.1`, and `::1`. Local port binding is
+allowed for every local port because Codex has no port-level allowlist; the
+installer never promises per-port restriction. Permission changes apply only to
+newly started Codex sessions, so restart Codex after enabling or disabling them.
 
 There is deliberately no legacy detection or migration. Existing Basix,
 Defaultwienix, link-mode, or older bundle installations must be removed with the
@@ -62,4 +74,5 @@ causes a safe exit before filesystem or MCP changes.
 
 Both installers report the target and dry-run state, followed by grouped results.
 The Agents group lists every native agent and marks it as installed, updated, or
-unchanged. They do not report a mode or a Lumen phase.
+unchanged. Project reports include the Playwright permission transition and its
+restart/local-port warning; the global installer has no Playwright phase.
