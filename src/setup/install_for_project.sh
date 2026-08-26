@@ -20,9 +20,11 @@ esac; done
 [[ ! -e $TARGET || -d $TARGET ]] || die
 TARGET=$(realpath -m -- "$TARGET"); INSTALL_TARGET_ROOT=$TARGET
 CONFIG="$TARGET/.codex/config.toml" STATE="$TARGET/.codex/.basix-install-state" AGENT_DIR="$TARGET/.codex/basix/agents"
+STATE_PATH_ROOT="$TARGET" STATE_LEGACY_ROOT=''
 HELPER="$ROOT/setup/lib/manage_developer_instructions.py" INSTRUCTIONS="$ROOT/setup/developer_instruction.md"
 report_header; report_meta Target "$TARGET"; report_meta 'Dry run' "$DRY_RUN"
 REPORT_POINT='Configuration parents'; target_parent_is_safe '' "$CONFIG" || die; target_parent_is_safe '' "$STATE" || die; [[ ! -L $CONFIG && ! -L $STATE ]] || die
+REPORT_POINT='Installer state'; state_detect_legacy_root "$STATE" "$TARGET" || die
 
 permission_prompt() {
   local label=$1 variable=$2 response

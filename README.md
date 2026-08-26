@@ -31,8 +31,9 @@ All installable Basix sources live below `src/`:
 The source of truth for agent behavior is `src/agents/native/`; setup scripts only
 bind those definitions into supported Codex locations. Persistent shared
 instructions come from `src/setup/developer_instruction.md`. Installer state is
-used to ensure that uninstall operations preserve foreign or locally modified
-  files. Copy state inventories every installed file, so uninstall can remove
+stored relative to each install root and used to ensure that uninstall operations
+preserve foreign or locally modified files. Copy state inventories every installed
+file, so uninstall can remove
 unchanged Basix files from a mixed tree without deleting changed files, foreign
 siblings, symlinks, special files, or nonempty parent directories. Configuration
 markers define the Basix-owned spans; content outside them remains byte-for-byte

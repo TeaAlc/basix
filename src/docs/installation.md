@@ -30,12 +30,19 @@ project first needs a qualifying ADR.
 
 ## Updates and safety
 
-Installer state contains only `copy`, `dircopy`, and `dirfile` records. A
+Installer state contains only `copy`, `dircopy`, and `dirfile` records. Target
+paths are stored relative to the installer root, so a project or `CODEX_HOME`
+can move without invalidating its inventory. A project install also rebases
+legacy absolute records when they point to the known Basix trees. A
 reinstallation leaves identical copies unchanged, synchronizes recorded managed
 copies with the canonical source, and removes obsolete unchanged manifest files.
 It rejects foreign directory contents, directory symlinks, unsafe symlinked
 parents, special or unreadable source nodes, and targets physically identical to
 their source before mutation.
+
+If a project `.codex/config.toml` is deleted, the next install recreates it from
+the managed instruction, agent, and selected local-access settings while leaving
+foreign sibling files untouched.
 
 Uninstall removes only files whose current hash matches their recorded install
 hash. Locally modified files and foreign contents are preserved, and only empty

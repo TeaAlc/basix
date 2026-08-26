@@ -8,6 +8,7 @@ DRY_RUN=false UNINSTALL=false
 while (($#)); do case $1 in --dry-run) DRY_RUN=true; shift ;; --uninstall) UNINSTALL=true; shift ;; *) die ;; esac; done
 CODEX_HOME=${CODEX_HOME:-${HOME:?}/.codex}; INSTALL_TARGET_ROOT=$CODEX_HOME
 CONFIG="$CODEX_HOME/config.toml" STATE="$CODEX_HOME/.basix-install-state" PLUGIN_ROOT="$CODEX_HOME/basix-plugin-root" AGENT_DIR="$CODEX_HOME/basix/agents"
+STATE_PATH_ROOT="$CODEX_HOME" STATE_LEGACY_ROOT=''
 HELPER="$ROOT/setup/lib/manage_developer_instructions.py" INSTRUCTIONS="$ROOT/setup/developer_instruction.md"
 report_header; report_meta Target "$CODEX_HOME"; report_meta 'Dry run' "$DRY_RUN"
 REPORT_POINT='Configuration parents'; target_parent_is_safe '' "$CONFIG" || die; target_parent_is_safe '' "$STATE" || die; [[ ! -L $CONFIG && ! -L $STATE ]] || die

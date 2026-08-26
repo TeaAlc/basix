@@ -5,6 +5,8 @@
 export PYTHONDONTWRITEBYTECODE=1
 
 REPORT_ACTIVE=false REPORT_CHANGED=0 REPORT_UNCHANGED=0 REPORT_FAILED=0 REPORT_POINT='Operation'
+STATE_PATH_ROOT=${STATE_PATH_ROOT:-}
+STATE_LEGACY_ROOT=${STATE_LEGACY_ROOT:-}
 report_color=false
 if [[ -t 1 && -n ${TERM:-} && ${TERM:-} != dumb && -z ${NO_COLOR:-} && -z ${CI:-} ]]; then report_color=true; fi
 report_paint() { local code=$1 text=$2; if [[ $report_color == true ]]; then printf '\033[%sm%s\033[0m' "$code" "$text"; else printf '%s' "$text"; fi; }
@@ -75,8 +77,57 @@ sha256_file() { sha256sum "$1" | awk '{print $1}'; }
 filtered_files() { find "$1" \( -type d -name __pycache__ -prune \) -o \( -type f ! -name '*.pyc' ! -name '*.pyo' -print0 \); }
 sha256_tree() { (cd "$1" && filtered_files . | sort -z | xargs -0 -r sha256sum) | sha256sum | awk '{print $1}'; }
 copy_filtered_tree() { local source=$1 target=$2; mkdir -p "$target"; (cd "$source" && tar -cf - --exclude=__pycache__ --exclude='*.pyc' --exclude='*.pyo' .) | (cd "$target" && tar -xf -); }
-record_target() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$STATE_TMP"; }
-record_tree_file() { printf 'dirfile\t%s\t%s\t%s\n' "$1" "$2" "$3" >> "$STATE_TMP"; }
+state_record_target() {
+  local target=$1 root=${STATE_PATH_ROOT:-} relative
+  if [[ -z $root ]]; then
+    printf '%s\n' "$target"
+    return 0
+  fi
+  relative=$(realpath -m --relative-to="$root" -- "$target") || return 1
+  relative_managed_path_is_safe "$relative" || return 1
+  printf '%s\n' "$relative"
+}
+state_resolve_target() {
+  local stored=$1 root=${STATE_PATH_ROOT:-} legacy=${STATE_LEGACY_ROOT:-} resolved suffix
+  if [[ $stored == /* ]]; then
+    resolved=$stored
+    if [[ -n $root && -n $legacy && $legacy != "$root" && ( $stored == "$legacy" || $stored == "$legacy/"* ) ]]; then
+      if [[ $stored == "$legacy" ]]; then suffix='.'; else suffix=${stored#"$legacy"/}; fi
+      relative_managed_path_is_safe "$suffix" || return 1
+      resolved="$root/$suffix"
+    fi
+    realpath -m -- "$resolved"
+  else
+    [[ -n $root ]] || return 1
+    relative_managed_path_is_safe "$stored" || return 1
+    realpath -m -- "$root/$stored"
+  fi
+}
+state_detect_legacy_root() {
+  local state=$1 root=$2 kind target rest candidate legacy=''
+  STATE_LEGACY_ROOT=''
+  [[ -f $state ]] || return 0
+  while IFS=$'\t' read -r kind target rest; do
+    [[ -z $kind && -z $target && -z $rest ]] && continue
+    case $kind in copy|dircopy|dirfile) ;; *) return 1 ;; esac
+    if [[ $target == /* ]]; then
+      [[ $target == "$root" || $target == "$root/"* ]] && continue
+      candidate=''
+      case $target in
+        */.agents/skills|*/.agents/skills/*) candidate=${target%%/.agents/skills*} ;;
+        */.codex/basix|*/.codex/basix/*) candidate=${target%%/.codex/basix*} ;;
+        *) return 1 ;;
+      esac
+      [[ -n $candidate && $candidate != / ]] || return 1
+      if [[ -z $legacy ]]; then legacy=$candidate; elif [[ $legacy != "$candidate" ]]; then return 1; fi
+    else
+      relative_managed_path_is_safe "$target" || return 1
+    fi
+  done < "$state"
+  STATE_LEGACY_ROOT=$legacy
+}
+record_target() { local target; target=$(state_record_target "$2") || die; printf '%s\t%s\t%s\n' "$1" "$target" "$3" >> "$STATE_TMP"; }
+record_tree_file() { local target; target=$(state_record_target "$1") || die; printf 'dirfile\t%s\t%s\t%s\n' "$target" "$2" "$3" >> "$STATE_TMP"; }
 canonical_path() { realpath -e -- "$1" 2>/dev/null || die; }
 same_physical_path() { local left right; left=$(realpath -e -- "$1" 2>/dev/null) || return 1; right=$(realpath -e -- "$2" 2>/dev/null) || return 1; [[ $left == "$right" || $1 -ef $2 ]]; }
 validate_source_tree() {
@@ -112,8 +163,26 @@ preflight_file() {
     cmp -s "$source" "$target" || state_target_is_managed "${STATE:-}" "$target" || die
   fi
 }
-state_target_is_managed() { local state=$1 selected=$2 kind target ignored; [[ -f $state ]] || return 1; while IFS=$'\t' read -r kind target ignored; do [[ $kind == copy && $target == "$selected" ]] && return 0; done < "$state"; return 1; }
-state_directory_is_managed() { local state=$1 selected=$2 kind target ignored; [[ -f $state ]] || return 1; while IFS=$'\t' read -r kind target ignored; do [[ $kind == dircopy && $target == "$selected" ]] && return 0; done < "$state"; return 1; }
+state_target_is_managed() {
+  local state=$1 selected=$2 kind target ignored resolved
+  [[ -f $state ]] || return 1
+  while IFS=$'\t' read -r kind target ignored; do
+    [[ $kind == copy ]] || continue
+    resolved=$(state_resolve_target "$target") || continue
+    [[ $resolved == "$selected" ]] && return 0
+  done < "$state"
+  return 1
+}
+state_directory_is_managed() {
+  local state=$1 selected=$2 kind target ignored resolved
+  [[ -f $state ]] || return 1
+  while IFS=$'\t' read -r kind target ignored; do
+    [[ $kind == dircopy ]] || continue
+    resolved=$(state_resolve_target "$target") || continue
+    [[ $resolved == "$selected" ]] && return 0
+  done < "$state"
+  return 1
+}
 tree_has_only_source_paths() {
   local source=$1 target=$2
   [[ -d $target && ! -L $target ]] || return 1
@@ -132,14 +201,26 @@ PY
 tree_has_only_managed_paths() {
   local source=$1 target=$2 state=$3
   [[ -d $target && ! -L $target && -f $state ]] || return 1
-  python3 - "$source" "$target" "$state" <<'PY'
+  python3 - "$source" "$target" "$state" "${STATE_PATH_ROOT:-}" "${STATE_LEGACY_ROOT:-}" <<'PY'
 import os,stat,sys
-source,target,state=map(os.path.abspath,sys.argv[1:])
+source,target,state,state_root,legacy_root=sys.argv[1:]
+source,target,state=map(os.path.abspath,(source,target,state))
+state_root=os.path.abspath(state_root) if state_root else ""
+
+def resolve(stored):
+    if stored.startswith(os.sep):
+        if legacy_root and (stored == legacy_root or stored.startswith(legacy_root + os.sep)):
+            stored = os.path.join(state_root, os.path.relpath(stored, legacy_root))
+        return os.path.normpath(stored)
+    if not state_root:
+        return None
+    return os.path.normpath(os.path.join(state_root, stored))
+
 managed=set()
 with open(state,encoding="utf-8") as stream:
     for line in stream:
         fields=line.rstrip("\n").split("\t")
-        if len(fields)==4 and fields[0]=="dirfile" and fields[1]==target:
+        if len(fields)==4 and fields[0]=="dirfile" and resolve(fields[1])==target:
             managed.add(os.path.normpath(fields[2]))
 for root,dirs,files in os.walk(target,followlinks=False):
     relroot=os.path.relpath(root,target)
@@ -185,25 +266,47 @@ managed_file_matches() {
   if [[ $parent != "$relative" ]]; then local IFS=/; read -r -a parts <<< "$parent"; for component in "${parts[@]}"; do current="$current/$component"; [[ -d $current && ! -L $current ]] || return 1; done; fi
   current="$root/$relative"; [[ -f $current && ! -L $current && $(sha256_file "$current") == "$expected" ]]
 }
-state_has_tree_inventory() { local state=$1 selected=$2 kind target rest; [[ -f $state ]] || return 1; while IFS=$'\t' read -r kind target rest; do [[ $kind == dirfile && $target == "$selected" ]] && return 0; done < "$state"; return 1; }
+state_has_tree_inventory() {
+  local state=$1 selected=$2 kind target rest resolved
+  [[ -f $state ]] || return 1
+  while IFS=$'\t' read -r kind target rest; do
+    [[ $kind == dirfile ]] || continue
+    resolved=$(state_resolve_target "$target") || continue
+    [[ $resolved == "$selected" ]] && return 0
+  done < "$state"
+  return 1
+}
 directory_removal_status() {
-  local state=$1 selected=$2 source=${3:-} kind target relative expected found=false removable=false changed=false
+  local state=$1 selected=$2 source=${3:-} kind target relative expected resolved found=false removable=false changed=false
   [[ -f $state ]] || { printf 'absent\n'; return; }; target_parent_is_safe '' "$selected" || { printf 'preserved\n'; return; }
   [[ ! -L $selected ]] || { printf 'preserved\n'; return; }; [[ -e $selected ]] || { printf 'absent\n'; return; }; [[ -d $selected ]] || { printf 'preserved\n'; return; }
   [[ -z $source ]] || ! same_physical_path "$source" "$selected" || { printf 'preserved\n'; return; }
   state_has_tree_inventory "$state" "$selected" || { printf 'preserved\n'; return; }
-  while IFS=$'\t' read -r kind target relative expected; do [[ $kind == dirfile && $target == "$selected" ]] || continue; found=true; if managed_file_matches "$selected" "$relative" "$expected"; then removable=true; else changed=true; fi; done < "$state"
+  while IFS=$'\t' read -r kind target relative expected; do
+    [[ $kind == dirfile ]] || continue
+    resolved=$(state_resolve_target "$target") || continue
+    [[ $resolved == "$selected" ]] || continue
+    found=true
+    if managed_file_matches "$selected" "$relative" "$expected"; then removable=true; else changed=true; fi
+  done < "$state"
   [[ $found == true ]] || { printf 'preserved\n'; return; }
   if [[ $changed == false ]] && tree_has_only_source_paths "${source:-$selected}" "$selected"; then printf 'changed\n'; elif [[ $removable == true ]]; then printf 'partial\n'; else printf 'preserved\n'; fi
 }
 remove_recorded_directory() {
-  local state=$1 selected=$2 source=${3:-} status kind target relative expected parent
+  local state=$1 selected=$2 source=${3:-} status kind target relative expected parent resolved
   status=$(directory_removal_status "$state" "$selected" "$source")
   [[ $status == changed || $status == partial ]] || return 0
   [[ $DRY_RUN == true ]] && return 0
-  while IFS=$'\t' read -r kind target relative expected; do [[ $kind == dirfile && $target == "$selected" ]] || continue; managed_file_matches "$selected" "$relative" "$expected" && rm -- "$selected/$relative"; done < "$state"
   while IFS=$'\t' read -r kind target relative expected; do
-    [[ $kind == dirfile && $target == "$selected" ]] || continue
+    [[ $kind == dirfile ]] || continue
+    resolved=$(state_resolve_target "$target") || continue
+    [[ $resolved == "$selected" ]] || continue
+    managed_file_matches "$selected" "$relative" "$expected" && rm -- "$selected/$relative"
+  done < "$state"
+  while IFS=$'\t' read -r kind target relative expected; do
+    [[ $kind == dirfile ]] || continue
+    resolved=$(state_resolve_target "$target") || continue
+    [[ $resolved == "$selected" ]] || continue
     parent=${relative%/*}; [[ $parent != "$relative" ]] || continue
     while [[ -n $parent && $parent != . ]]; do rmdir -- "$selected/$parent" 2>/dev/null || true; [[ $parent == */* ]] || break; parent=${parent%/*}; done
   done < "$state"
@@ -211,23 +314,26 @@ remove_recorded_directory() {
 }
 path_is_below() { local path root; path=$(realpath -m -- "$1"); root=$(realpath -m -- "$2"); [[ $path == "$root/"* ]]; }
 reconcile_stale_targets() {
-  local old=$1 new=$2; shift 2; local kind target expected status root allowed
+  local old=$1 new=$2; shift 2; local kind target expected status root allowed resolved
   [[ -f $old ]] || return 0
   while IFS=$'\t' read -r kind target expected; do
     [[ $kind == copy || $kind == dircopy ]] || continue
-    awk -F '\t' -v selected="$target" '$2 == selected {found=1} END {exit !found}' "$new" && continue
-    allowed=false; for root in "$@"; do path_is_below "$target" "$root" && allowed=true; done; [[ $allowed == true ]] || continue
-    if [[ $kind == copy ]]; then if [[ -f $target && ! -L $target && $(sha256_file "$target") == "$expected" ]]; then STALE_CHANGED=true; [[ $DRY_RUN == true ]] || rm -- "$target"; fi
-    else status=$(directory_removal_status "$old" "$target"); if [[ $status == changed || $status == partial ]]; then STALE_CHANGED=true; remove_recorded_directory "$old" "$target"; fi; fi
+    resolved=$(state_resolve_target "$target") || continue
+    if [[ $kind == copy ]]; then state_target_is_managed "$new" "$resolved" && continue; else state_directory_is_managed "$new" "$resolved" && continue; fi
+    allowed=false; for root in "$@"; do path_is_below "$resolved" "$root" && allowed=true; done; [[ $allowed == true ]] || continue
+    if [[ $kind == copy ]]; then if [[ -f $resolved && ! -L $resolved && $(sha256_file "$resolved") == "$expected" ]]; then STALE_CHANGED=true; [[ $DRY_RUN == true ]] || rm -- "$resolved"; fi
+    else status=$(directory_removal_status "$old" "$resolved"); if [[ $status == changed || $status == partial ]]; then STALE_CHANGED=true; remove_recorded_directory "$old" "$resolved"; fi; fi
   done < "$old"
 }
 remove_recorded_targets() {
-  local state=$1; shift; local kind target expected actual root allowed status
+  local state=$1; shift; local kind target expected actual root allowed status resolved
   [[ -f $state ]] || return 0
   while IFS=$'\t' read -r kind target expected; do
-    [[ $kind == copy || $kind == dircopy ]] || continue; allowed=false; for root in "$@"; do path_is_below "$target" "$root" && allowed=true; done; [[ $allowed == true ]] || { REMOVE_PRESERVED=true; continue; }
-    if [[ $kind == copy ]]; then if [[ -f $target && ! -L $target ]]; then actual=$(sha256_file "$target"); if [[ $actual == "$expected" ]]; then REMOVE_CHANGED=true; [[ $DRY_RUN == true ]] || rm -- "$target"; else REMOVE_PRESERVED=true; fi; elif [[ -e $target || -L $target ]]; then REMOVE_PRESERVED=true; fi
-    else status=$(directory_removal_status "$state" "$target"); case $status in changed|partial) REMOVE_CHANGED=true; remove_recorded_directory "$state" "$target" ;; preserved) REMOVE_PRESERVED=true ;; esac; fi
+    [[ $kind == copy || $kind == dircopy ]] || continue
+    resolved=$(state_resolve_target "$target") || { REMOVE_PRESERVED=true; continue; }
+    allowed=false; for root in "$@"; do path_is_below "$resolved" "$root" && allowed=true; done; [[ $allowed == true ]] || { REMOVE_PRESERVED=true; continue; }
+    if [[ $kind == copy ]]; then if [[ -f $resolved && ! -L $resolved ]]; then actual=$(sha256_file "$resolved"); if [[ $actual == "$expected" ]]; then REMOVE_CHANGED=true; [[ $DRY_RUN == true ]] || rm -- "$resolved"; else REMOVE_PRESERVED=true; fi; elif [[ -e $resolved || -L $resolved ]]; then REMOVE_PRESERVED=true; fi
+    else status=$(directory_removal_status "$state" "$resolved"); case $status in changed|partial) REMOVE_CHANGED=true; remove_recorded_directory "$state" "$resolved" ;; preserved) REMOVE_PRESERVED=true ;; esac; fi
   done < "$state"
 }
 prune_dir() { [[ $DRY_RUN == true ]] && return 0; target_parent_is_safe '' "$1" || return 0; [[ -d $1 && ! -L $1 ]] || return 0; rmdir -- "$1" 2>/dev/null || true; }

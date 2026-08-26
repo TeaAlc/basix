@@ -7,6 +7,14 @@ passes=0 failures=0
 ok() { printf 'ok - %s\n' "$1"; passes=$((passes+1)); }
 bad() { printf 'not ok - %s\n' "$1"; failures=$((failures+1)); }
 check() { local label=$1; shift; if "$@"; then ok "$label"; else bad "$label"; fi; }
+state_targets_are_relative() {
+  local state=$1
+  [[ -s $state ]] || return 1
+  awk -F '\t' '$1 ~ /^(copy|dircopy|dirfile)$/ {count++; if ($2 ~ /^\//) bad=1} END {exit (count == 0 || bad)}' "$state"
+}
+foreign_files_are_preserved() {
+  grep -Fxq 'keep me' "$1" && grep -Fxq 'foreign config sibling' "$2"
+}
 mock="$case_dir/bin"; mkdir -p "$mock"
 cat >"$mock/codex" <<'SH'
 #!/usr/bin/env bash
@@ -33,6 +41,52 @@ for agent in "$ROOT"/agents/native/*.toml; do
   check "project reinstall reports $(basename "$agent") as unchanged" grep -Fq "$(basename "$agent") — unchanged" <<<"$second_output"
 done
 check 'project reinstall is idempotent' test "$before" = "$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml")"
+
+renamed_source="$case_dir/rename-source"
+"$ROOT/setup/install_for_project.sh" "$renamed_source" --no-local-network --no-test-socket >/dev/null
+printf 'keep me\n' >"$renamed_source/foreign.keep"
+mkdir -p "$renamed_source/.codex"
+printf 'foreign config sibling\n' >"$renamed_source/.codex/foreign.toml"
+check 'project state records are relative to the project root' \
+  state_targets_are_relative "$renamed_source/.codex/.basix-install-state"
+renamed_target="$case_dir/rename-target"
+mv "$renamed_source" "$renamed_target"
+check 'project reinstall succeeds after directory rename' \
+  "$ROOT/setup/install_for_project.sh" "$renamed_target" --no-local-network --no-test-socket
+check 'renamed project keeps foreign root file' grep -Fxq 'keep me' "$renamed_target/foreign.keep"
+check 'renamed project keeps foreign config sibling' grep -Fxq 'foreign config sibling' "$renamed_target/.codex/foreign.toml"
+check 'renamed project state remains relative' \
+  state_targets_are_relative "$renamed_target/.codex/.basix-install-state"
+check 'renamed project uninstall succeeds' \
+  "$ROOT/setup/install_for_project.sh" "$renamed_target" --uninstall
+check 'renamed project uninstall preserves foreign files' \
+  foreign_files_are_preserved \
+  "$renamed_target/foreign.keep" "$renamed_target/.codex/foreign.toml"
+check 'renamed project uninstall removes managed payloads' test ! -e "$renamed_target/.agents/skills/basix" -a ! -e "$renamed_target/.codex/basix"
+check 'renamed project uninstall removes install state' test ! -e "$renamed_target/.codex/.basix-install-state"
+
+legacy_source="$case_dir/legacy-source"
+"$ROOT/setup/install_for_project.sh" "$legacy_source" --no-local-network --no-test-socket >/dev/null
+legacy_target="$case_dir/legacy-target"
+mv "$legacy_source" "$legacy_target"
+awk -F '\t' -v OFS='\t' -v old="$legacy_source" '{if ($2 !~ /^\//) $2=old "/" $2; print}' \
+  "$legacy_target/.codex/.basix-install-state" >"$case_dir/legacy-state"
+mv "$case_dir/legacy-state" "$legacy_target/.codex/.basix-install-state"
+check 'legacy absolute state rebases after project move' \
+  "$ROOT/setup/install_for_project.sh" "$legacy_target" --no-local-network --no-test-socket
+check 'legacy absolute state is rewritten relatively' \
+  state_targets_are_relative "$legacy_target/.codex/.basix-install-state"
+
+recreate="$case_dir/recreate-config"
+"$ROOT/setup/install_for_project.sh" "$recreate" --local-network --test-socket >/dev/null
+cp "$recreate/.codex/config.toml" "$case_dir/recreate-config.initial"
+printf 'foreign config sibling\n' >"$recreate/.codex/foreign.toml"
+rm -- "$recreate/.codex/config.toml"
+check 'reinstall recreates deleted project config' \
+  "$ROOT/setup/install_for_project.sh" "$recreate" --local-network --test-socket
+check 'recreated config preserves managed behavior' cmp -s "$case_dir/recreate-config.initial" "$recreate/.codex/config.toml"
+check 'reinstall preserves foreign config sibling' grep -Fxq 'foreign config sibling' "$recreate/.codex/foreign.toml"
+check 'reinstall retains install state after config recreation' test -s "$recreate/.codex/.basix-install-state"
 
 source_copy="$case_dir/source"; cp -R "$ROOT" "$source_copy"; update="$case_dir/update"
 "$source_copy/setup/install_for_project.sh" "$update" --no-local-network --no-test-socket >/dev/null
