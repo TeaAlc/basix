@@ -239,6 +239,12 @@ usefulness = 0
 insight = "Round-trip tests must compare exact LF/CRLF/no-final foreign bytes; managed insertion separators and assignment line endings need reversible ownership, not only semantic TOML equality."
 
 [[entries]]
+date = "2026-08-26"
+category = "Verification"
+usefulness = 1
+insight = "Project installer state stores absolute target paths; renaming a project without rewriting .codex/.basix-install-state makes existing trees fail closed during preflight."
+
+[[entries]]
 date = "2026-08-23"
 category = "Verification"
 usefulness = 0
