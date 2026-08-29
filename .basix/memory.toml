@@ -3,6 +3,11 @@ version = 1
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
+insight = "Podman 4.9.3-era Aardvark cannot guarantee peer aliases plus blocked external DNS; relaxed policy permits DNS metadata but still requires alias resolution and failed direct TCP egress."
+
+[[entries]]
+date = "2026-08-29"
+category = "Verification"
 insight = "Tor container restarts can change its internal IP while Scrapling retains a literal SOCKS address; test restart drift and safely reconcile managed containers."
 
 [[entries]]
@@ -223,3 +228,13 @@ insight = "Capability-specific permission installers must reject foreign network
 date = "2026-08-23"
 category = "Verification"
 insight = "Disabling all managed capabilities must still validate shared default, network_proxy, and profile ownership keys before returning unchanged; fail-closed removal is part of the safety contract."
+
+[[entries]]
+date = "2026-08-29"
+category = "Verification"
+insight = "The Scrapling installer must preflight running-container ownership, snapshot managed Tor/Scrapling IDs before replacement, and restore them on later Codex or HTTP failure."
+
+[[entries]]
+date = "2026-08-29"
+category = "Verification"
+insight = "Before deleting a named runtime network, recheck its immutable ID and reconnect detached containers if the pre-removal check fails; wrappers must strip positional as well as keyword session IDs."

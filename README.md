@@ -220,7 +220,7 @@ Two or more registrations, foreign running Scrapling MCP processes, or unsafe
 runtime resources always cause an abort; `--force` cannot bypass those checks.
 The installer pulls the configured Scrapling image, pins the verified digest,
 validates the exact MCP tool policy, and registers the HTTP URL only after an MCP
-initialize handshake, schema inspection, and a real `get` tool call report
+initialize handshake, schema inspection, and a real `make_request` tool call report
 `IsTor: true`. Restart running Codex sessions after a successful migration. The
 installed controller supports `prepare`, `start`, `stop`, `status`, and `tor-ip`.
 An older Basix-managed stdio container is migrated only when its complete runtime
@@ -228,6 +228,8 @@ and security signature is intact. It remains running until the replacement HTTP
 service passes those checks, is revalidated by immutable container ID, and is then
 removed. Partially matching or foreign containers are never adopted or removed,
 including with `--force`.
+The setup preflight requires `basix-tor-proxy` to resolve and direct TCP egress
+to fail; external DNS answers are allowed and are not used for HTTP requests.
 Before starting Tor, the controller runs a temporary named probe in the existing
 egress network. If the host cannot create the rootless network namespace, it
 aborts before creating either service and reports the runtime, rootless status,

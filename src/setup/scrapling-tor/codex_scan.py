@@ -85,15 +85,28 @@ def fingerprint(found):
 
 
 def expected(entry, endpoint):
+    # Codex emits booleans for these flags. Treat an explicit null or any other
+    # JSON type as malformed instead of relying on Python truthiness.
+    for field in ("enabled", "disabled"):
+        if field in entry and type(entry[field]) is not bool:
+            return False
+    if entry.get("disabled", False) is not False:
+        return False
+
     spec = transport(entry)
+    if "type" in spec and not isinstance(spec["type"], str):
+        return False
+
     if spec is entry:
         allowed = {"name", "enabled", "disabled", "disabled_reason", "type", "url",
-                   "startup_timeout_sec", "tool_timeout_sec", "auth_status"}
+                   "startup_timeout_sec", "tool_timeout_sec", "auth_status",
+                   "http_headers_helper"}
         transport_allowed = allowed
     else:
         allowed = {"name", "enabled", "disabled", "disabled_reason", "transport",
-                   "startup_timeout_sec", "tool_timeout_sec", "auth_status"}
-        transport_allowed = {"type", "url", "bearer_token_env_var", "http_headers", "env_http_headers"}
+                   "startup_timeout_sec", "tool_timeout_sec", "auth_status",
+                   "http_headers_helper"}
+        transport_allowed = {"type", "url", "bearer_token_env_var", "http_headers", "env_http_headers", "http_headers_helper"}
     return (
         entry.get("name") == "scrapling"
         and entry.get("enabled", not entry.get("disabled", False))
@@ -104,10 +117,12 @@ def expected(entry, endpoint):
         and entry.get("disabled_reason") is None
         and entry.get("startup_timeout_sec") is None
         and entry.get("tool_timeout_sec") is None
-        and entry.get("auth_status") in (None, "unsupported")
+        and entry.get("auth_status") in (None, "unsupported", "unknown")
+        and entry.get("http_headers_helper") is None
         and spec.get("bearer_token_env_var") is None
         and spec.get("http_headers") is None
         and spec.get("env_http_headers") is None
+        and spec.get("http_headers_helper") is None
     )
 
 

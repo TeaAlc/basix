@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
 import sys
 import urllib.request
 import uuid
 
 EXPECTED_TOOLS = {
-    "open_session", "close_session", "list_sessions", "get", "bulk_get",
-    "fetch", "bulk_fetch", "stealthy_fetch", "bulk_stealthy_fetch", "screenshot",
+    "bulk_fetch", "bulk_get", "bulk_stealthy_fetch", "close_session", "fetch",
+    "list_sessions", "make_request", "open_request_session", "open_session",
+    "screenshot", "session_fetch", "session_make_request", "stealthy_fetch",
 }
 CLIENT_DESCRIPTION_MARKERS = (
     "calling agent is the MCP client",
@@ -18,9 +21,28 @@ CLIENT_DESCRIPTION_MARKERS = (
     ":param client_id:",
 )
 HIDDEN_ARGUMENTS = {
-    "proxy", "proxy_auth", "cdp_url", "real_chrome", "executable_path",
+    "proxy", "proxy_auth", "auth", "cdp_url", "real_chrome", "executable_path",
     "additional_args", "block_webrtc", "dns_over_https", "http3", "extra_flags",
 }
+TOR_HOST = os.environ.get("BASIX_TOR_HOST", os.environ.get("BASIX_TOR_IP", "tor"))
+
+
+def validate_local_tor(host=TOR_HOST, *, resolver=None, connector=None):
+    """Validate Tor alias resolution and local SOCKS readiness.
+
+    :param host: Stable Tor network alias.
+    :param resolver: Callable resolving the alias to an IPv4 address.
+    :param connector: Callable connecting to an address with a timeout.
+    :return: Resolved ready address.
+    """
+    resolver = resolver or socket.gethostbyname
+    connector = connector or socket.create_connection
+    try:
+        address = resolver(host)
+        with connector((address, 9050), timeout=1.0):
+            return address
+    except (OSError, socket.timeout) as exc:
+        raise RuntimeError(f"Tor alias or SOCKS readiness failed for {host}: {exc}") from exc
 
 
 class MCPClient:
@@ -152,6 +174,8 @@ def validate_tor_result(endpoint, called):
 
 def main():
     endpoint = sys.argv[1]
+    local_only = len(sys.argv) > 2 and sys.argv[2] == "--local-ready"
+    mcp_only = len(sys.argv) > 2 and sys.argv[2] == "--mcp-only"
     client = MCPClient(endpoint)
     initialized = client.send({
         "jsonrpc": "2.0", "id": 1, "method": "initialize",
@@ -164,9 +188,14 @@ def main():
     listing = client.send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
                           phase="tools/list")
     tools = validate_tool_inventory(endpoint, listing)
+    if local_only:
+        validate_local_tor()
+        return
+    if mcp_only:
+        return
     called = client.send({
         "jsonrpc": "2.0", "id": 3, "method": "tools/call",
-        "params": {"name": "get", "arguments": {
+        "params": {"name": "make_request", "arguments": {
             "url": "https://check.torproject.org/api/ip", "client_id": client.client_id,
         }},
     }, phase="tools/call")

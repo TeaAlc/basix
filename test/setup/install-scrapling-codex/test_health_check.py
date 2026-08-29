@@ -126,6 +126,11 @@ class HealthCheckTests(unittest.TestCase):
             "result": {"content": [{"type": "text", "text": '{\n  "IsTor": true\n}'}]}
         })
 
+    def test_mcp_only_mode_is_distinct_from_local_tor_readiness(self):
+        source = SOURCE.read_text()
+        self.assertIn('mcp_only = len(sys.argv) > 2 and sys.argv[2] == "--mcp-only"', source)
+        self.assertIn('if mcp_only:', source)
+
 
 if __name__ == "__main__":
     unittest.main()
