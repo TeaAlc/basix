@@ -80,6 +80,42 @@ codex_help=$(codex mcp --help 2>&1) || fail "$EXIT_CODEX" 'Codex MCP command is 
 list_help=$(codex mcp list --help 2>&1) || fail "$EXIT_CODEX" 'Codex MCP list is unavailable'
 [[ $list_help == *--json* ]] || fail "$EXIT_CODEX" 'Codex MCP list lacks --json support'
 
+prepare_rootless_netns_mount() {
+  # A reused rootless netns may lack the bind target Podman mounts XDG_RUNTIME_DIR onto.
+  [[ $runtime == podman ]] || return 0
+  local rootless runtime_dir tmp_dir target
+  rootless=$("$runtime" info --format '{{.Host.Security.Rootless}}' 2>/dev/null) || {
+    printf 'Could not inspect Podman rootless mode; refusing the capability preflight.\n' >&2
+    return "$EXIT_RUNTIME"
+  }
+  [[ $rootless == true ]] || return 0
+  runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+  [[ $runtime_dir == /* && -d $runtime_dir && -w $runtime_dir ]] || {
+    printf 'Podman rootless XDG_RUNTIME_DIR is missing or not writable: %s\n' "$runtime_dir" >&2
+    return "$EXIT_RUNTIME"
+  }
+  if ! tmp_dir=$("$runtime" --log-level=debug info 2>&1 |
+    sed -n 's/.*Using tmp dir //p' | sed -e 's/^"//' -e 's/"[[:space:]]*$//' | tail -n 1); then
+    printf 'Could not inspect Podman temporary directory; refusing the capability preflight.\n' >&2
+    return "$EXIT_RUNTIME"
+  fi
+  [[ $tmp_dir == /* && -d $tmp_dir && -w $tmp_dir ]] || {
+    printf 'Podman rootless temporary directory is missing or not writable: %s\n' "${tmp_dir:-unknown}" >&2
+    return "$EXIT_RUNTIME"
+  }
+  target="$tmp_dir/rootless-netns$runtime_dir"
+  if [[ ! -d $target ]]; then
+    mkdir -p "$target" || {
+      printf 'Could not prepare the Podman rootless netns mount target: %s\n' "$target" >&2
+      return "$EXIT_RUNTIME"
+    }
+  fi
+  chmod 700 "$target" || {
+    printf 'Could not secure the Podman rootless netns mount target: %s\n' "$target" >&2
+    return "$EXIT_RUNTIME"
+  }
+}
+
 work=$(mktemp -d "${TMPDIR:-/tmp}/basix-scrapling-install.XXXXXX")
 list_file=$work/list.json backup_config=$work/config.toml backup_support=$work/old-support
 capability_net="basix-scrapling-capability-$$-$RANDOM"
@@ -627,6 +663,9 @@ if ((match_count == 1)); then
 fi
 
 "$runtime" info >/dev/null 2>&1 || fail "$EXIT_RUNTIME" "Cannot use $runtime"
+if ! $dry_run; then
+  prepare_rootless_netns_mount || fail "$EXIT_RUNTIME" 'Podman rootless network runtime is unavailable; no managed resource was mutated'
+fi
 if $dry_run; then
   printf 'Dry run (no changes): pull %q; pin its digest; verify exact tool policy; build/pin Tor; validate networks and sidecar; test Tor egress.\n' "$image"
   ((match_count == 0)) || $expected_existing || printf 'Would run: codex mcp remove %q\n' "$old_name"

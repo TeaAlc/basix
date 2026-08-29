@@ -4,7 +4,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 passes=0 failures=0
 
 make_mocks() {
-  case_dir=$(mktemp -d); mkdir -p "$case_dir/bin" "$case_dir/home/codex"; log=$case_dir/log; : >"$log"
+  case_dir=$(mktemp -d); mkdir -p "$case_dir/bin" "$case_dir/home/codex" "$case_dir/xdg-runtime/libpod/tmp"; log=$case_dir/log; : >"$log"
   printf '%s\n' "${MOCK_LIST:-[]}" >"$case_dir/list.json"
   cat >"$case_dir/bin/codex" <<'EOF'
 #!/usr/bin/env bash
@@ -51,6 +51,11 @@ case "${1-}" in
     [[ ${MOCK_INFO:-ok} == ok ]] || exit 1
     if [[ $* == *'Host.Security.Rootless'* ]]; then printf '%s\n' "${MOCK_ROOTLESS:-true}";
     elif [[ $* == *'Store.RunRoot'* ]]; then printf '%s\n' "${MOCK_RUNROOT:-/run/user/1000/containers}"; fi ;;
+  --log-level=debug)
+    [[ ${2-} == info ]] || exit 1
+    [[ ${MOCK_TMPDIR_DEBUG:-ok} != fail ]] || exit 1
+    [[ ${MOCK_TMPDIR_DEBUG:-ok} != empty ]] || exit 0
+    printf 'time=mock level=debug msg="Using tmp dir %s"\n' "${MOCK_TMPDIR:-$MOCK_ROOT/xdg-runtime/libpod/tmp}" ;;
   ps)
     [[ ${MOCK_PS_FAIL:-false} != true ]] || exit 1
     [[ ${MOCK_PS_MALFORMED:-false} != true ]] || printf '%064d\n' 7
@@ -65,7 +70,7 @@ case "${1-}" in
   network)
     case ${2-} in
       inspect) name=${*: -1}; [[ -f $MOCK_ROOT/net-$name ]] || exit 1; if [[ $* == *'--format'* ]]; then printf 'network-%s\n' "$name"; else internal=false; [[ $name == basix-scrapling-internal ]] && internal=true; dns=true; [[ ! -f $MOCK_ROOT/dns-disabled-$name ]] || dns=false; labels='{"io.basix.scrapling-tor.managed":"'"${MOCK_OWNER:-true}"'"}'; [[ -z ${BASIX_SETUP_TRANSACTION_ID:-} || $name == basix-scrapling-capability-* ]] || labels='{"io.basix.scrapling-tor.managed":"'"${MOCK_OWNER:-true}"'","io.basix.scrapling-tor.setup":"'"$BASIX_SETUP_TRANSACTION_ID"'"}'; containers='{}'; [[ $name != basix-scrapling-internal || ${MOCK_LEGACY:-false} != true ]] || containers='{"49ac63819ee416d827015b0cd8136e3d1c849f0316a701f1c2949ccd48a7ecab":{"Name":"adoring_rhodes"}}'; printf '[{"Id":"network-%s","Driver":"bridge","Internal":%s,"DNSEnabled":%s,"NetworkDNSServers":[],"EnableIPv6":false,"Containers":%s,"Labels":%s}]\n' "$name" "$internal" "$dns" "$containers" "$labels"; fi ;;
-      create) name=${*: -1}; [[ ${MOCK_CAPABILITY_FAIL:-false} != true || $name != basix-scrapling-capability-* ]] || exit 125; : >"$MOCK_ROOT/net-$name"; rm -f "$MOCK_ROOT/dns-disabled-$name" ;;
+      create) name=${*: -1}; [[ ${MOCK_CAPABILITY_FAIL:-false} != true || $name != basix-scrapling-capability-* ]] || exit 125; [[ ${MOCK_REQUIRE_NETNS_TARGET:-false} != true || -d "${MOCK_TMPDIR}/rootless-netns${XDG_RUNTIME_DIR}" ]] || exit 125; : >"$MOCK_ROOT/net-$name"; rm -f "$MOCK_ROOT/dns-disabled-$name" ;;
       connect) : ;;
       disconnect) : ;;
       rm) rm -f "$MOCK_ROOT/net-${*: -1}" ;;
@@ -167,12 +172,15 @@ EOF
 run_installer() {
   output=$case_dir/output; set +e
   PATH="$case_dir/bin:$PATH" HOME="$case_dir/home" CODEX_HOME="$case_dir/home/codex" MOCK_LOG="$log" MOCK_ROOT="$case_dir" \
+    XDG_RUNTIME_DIR="${MOCK_XDG_RUNTIME_DIR:-$case_dir/xdg-runtime}" MOCK_TMPDIR="$case_dir/xdg-runtime/libpod/tmp" \
     MOCK_ADD="${MOCK_ADD:-ok}" MOCK_REMOVE="${MOCK_REMOVE:-ok}" MOCK_RACE="${MOCK_RACE:-false}" MOCK_OWNER="${MOCK_OWNER:-true}" \
     MOCK_HEALTH="${MOCK_HEALTH:-healthy}" MOCK_ISTOR="${MOCK_ISTOR:-true}" MOCK_HANDSHAKE="${MOCK_HANDSHAKE:-ok}" MOCK_RUNTIME="${MOCK_RUNTIME:-ok}" \
     MOCK_FOREIGN="${MOCK_FOREIGN:-false}" MOCK_BENIGN_SCALAR="${MOCK_BENIGN_SCALAR:-false}" MOCK_RESTART="${MOCK_RESTART:-unless-stopped}" \
     MOCK_LEGACY="${MOCK_LEGACY:-false}" MOCK_FIXTURE="$ROOT/test/setup/install-scrapling-codex/fixtures/podman-legacy-stdio.json" \
     MOCK_PS_FAIL="${MOCK_PS_FAIL:-false}" \
     MOCK_CAPABILITY_FAIL="${MOCK_CAPABILITY_FAIL:-false}" \
+    MOCK_REQUIRE_NETNS_TARGET="${MOCK_REQUIRE_NETNS_TARGET:-false}" \
+    MOCK_TMPDIR_DEBUG="${MOCK_TMPDIR_DEBUG:-ok}" \
     MOCK_PS_MALFORMED="${MOCK_PS_MALFORMED:-false}" \
     MOCK_PROBE_FAIL="${MOCK_PROBE_FAIL:-false}" MOCK_ROOTLESS="${MOCK_ROOTLESS:-true}" MOCK_RUNROOT="${MOCK_RUNROOT:-/run/user/1000/containers}" \
     MOCK_TOR_RUN_FAIL="${MOCK_TOR_RUN_FAIL:-false}" MOCK_SCRAPLING_RUN_FAIL="${MOCK_SCRAPLING_RUN_FAIL:-false}" MOCK_BOOTSTRAP="${MOCK_BOOTSTRAP:-true}" \
@@ -205,6 +213,25 @@ make_mocks; MOCK_CAPABILITY_FAIL=true run_installer
 ! grep -q -- '--name basix-scrapling-tor ' "$log" || status=99
 ! grep -q -- '--name basix-scrapling-mcp ' "$log" || status=99
 check 'failed alias and egress proof blocks managed mutation' 4 'Internal alias and direct-egress capability proof failed' 'codex mcp add'
+
+make_mocks; MOCK_REQUIRE_NETNS_TARGET=true run_installer
+check 'rootless netns mount target is prepared before capability proof' 0 'installation verified'
+
+make_mocks; MOCK_XDG_RUNTIME_DIR="$case_dir/missing-runtime" run_installer
+! grep -q -- '--name basix-scrapling-tor ' "$log" || status=99
+check 'missing rootless runtime blocks managed mutation' 4 'XDG_RUNTIME_DIR is missing or not writable' 'podman pull|codex mcp add'
+
+make_mocks; printf 'not a directory\n' >"$case_dir/not-a-runtime"; MOCK_XDG_RUNTIME_DIR="$case_dir/not-a-runtime" run_installer
+! grep -q -- '--name basix-scrapling-tor ' "$log" || status=99
+check 'unusable rootless runtime blocks managed mutation' 4 'XDG_RUNTIME_DIR is missing or not writable' 'podman pull|codex mcp add'
+
+make_mocks; MOCK_TMPDIR_DEBUG=empty run_installer
+! grep -q -- '--name basix-scrapling-tor ' "$log" || status=99
+check 'unparseable rootless temp path blocks managed mutation' 4 'temporary directory is missing or not writable' 'podman pull|codex mcp add'
+
+make_mocks; MOCK_ROOTLESS=false run_installer
+[[ ! -e "$case_dir/xdg-runtime/libpod/tmp/rootless-netns" ]] || status=99
+check 'rootful Podman skips the rootless repair' 0 'installation verified'
 
 make_mocks; MOCK_PROBE_FAIL=true MOCK_ROOTLESS=true MOCK_RUNROOT=/run/user/1000/containers run_installer
 ! grep -q -- '--name basix-scrapling-tor ' "$log" || status=99
@@ -327,6 +354,10 @@ check 'Codex failure restores pre-existing managed runtime' 8 'Could not add can
 secret='[{"name":"neutral","url":"https://token:very-secret@host/SCRAPLING","env":{"API_TOKEN":"never-print"}}]'
 make_mocks; printf '%s\n' "$secret" >"$case_dir/list.json"; run_installer --dry-run; grep -qE 'very-secret|never-print' "$case_dir/output" && status=99
 check 'diagnostics redact credentials and values' 0 '<redacted>'
+
+make_mocks; run_installer --dry-run
+[[ ! -e "$case_dir/xdg-runtime/libpod/tmp/rootless-netns" ]] || status=99
+check 'dry-run does not prepare or mutate the runtime' 0 'Dry run \(no changes\)'
 
 printf '%d passed, %d failed\n' "$passes" "$failures"
 grep -q '"make_request","open_request_session","open_session"' \

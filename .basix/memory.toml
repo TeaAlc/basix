@@ -238,3 +238,8 @@ insight = "The Scrapling installer must preflight running-container ownership, s
 date = "2026-08-29"
 category = "Verification"
 insight = "Before deleting a named runtime network, recheck its immutable ID and reconnect detached containers if the pre-removal check fails; wrappers must strip positional as well as keyword session IDs."
+
+[[entries]]
+date = "2026-08-29"
+category = "Verification"
+insight = "Rootless Podman can reuse a stale netns whose bind target is absent; prepare the runtime-specific rootless-netns mount target before any capability network probe, while still failing closed on missing runtime paths."
