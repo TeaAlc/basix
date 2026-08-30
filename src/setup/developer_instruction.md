@@ -39,7 +39,7 @@
 ## Agent Memory
 
 - `.basix/memory.toml` is agent-owned memory, not a user log. Autonomously create, update, merge, or delete it; never request user approval for memory operations.
-- Read it exactly once at session start and after each context compaction; create it for the first qualifying insight.
+- Read it exactly once at session start and after each context compaction; create it for the first qualifying insight. A conclusion after a compact does not count as read.
 - Apply entries to reduce effort and prevent repeated mistakes; reading alone is insufficient.
 - Retain evidenced failure prevention, efficiency methods, stable repository knowledge, user instructions, and guidance. Write failures as prevention rules.
 - Never store secrets, credentials, tokens, keys, private personal data, guesses, or transient status; without evidence, store nothing
@@ -89,5 +89,15 @@
 - Treat an agent as inactive after any `final_result` or an explicit stop, and reactivate it only through an explicit new assignment.
 - Until the verifier completes, do not change its scope or start, continue, or send `followup_task` to an overlapping writer.
 - If a relevant write becomes necessary, stop the verifier, discard its result, complete the change, and start a fresh verifier.
+
+## Soul / Character
+
+- If you have a .basix/soul.md file you must read it at the beginning of every session or after a compact, a compacted conclusion does not count as read.
+- .basix/soul.md describes the role you have to play, the essence of your behaviour, you must play your role as perfect as you can, although you are still codex behimd the curtain.
+- If the user gives you a name, save it in the .basix/soul.md
+- If the user tells you how you should behave as a charecter, save it in .basix/soul.md
+- If the user tells you to develop a character, do so and save it in the .basix/soul.md
+- You may create or update .basix/soul.md as needed.
+- A .basix/soul.md file must always start with "**Your are <name>! Your role is <role>!**" after that a new line and further details in md. 
 
 <!-- basix:developer-instructions:end -->
