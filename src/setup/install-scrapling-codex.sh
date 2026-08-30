@@ -83,7 +83,7 @@ list_help=$(codex mcp list --help 2>&1) || fail "$EXIT_CODEX" 'Codex MCP list is
 prepare_rootless_netns_mount() {
   # A reused rootless netns may lack the bind target Podman mounts XDG_RUNTIME_DIR onto.
   [[ $runtime == podman ]] || return 0
-  local rootless runtime_dir tmp_dir target
+  local rootless runtime_dir tmp_dir netns_root target resolv_conf
   rootless=$("$runtime" info --format '{{.Host.Security.Rootless}}' 2>/dev/null) || {
     printf 'Could not inspect Podman rootless mode; refusing the capability preflight.\n' >&2
     return "$EXIT_RUNTIME"
@@ -103,15 +103,37 @@ prepare_rootless_netns_mount() {
     printf 'Podman rootless temporary directory is missing or not writable: %s\n' "${tmp_dir:-unknown}" >&2
     return "$EXIT_RUNTIME"
   }
-  target="$tmp_dir/rootless-netns$runtime_dir"
-  if [[ ! -d $target ]]; then
-    mkdir -p "$target" || {
-      printf 'Could not prepare the Podman rootless netns mount target: %s\n' "$target" >&2
+  netns_root="$tmp_dir/rootless-netns"
+  [[ ! -L $netns_root ]] || {
+    printf 'Podman rootless netns root is a symlink: %s\n' "$netns_root" >&2
+    return "$EXIT_RUNTIME"
+  }
+  target="$netns_root$runtime_dir"
+  mkdir -p "$netns_root/run/systemd/resolve" "$netns_root/var/lib" "$target" || {
+    printf 'Could not prepare the Podman rootless netns mount targets under: %s\n' "$netns_root" >&2
+    return "$EXIT_RUNTIME"
+  }
+  chmod 700 "$target" || {
+    printf 'Could not secure the Podman rootless netns mount target: %s\n' "$target" >&2
+    return "$EXIT_RUNTIME"
+  }
+  resolv_conf="$netns_root/resolv.conf"
+  if [[ -L $resolv_conf || -d $resolv_conf || ( -e $resolv_conf && ! -f $resolv_conf ) ]]; then
+    printf 'Podman rootless netns resolv.conf is not a regular file: %s\n' "$resolv_conf" >&2
+    return "$EXIT_RUNTIME"
+  fi
+  if [[ ! -e $resolv_conf ]]; then
+    [[ -f /etc/resolv.conf && -r /etc/resolv.conf ]] || {
+      printf 'Host resolv.conf is not readable; refusing the rootless network preflight.\n' >&2
+      return "$EXIT_RUNTIME"
+    }
+    cp --preserve=mode -- /etc/resolv.conf "$resolv_conf" || {
+      printf 'Could not prepare the Podman rootless netns resolv.conf: %s\n' "$resolv_conf" >&2
       return "$EXIT_RUNTIME"
     }
   fi
-  chmod 700 "$target" || {
-    printf 'Could not secure the Podman rootless netns mount target: %s\n' "$target" >&2
+  [[ -f $resolv_conf && ! -L $resolv_conf ]] || {
+    printf 'Podman rootless netns resolv.conf could not be secured: %s\n' "$resolv_conf" >&2
     return "$EXIT_RUNTIME"
   }
 }

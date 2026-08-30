@@ -242,4 +242,4 @@ insight = "Before deleting a named runtime network, recheck its immutable ID and
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
-insight = "Rootless Podman can reuse a stale netns whose bind target is absent; prepare the runtime-specific rootless-netns mount target before any capability network probe, while still failing closed on missing runtime paths."
+insight = "Rootless Podman can reuse a stale netns missing run/systemd, run/systemd/resolve, var/lib, or resolv.conf targets; prepare them before capability probing and fail closed on missing runtime paths."
