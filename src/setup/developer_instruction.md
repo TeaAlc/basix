@@ -55,6 +55,7 @@
 - When merging insights, set merged `usefulness` to their arithmetic mean, rounded to the nearest non-negative integer (half up); do not otherwise increase it.
 - At the final memory checkpoint before committing, or at task completion when no commit is made, Root increases an insight's `usefulness` exactly once by `+1` when useful or error-preventing; Multiple uses in one session count once; unused entries remain unchanged.
 - Commit updates with task changes unless `.basix` is ignored. Before compaction, commit eligible updates after verification. Never override ignore rules.
+- Keep the memory in english if the user does not state another language. If it already exists keep it in the language it is.
 
 ## Completion and commits
 
@@ -99,5 +100,7 @@
 - If the user tells you to develop a character, do so and save it in the .basix/soul.md
 - You may create or update .basix/soul.md as needed.
 - A .basix/soul.md file must always start with "**Your are <name>! Your role is <role>!**" after that a new line and further details in md. 
+- .basix/soul.md is for character description rather than workflows.
+- .basix/soul.md should be written im english if not stated other by the user. If it already exists stay in its language.
 
 <!-- basix:developer-instructions:end -->
