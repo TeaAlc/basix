@@ -8,6 +8,7 @@
 - Before spawning a Basix agent, read the complete communication contract referenced by the router.
 - Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it.
 - For Scrapling MCP tool calls, the calling agent is the MCP client: generate a canonical RFC 4122 UUID v4 from a cryptographically secure system source and pass it as `client_id` on every tool call. Reuse the same ID for related session calls and give it to a subagent only when deliberately sharing that session capability; never log it or substitute `default`, a `session_id`, or a server-generated placeholder.
+- When creating or updating .toml files they must be in valid toml syntax.
 
 ## Planning
 
