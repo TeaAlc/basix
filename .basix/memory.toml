@@ -4,242 +4,296 @@ version = 1
 date = "2026-08-29"
 category = "Verification"
 insight = "Podman 4.9.3-era Aardvark cannot guarantee peer aliases plus blocked external DNS; relaxed policy permits DNS metadata but still requires alias resolution and failed direct TCP egress."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
 insight = "Tor container restarts can change its internal IP while Scrapling retains a literal SOCKS address; test restart drift and safely reconcile managed containers."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
 insight = "Codex MCP JSON may add safe null fields or new status values; fixture tests must track live shapes while strictly rejecting credentials and unknown non-null fields."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-04"
 category = "User Instruction"
 insight = "Treat memory as agent-owned: curate it proactively and selectively to improve efficiency, inform decisions, and prevent repeated mistakes without requesting user approval."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-04"
 category = "User Instruction"
 insight = "Allow strongly evidenced subagent insights to be proposed in final results, reviewed by Root, and selectively retained with the originating subagent type."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Native Basix agents communicate only with their direct spawning parent; parents independently resolve, instruct, or escalate new messages upward, never automatically forwarding child reports."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-08"
 category = "Tooling"
 insight = "Multi-file apply_patch calls can leave earlier hunks applied when a later file fails verification; use smaller patches and inspect affected files after failures."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
+usefulness = 1
 
 [[entries]]
 date = "2026-08-08"
 category = "Subagent Insight"
 subagent_type = "basix_file_explorer"
 insight = "Contract compression and wording-dependent assertions must change atomically; validator, setup, smoke, documentation, and role defaults independently encode the effort taxonomy."
+usefulness = 1
 
 [[entries]]
 date = "2026-08-08"
 category = "Verification"
 insight = "Basix skill descriptions containing the required prefix colon need YAML quotes; metadata checks must strip matching quotes before testing the Basix-Skill prefix."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-09"
 category = "Subagent Insight"
 subagent_type = "basix_verifier"
 insight = "Copy-tree uninstall must prune only inventory-derived directories; blanket empty-directory deletion can remove foreign directories. Preflight all manifest files before any payload mutation."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Workflow"
 insight = "Run focused negative tests before freezing verifier targets. After corrections, rerun focused checks first, then run the full verification once."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Verification"
 insight = "Validate metadata types before set membership; malformed TOML arrays or tables otherwise raise uncaught TypeError instead of the validator's controlled Invalid diagnostic."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Subagent Insight"
 subagent_type = "basix_verifier"
 insight = "Test configuration generators with control characters and shell-sensitive, quoted, and backslash paths; happy-path runtime coverage misses serialization and parser-boundary failures."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Verification"
 insight = "Compare live tmux bindings against same-version isolated list-keys output; hand-built config text differs after tmux normalization."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Tooling"
 insight = "Keep tmux extended-keys negotiated with `on`; forcing `always` may rewrite legacy controls for unaware applications. Never compensate with application keymaps or per-key tmux bindings."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Tooling"
 insight = "Codex rollouts under ~/.codex/sessions persist token_count totals; map CODEX_THREAD_ID and recursive sub_agent_activity agent_thread_id values to per-thread files without reading message content."
+usefulness = 1
 
 [[entries]]
 date = "2026-08-10"
 category = "Verification"
 insight = "Memory validation must assert required entries by content, not exact category or subagent-type counts; durable memory legitimately grows across sessions."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Subagent Insight"
 subagent_type = "basix_verifier"
 insight = "Compare thread-path assignments before visited-cycle short-circuits; otherwise conflicting cyclic or later references bypass ambiguity errors."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
 category = "Repository"
 insight = "All tests are component-owned under test/. verify-basix.sh aggregates deterministic agents, skills, and shared suites; test-setup.sh aggregates setup; live tests remain explicit."
+usefulness = 1
 
 [[entries]]
 date = "2026-08-11"
 category = "Verification"
 insight = "Normalize whitespace before asserting prose across wrapped Markdown lines; exact substring assertions otherwise fail when formatting alone inserts line breaks."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-11"
 category = "User Instruction"
 insight = "Exclude the configure-tmux suite from standard test aggregators; run it only when an explicit plan changes the configure-tmux skill."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-14"
 category = "Verification"
 insight = "When router policy moves into a required reference, validation must compose both files rather than demand duplicated runtime guidance."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-14"
 category = "Repository"
 insight = "Codex subagent session metadata stores parent_thread_id, agent_path, and agent_role together under payload.source.subagent.thread_spawn; collector discovery must prioritize this relation over legacy activity events."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-20"
 category = "Verification"
 insight = "Container reuse checks must bind configured and actual image identities, command, mounts, environment, network, health, and restart policy; labels and one matching image field are insufficient."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Repository"
 insight = "Legacy Basix Scrapling containers may have an empty Podman restart policy; replace them only after every other ownership and security invariant passes."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Podman inspect may serialize Config.Entrypoint as a string and Config.Cmd as a list; normalize both before combining commands during foreign-container scans."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Isolated rootless Podman can complete large registry pulls yet fail Tor bootstrap when its network namespace cannot mount or egress; record this separately from installer test evidence."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Rollback of a failed named container run must remove a runtime-issued ID (output or cidfile), never fall back to the name because a race can replace it with a foreign container."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Emit runtime status, health, logs, and Tor IP inside verify_mcp before returning failure; the ERR trap then rolls back while preserving diagnostics ordering."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Tooling"
 insight = "urllib build_opener may omit an empty ProxyHandler from handlers; retain the handler reference when tests must prove environment proxies are explicitly disabled."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Rootless Podman may leave State.Health.Status at starting because no healthcheck manager is active; verify Tor bootstrap with an explicit exec notice-file check and keep runtime health diagnostic-only."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Fresh rootless port forwarding can reset the first MCP POST; retry only transient transport failures before rollback, then parse nested JSON text for an exact IsTor=true boolean."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Current Codex emits streamable_http registrations with null auth/header fields and unsupported auth_status; accept only this exact safe shape, rejecting non-null credentials or unknown fields."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Verification"
 insight = "Scrapling singular browser tools dynamically call their bulk counterparts; policy wrappers must expose singular adapters that pass client_id into wrapped bulk methods to preserve session ownership."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "Tooling"
 insight = "Scrapling tool_describe reads the active MCP container; source-side metadata changes remain invisible until the managed service is reinstalled or restarted."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-21"
 category = "User Instruction"
 insight = "Every persistent function, whether in an MCP server or script, must document every parameter in its respective docstring."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-22"
 category = "Repository"
 insight = "Native agent TOMLs are auto-discovered by installers and setup copy tests; adding one needs no installer logic change, but requires deterministic agent and aggregate coverage."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-22"
 category = "Repository"
 insight = "Project and global installers share src/setup/lib/common.sh; per-agent install reports should use the canonical native TOML filenames and compare targets before copying to distinguish installed from updated."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-23"
 category = "Verification"
 insight = "Installer preflight must validate every managed config transition before payload or state mutation; otherwise a later marker failure can leave partial install or uninstall changes."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-23"
 category = "Repository"
 insight = "Marker ownership is insufficient for TOML safety: managed blocks must also prove effective top-level/table context so relocated blocks cannot report unchanged while Codex ignores them."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-23"
 category = "Verification"
 insight = "Round-trip tests must compare exact LF/CRLF/no-final foreign bytes; managed insertion separators and assignment line endings need reversible ownership, not only semantic TOML equality."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-26"
 category = "Verification"
 insight = "Project installer state stores absolute target paths; renaming a project without rewriting .codex/.basix-install-state makes existing trees fail closed during preflight."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-23"
 category = "Verification"
 insight = "Capability-specific permission installers must reject foreign network_proxy values even when only a Unix test socket is enabled; otherwise socket-only mode silently inherits broader network behavior."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-23"
 category = "Verification"
 insight = "Disabling all managed capabilities must still validate shared default, network_proxy, and profile ownership keys before returning unchanged; fail-closed removal is part of the safety contract."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
 insight = "The Scrapling installer must preflight running-container ownership, snapshot managed Tor/Scrapling IDs before replacement, and restore them on later Codex or HTTP failure."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
 insight = "Before deleting a named runtime network, recheck its immutable ID and reconnect detached containers if the pre-removal check fails; wrappers must strip positional as well as keyword session IDs."
+usefulness = 0
 
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
 insight = "Rootless Podman can reuse a stale netns missing run/systemd, run/systemd/resolve, var/lib, or resolv.conf targets; prepare them before capability probing and fail closed on missing runtime paths."
+usefulness = 0
+
+[[entries]]
+date = "2026-09-13"
+category = "Verification"
+insight = "The explorer benchmark extracts only search instructions and ignores runtime rules; measure full agent orchestration separately before claiming Basix-wide efficiency gains."
+usefulness = 0
