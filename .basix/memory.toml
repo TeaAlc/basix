@@ -46,7 +46,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 1
+usefulness = 2
 
 [[entries]]
 date = "2026-08-08"
@@ -59,7 +59,7 @@ usefulness = 1
 date = "2026-08-08"
 category = "Verification"
 insight = "Basix skill descriptions containing the required prefix colon need YAML quotes; metadata checks must strip matching quotes before testing the Basix-Skill prefix."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-09"
