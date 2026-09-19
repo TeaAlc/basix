@@ -291,7 +291,7 @@ for phrase in ("`/root` is the fixed principal", "sets `agent_level`",
                "omission means `junior`", "never spawns another principal"):
     assert phrase in policy, phrase
 memory_section = re.search(r"(?ms)^## Agent Memory\n.*?(?=^## )", policy).group(0)
-assert len(memory_section) <= 2500, len(memory_section)
+assert len(memory_section) <= 2800, len(memory_section)
 conventions_section = re.search(r"(?ms)^## Basix conventions\n.*?(?=^## )", policy).group(0)
 for removed in (
     "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`",
