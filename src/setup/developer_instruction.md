@@ -23,6 +23,7 @@
 - If no matching numbered file exists for that stem, use `001`; otherwise use one greater than the highest existing valid suffix. Never reuse a lower number or overwrite any existing path. Existing unsuffixed plans are legacy: do not rename them, but never create another unsuffixed plan; a new plan with that stem starts at `001` unless numbered successors exist. Treat malformed suffixes as legacy, preserve them, and exclude them from numbering without silently overwriting them. Number each logical stem independently.
 - Move a replaced or completed plan to `.basix/plans/archive/` with its exact numbered basename. After each phase, update the remaining plan from its results. At each phase, change affected parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens; keep the overall goal authoritative.
 - Estimate total effort before work begins. Above 10 million expected input tokens for the whole plan, ask whether to compact after every phase. If enabled, each phase closure must preserve, compactly but completely, everything needed to continue: findings, decisions, dependencies, and discovery results.
+- If the files that are needed to fix a bug are add a feature are discovered, list them in the plan with a short description of max 32 characters of the doings where the files need to be involved.
 
 ## Architecture Decision Records (ADRs)
 
