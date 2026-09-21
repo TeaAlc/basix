@@ -46,7 +46,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 2
+usefulness = 3
 
 [[entries]]
 date = "2026-08-08"
