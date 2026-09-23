@@ -250,7 +250,7 @@ assert router_levels == {"/root": "principal", **native_levels}
 pager_path = root / "agents/native/basix-pager.toml"
 pager = tomllib.loads(pager_path.read_text())
 assert pager["name"] == "basix_pager"
-assert pager["model"] == "gpt-5.6-luna" and pager["model_reasoning_effort"] == "xhigh"
+assert pager["model"] == "gpt-6-luna" and pager["model_reasoning_effort"] == "xhigh"
 assert pager["sandbox_mode"] == "workspace-write"
 assert "task_profile" in pager["developer_instructions"]
 for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
@@ -260,7 +260,7 @@ assert ".basix/contracts/<chain-id>.md" in pager["developer_instructions"]
 verifier_path = root / "agents/native/basix-verifier.toml"
 verifier = tomllib.loads(verifier_path.read_text())
 assert verifier["name"] == "basix_verifier"
-assert verifier["model"] == "gpt-5.6-luna" and verifier["model_reasoning_effort"] == "xhigh"
+assert verifier["model"] == "gpt-6-luna" and verifier["model_reasoning_effort"] == "xhigh"
 assert verifier["sandbox_mode"] == "read-only"
 for phrase in (
     "immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent", "write freeze",
@@ -710,9 +710,9 @@ for name, phrases in description_requirements.items():
 classification = (root / "skills/basix-agent-authoring/references/model-classification.md").read_text()
 for phrase in (
     "Highly complex reference roles",
-    "| Highly complex | `gpt-5.6-luna`, `xhigh` |",
-    "| Exceptional | `gpt-5.6-luna`, `max` |",
-    "gpt-5.6-luna` with `xhigh` reasoning",
+    "| Highly complex | `gpt-6-luna`, `xhigh` |",
+    "| Exceptional | `gpt-6-luna`, `max` |",
+    "gpt-6-luna` with `xhigh` reasoning",
     "bug hunting plus bug fixing",
     "coordinating subagents",
     "workspace-write",
@@ -752,7 +752,7 @@ for phrase in (
     "never scans `.basix/`",
     "Quality gates remain forbidden from inspecting `.basix/`",
     "basix_miraculix",
-    "gpt-5.6-sol",
+    "gpt-6-astra",
     "strongly recommended under extreme uncertainty",
     "Das weiß ich nicht",
 ):

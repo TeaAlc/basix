@@ -55,7 +55,7 @@ only `/root` may directly spawn a generic principal. Generic agents carry
 `agent_level` in their Principal assignment, default to junior, and have no native
 TOML metadata.
 
-- `basix_pager` is a Highly complex reference role using `gpt-5.6-luna` with
+- `basix_pager` is a Highly complex reference role using `gpt-6-luna` with
   `xhigh` reasoning and is the sole native agent with `workspace-write`. It
   is a fresh, single-assignment nontrivial web senior selected by its spawning parent with exactly one
   profile: `ui_ux`, `frontend`, `backend_web`, `fullstack`, or `integration`.
@@ -64,14 +64,14 @@ TOML metadata.
 
 The native read-only agents are:
 
-- `basix_verifier` is a Highly complex reference role using `gpt-5.6-luna` with
+- `basix_verifier` is a Highly complex reference role using `gpt-6-luna` with
   `xhigh` reasoning. It receives one immutable, bounded result in fresh context
   and reports `pass`, `pass_with_findings`, `remediation_required`, or
   `inconclusive` without modifying the target. A continued cycle is allowed only
   for the same unchanged result when the spawning parent documents why retained
   context is materially required; changed files, criteria, scope, or remediation
   always require a fresh verifier.
-- `basix_researcher` uses `gpt-5.6-luna` with medium reasoning for general research. Persistent
+- `basix_researcher` uses `gpt-6-luna` with medium reasoning for general research. Persistent
   developer instructions require the main agent to delegate all external research, website
   inspection, and scraping to it; the Basix skill supplies fresh-context and bounded-assignment
   orchestration. For web research
@@ -86,13 +86,13 @@ The native read-only agents are:
   `client_id`, and reuse it for related session operations. It must disclose the
   ID to a subagent only when intentionally sharing that session capability; the
   UUID is not server authentication and must not be logged or persisted by the installer.
-- `basix_file_explorer` uses `gpt-5.6-luna` with low reasoning for extensive local file
+- `basix_file_explorer` uses `gpt-6-luna` with low reasoning for extensive local file
   discovery. It inventories all supported file types, verifies evidence with `rg` and targeted
   reads, and forbids Lumen, other MCP search tools, and web search. Persistent developer instructions
   require the main agent to delegate broad evidence discovery, preferably before it begins; the Basix
   skill supplies fresh-context and bounded-assignment orchestration. The explorer discovers evidence read-only; implementation
   and final code analysis remain the main agent's responsibility.
-- `basix_miraculix` uses an explicit `gpt-5.6-sol` override with low reasoning
+- `basix_miraculix` uses an explicit `gpt-6-astra` override with low reasoning
   for a short, independent second opinion. A senior or principal may consult it,
   and consultation is strongly recommended under extreme uncertainty. Its fresh
   assignment contains one goal and bundled question values totaling at most 1024

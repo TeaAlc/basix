@@ -43,7 +43,7 @@ with open(sys.argv[1], "rb") as handle:
 profile = sys.argv[2]
 instructions = agent["developer_instructions"]
 required = ["ui_ux", "frontend", "backend_web", "fullstack", "integration"]
-if agent["name"] != "basix_pager" or agent["model"] != "gpt-5.6-luna" or agent["model_reasoning_effort"] != "xhigh":
+if agent["name"] != "basix_pager" or agent["model"] != "gpt-6-luna" or agent["model_reasoning_effort"] != "xhigh":
     raise SystemExit("invalid pager model configuration")
 if agent["sandbox_mode"] != "workspace-write":
     raise SystemExit("invalid pager sandbox configuration")

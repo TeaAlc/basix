@@ -27,7 +27,7 @@ skill-local links and scripts. Do not orchestrate running agents.
    Insert or replace the marked bootstrap block in
    `developer_instructions`; never duplicate or embed the full contract. Every native agent TOML description
    must begin exactly with `Basix-Agent: `.
-4. Use `gpt-5.6-luna` with `low`, `medium`, `high`, `xhigh`, or `max` according to the
+4. Use `gpt-6-luna` with `low`, `medium`, `high`, `xhigh`, or `max` according to the
    classification reference, unless the user explicitly overrides it. Put
    `# basix-agent-authoring: explicit-model-override` immediately before
    `model =` only for an explicit override. `xhigh` is the standard Luna level for

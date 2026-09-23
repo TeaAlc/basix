@@ -314,7 +314,7 @@ def validate_agent(path: Path) -> None:
     index = model_lines[0]
     override = index > 0 and lines[index - 1].strip() == OVERRIDE
     if not override:
-        need(parsed["model"] == "gpt-5.6-luna", f"{path}: non-Luna model requires explicit override marker")
+        need(parsed["model"] == "gpt-6-luna", f"{path}: non-Luna model requires explicit override marker")
         need(parsed["model_reasoning_effort"] in EFFORTS,
              f"{path}: effort must be low, medium, high, xhigh, or max")
     sandbox_lines = [i for i, line in enumerate(lines) if re.match(r"^\s*sandbox_mode\s*=", line)]
@@ -331,30 +331,30 @@ def validate_agent(path: Path) -> None:
         need(not sandbox_override,
              f"{path}: explicit sandbox override marker is reserved for basix_pager workspace-write")
     if parsed["name"] == "basix_file_explorer":
-        need(not override and parsed["model"] == "gpt-5.6-luna",
-             f"{path}: basix_file_explorer must use gpt-5.6-luna without override")
+        need(not override and parsed["model"] == "gpt-6-luna",
+             f"{path}: basix_file_explorer must use gpt-6-luna without override")
         need(parsed["model_reasoning_effort"] == "low",
              f"{path}: basix_file_explorer must use low reasoning effort")
     if parsed["name"] == "basix_researcher":
-        need(not override and parsed["model"] == "gpt-5.6-luna",
-             f"{path}: basix_researcher must use gpt-5.6-luna without override")
+        need(not override and parsed["model"] == "gpt-6-luna",
+             f"{path}: basix_researcher must use gpt-6-luna without override")
         need(parsed["model_reasoning_effort"] == "medium",
              f"{path}: basix_researcher must use medium reasoning effort")
     if parsed["name"] == "basix_miraculix":
-        need(override and parsed["model"] == "gpt-5.6-sol",
-             f"{path}: basix_miraculix must use explicitly overridden gpt-5.6-sol")
+        need(override and parsed["model"] == "gpt-6-astra",
+             f"{path}: basix_miraculix must use explicitly overridden gpt-6-astra")
         need(parsed["model_reasoning_effort"] == "low",
              f"{path}: basix_miraculix must use low reasoning effort")
         need(parsed["sandbox_mode"] == "read-only",
              f"{path}: basix_miraculix must remain read-only")
     if parsed["name"] == "basix_pager":
-        need(not override and parsed["model"] == "gpt-5.6-luna",
-             f"{path}: basix_pager must use classified gpt-5.6-luna without an override")
+        need(not override and parsed["model"] == "gpt-6-luna",
+             f"{path}: basix_pager must use classified gpt-6-luna without an override")
         need(parsed["model_reasoning_effort"] == "xhigh",
              f"{path}: basix_pager must use xhigh reasoning effort")
     if parsed["name"] == "basix_verifier":
-        need(not override and parsed["model"] == "gpt-5.6-luna",
-             f"{path}: basix_verifier must use classified gpt-5.6-luna without an override")
+        need(not override and parsed["model"] == "gpt-6-luna",
+             f"{path}: basix_verifier must use classified gpt-6-luna without an override")
         need(parsed["model_reasoning_effort"] == "xhigh",
              f"{path}: basix_verifier must use xhigh reasoning effort")
         need(parsed["sandbox_mode"] == "read-only",

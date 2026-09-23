@@ -7,7 +7,7 @@ path = Path(sys.argv[1])
 expected_name, effort, sandbox = sys.argv[2:5]
 agent = tomllib.loads(path.read_text(encoding="utf-8"))
 assert agent["name"] == expected_name
-assert agent["model"] == "gpt-5.6-luna"
+assert agent["model"] == "gpt-6-luna"
 assert agent["model_reasoning_effort"] == effort
 assert agent["sandbox_mode"] == sandbox
 assert agent["description"].startswith("Basix-Agent: ")

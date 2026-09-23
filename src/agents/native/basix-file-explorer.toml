@@ -3,7 +3,7 @@
 # basix-agent-authoring:metadata:end
 name = "basix_file_explorer"
 description = "Basix-Agent: Read-only file explorer for extensive local evidence discovery; assign a concrete filesystem question and expect a structured handoff to the spawning parent."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "low"
 sandbox_mode = "read-only"
 developer_instructions = """

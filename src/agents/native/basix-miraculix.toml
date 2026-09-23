@@ -4,7 +4,7 @@
 name = "basix_miraculix"
 description = "Basix-Agent: Read-only short-answer consultant for one goal and bundled questions when a strongly grounded second opinion is useful."
 # basix-agent-authoring: explicit-model-override
-model = "gpt-5.6-sol"
+model = "gpt-6-astra"
 model_reasoning_effort = "low"
 sandbox_mode = "read-only"
 developer_instructions = """

@@ -17,16 +17,16 @@ Its leading metadata block must include level `principal` and the standardized
 
 | Class | Default | Use when |
 |---|---|---|
-| Simple | `gpt-5.6-luna`, `low` | Bounded search, extraction, formatting, inventory, or short summary needs no material interpretation. |
-| Medium | `gpt-5.6-luna`, `medium` | Several sources require synthesis, evidence gathering, comparison, or limited interpretation without deep causal analysis. |
-| Complex | `gpt-5.6-luna`, `high` | Multi-step causal, dependency, security, architectural, state, lifecycle, or conflicting-requirement analysis is central. |
-| Highly complex | `gpt-5.6-luna`, `xhigh` | Demanding implementation, source-code verification, debugging and repair, or multi-stage planning with subagent coordination requires sustained reasoning across several interacting concerns. |
-| Exceptional | `gpt-5.6-luna`, `max` | Rare work combines multiple Highly-complex dimensions across a broad, high-risk scope and requires exhaustive reasoning throughout. |
+| Simple | `gpt-6-luna`, `low` | Bounded search, extraction, formatting, inventory, or short summary needs no material interpretation. |
+| Medium | `gpt-6-luna`, `medium` | Several sources require synthesis, evidence gathering, comparison, or limited interpretation without deep causal analysis. |
+| Complex | `gpt-6-luna`, `high` | Multi-step causal, dependency, security, architectural, state, lifecycle, or conflicting-requirement analysis is central. |
+| Highly complex | `gpt-6-luna`, `xhigh` | Demanding implementation, source-code verification, debugging and repair, or multi-stage planning with subagent coordination requires sustained reasoning across several interacting concerns. |
+| Exceptional | `gpt-6-luna`, `max` | Rare work combines multiple Highly-complex dimensions across a broad, high-risk scope and requires exhaustive reasoning throughout. |
 
 ## Highly complex reference roles
 
 The canonical `basix_pager` and `basix_verifier` are reference examples for the
-**Highly complex** class. Both use `gpt-5.6-luna` with `xhigh` reasoning as their
+**Highly complex** class. Both use `gpt-6-luna` with `xhigh` reasoning as their
 classification default, without an explicit model override marker.
 
 `basix_pager` performs demanding implementation and integration work while
