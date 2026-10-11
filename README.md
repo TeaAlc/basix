@@ -120,6 +120,7 @@ The installed skills provide these entry points:
 | `basix-planning` | Saved phase plans, numbering, revision, and archival |
 | `basix-adr` | Binding decision checks and ADR lifecycle |
 | `basix-agent-memory` | Evidence-based memory curation and retention |
+| `basix-ticket-management` | Service-independent ticket processing, metadata, and bounded creation recovery |
 | `basix-subagent-efficiency` | Task-level analysis of delegation attempts, retries, and recovery |
 | `basix-personality-model` | Evidence-based personality models and agent role specifications |
 | `configure-tmux` | tmux mouse, scrollback, clipboard, and extended-key troubleshooting |
@@ -137,6 +138,11 @@ that shape agent behavior:
 - Plans, persistent memory, and optional character instructions live under
   project-owned `.basix/`. Agents curate `.basix/memory.toml` autonomously and
   apply useful findings across sessions.
+- At session start and after compaction, agents load
+  [ticket management](src/skills/basix-ticket-management/SKILL.md) and silently
+  inspect existing open tickets and failed creation drafts. Coordinators own
+  project-local ticket metadata; retries require active authorized work and
+  verified persistence of the problem, with at most five additional attempts.
 - Basix provides binding ADR governance for durable, hard-to-reverse,
   cross-subsystem decisions. Agents read applicable active decisions and pause
   for explicit user confirmation before conflicting work or lifecycle changes.

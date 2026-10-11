@@ -10,6 +10,10 @@
 - For Scrapling MCP tool calls, the calling agent is the MCP client: generate a canonical RFC 4122 UUID v4 from a cryptographically secure system source and pass it as `client_id` on every tool call. Reuse the same ID for related session calls and give it to a subagent only when deliberately sharing that session capability; never log it or substitute `default`, a `session_id`, or a server-generated placeholder.
 - When creating or updating .toml files they must be in valid toml syntax.
 
+## Ticket management
+
+- At session start and after each context compaction, load the complete `basix-ticket-management` skill and silently inspect the project's `.basix/tickets/open/` and `.basix/tickets/failed/` if present. Report relevant action needs; follow the skill's authorization and retry rules. Do not create storage merely to inspect it.
+
 ## Soul / Character
 
 - If you have a .basix/soul.md file you must read it at the beginning of every session or after a compact, a compacted conclusion does not count as read.

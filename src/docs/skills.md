@@ -22,6 +22,25 @@ The [`basix-adr`](../skills/basix-adr/SKILL.md) skill is mandatory before planni
 
 The [`basix-agent-memory`](../skills/basix-agent-memory/SKILL.md) skill owns evidence-based memory curation, TOML shape, retention, language, merge scoring, and final session scoring. Startup reads and autonomous ownership stay in developer instructions; Contract 2.0 proposals retain their separate 24-word limit, while persisted insights allow 32 words.
 
+The [`basix-ticket-management`](../skills/basix-ticket-management/SKILL.md) skill
+defines service-independent ticket creation, processing, closure, reopening and
+recovery using existing authorized service tools. Load it completely at session
+start and after compaction; silently inspect existing `.basix/tickets/open/` and
+`failed/` without creating storage, and report relevant action needs. The
+coordinator alone writes project-local records, including delegated creation
+results. `open/` and `closed/` hold only five-field metadata for self-created
+tickets; processor-only work needs no local record. Service mappings distinguish
+instances and scopes, while IDs, confirmed creation times and filenames remain
+stable. Service content follows its default language and templates; local hints
+and errors are English. Full credential-free failed drafts preserve requests,
+UUIDs and every started attempt. At most five additional retries use minimum
+delays of 5 minutes, 30 minutes, 2 hours, 12 hours and 48 hours after the previous
+attempt; each requires a verified persistent problem and active authorization.
+Uncertain outcomes require an existing-ticket search, confirmed creation survives
+local write failures, and successful metadata is saved before draft deletion.
+There is no background retry scheduler. The skill contains the exact schemas,
+timestamp semantics, filename encoding and valid JSON examples.
+
 Saved-plan execution resolves model and effort independently: explicit user
 override, applicable specialist/skill settings, then `gpt-6.1-sol`/`low` runtime
 fallback. A model-only override retains applicable effort. Native authoring Luna

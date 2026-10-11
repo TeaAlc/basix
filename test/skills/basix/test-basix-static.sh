@@ -284,11 +284,15 @@ import tomllib
 from pathlib import Path
 
 root = Path(sys.argv[1])
-# Reverse only the four authorized activation lines, then prove all other bytes.
+# Reverse only the authorized ticket startup addition and four activation lines.
+# Prove all other bytes remain unchanged.
 # The fixed digest is the unchanged source baseline; installed tests need no Git.
 import hashlib
 instruction_bytes = (root / "setup/developer_instruction.md").read_bytes()
-baseline_bytes = instruction_bytes
+ticket_startup = "## Ticket management\n\n- At session start and after each context compaction, load the complete `basix-ticket-management` skill and silently inspect the project's `.basix/tickets/open/` and `.basix/tickets/failed/` if present. Report relevant action needs; follow the skill's authorization and retry rules. Do not create storage merely to inspect it.\n\n".encode()
+assert instruction_bytes.count(ticket_startup) == 1
+baseline_bytes = instruction_bytes.replace(ticket_startup, b"", 1)
+assert (root / "skills/basix-ticket-management/SKILL.md").is_file()
 for heading, skill, suffix in (
     ("Planning", "basix-planning", ""),
     ("Architecture Decision Records (ADRs)", "basix-adr", ""),
@@ -303,7 +307,35 @@ for heading, skill, suffix in (
     original = f"- TODO: Add skillname{suffix}".encode()
     baseline_bytes = baseline_bytes.replace(section, section.replace(replacement, original), 1)
 assert b"TODO: Add skillname" not in instruction_bytes
-assert hashlib.sha256(baseline_bytes).hexdigest() == "9ad2ddcc111dc735392f5ce15d83089ac9bd770361b2a5a5144f62248024fd78", "developer instructions changed outside authorized TODO spans"
+assert hashlib.sha256(baseline_bytes).hexdigest() == "9ad2ddcc111dc735392f5ce15d83089ac9bd770361b2a5a5144f62248024fd78", "developer instructions changed outside authorized TODO spans and ticket startup addition"
+# Validate the documented ticket data examples, not just skill discovery.
+import json
+ticket_skill = (root / "skills/basix-ticket-management/SKILL.md").read_text()
+ticket_examples = [json.loads(body) for body in re.findall(r"```json\n(.*?)\n```", ticket_skill, re.S)]
+assert len(ticket_examples) == 3
+systems, metadata, draft = ticket_examples
+assert len(systems) >= 2
+for system, mapping in systems.items():
+    assert re.fullmatch(r"[a-z0-9-]{1,16}", system)
+    assert set(mapping) == {"service", "instance", "scope", "access"}
+    assert all(isinstance(value, str) for value in mapping.values())
+assert set(metadata) == {"id", "datetime", "url", "title", "hints"}
+assert isinstance(metadata["id"], str) and len(metadata["title"]) <= 32
+assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", metadata["datetime"])
+import uuid
+assert uuid.UUID(draft["id"]).version == 4 and str(uuid.UUID(draft["id"])) == draft["id"]
+assert {"id", "datetime", "title", "hints", "request", "error", "initial_attempt", "retries"} <= set(draft)
+assert isinstance(draft["request"], dict) and len(draft["retries"]) <= 5
+for number, attempt in enumerate([draft["initial_attempt"], *draft["retries"]]):
+    assert set(attempt) == {"attempt", "started_at", "finished_at", "outcome", "error"}
+    assert attempt["attempt"] == number
+    assert attempt["outcome"] in {"pending", "failed", "uncertain", "confirmed"}
+for record in (metadata, draft):
+    assert isinstance(record["hints"], list)
+    assert all(isinstance(hint, str) for hint in record["hints"])
+for doc in (root.parent / "README.md", root / "docs/skills.md"):
+    assert "basix-ticket-management" in doc.read_text()
+
 instructions = (root / "setup/developer_instruction.md").read_text()
 assert instructions.count("<!-- basix:developer-instructions:start -->") == 1
 assert instructions.count("<!-- basix:developer-instructions:end -->") == 1

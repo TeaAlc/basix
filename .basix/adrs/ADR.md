@@ -7,3 +7,5 @@
 - [ADR 0008: GPT-6 agent models](ADR_0008_gpt-6-agent-models.md) — Luna default; Astra for Miraculix
 - [ADR 0010: Subagent model precedence](ADR_0010_subagent-model-selection-precedence.md) — Specialist selection before generic fallback
 - [ADR 0011: Context-related agent continuations](ADR_0011_context-related-agent-continuations.md) — Parent-authorized fixes and related follow-ups
+
+- [ADR 0012: Ticket data and retry model](ADR_0012_ticket-data-and-retry-model.md) — Durable ticket metadata and bounded recovery
