@@ -17,6 +17,13 @@ one enable/disable flag for each capability. The `test-socket` permission allows
 tests to use exactly `TARGET/test/test.sock`. Disable options remove only
 Basix-owned settings and fail closed on foreign overlapping values or damaged
 markers.
+Both modes discover complete canonical skill directories automatically, including
+`basix-subagent-management`, `basix-planning`, `basix-adr`, and
+`basix-agent-memory`. The plugin manifest discovers them through `./skills/`;
+no per-skill registration is required. The management tree contains the sole
+runtime communication contract. Managed updates remove the obsolete unchanged
+router-owned contract path while preserving locally modified and foreign files.
+
 The global installer also copies plugin and marketplace metadata and registers
 the plugin. The project installer uses the current directory when `TARGET` is
 omitted.
@@ -90,3 +97,7 @@ The Agents group lists every native agent and marks it as installed, updated, or
 unchanged. Project reports include the local access transition and its
 restart/socket or local-port warning; the global installer has no local access
 phase.
+
+The copied skill payload includes the management-owned Contract 2.0, its silent
+terminal-delivery guidance and authoring schema/validator. Native agents retain
+only the canonical bootstrap and their existing specialist configurations.

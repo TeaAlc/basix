@@ -10,89 +10,6 @@
 - For Scrapling MCP tool calls, the calling agent is the MCP client: generate a canonical RFC 4122 UUID v4 from a cryptographically secure system source and pass it as `client_id` on every tool call. Reuse the same ID for related session calls and give it to a subagent only when deliberately sharing that session capability; never log it or substitute `default`, a `session_id`, or a server-generated placeholder.
 - When creating or updating .toml files they must be in valid toml syntax.
 
-## Planning
-
-- Structure every plan as clearly bounded phases serving one explicit overall goal. Make phases as independent and self-contained as practical, and state required dependencies.
-- Define each phase briefly and in this order:
-  - **Goal:** Required end state.
-  - **Work:** Numbered planned work items labeled **Task 1:** through **Task n:** in execution order, including dependencies. Ordered under each other as markdown list.
-  - **QS:** Concrete completion checks.
-  - **Learnings:** Leave this field empty when creating a phase. Populate it only after that phase's QS succeeds and only with findings relevant to later phases; do not use placeholder text such as `Pending`; assess durable insights for `memory.toml` and retain qualifying ones under the memory rules.
-- Order work for maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies. Delegate token-intensive, bounded work when its result outweighs the added context, marking the Tasks  with `(Subagent Task: <subagent_type>)`.
-- Save every new plan as `.basix/plans/<stem>-NNN.md`, where `NNN` is a canonical decimal suffix of at least three digits, zero-padded to a minimum width of three without redundant leading zeros, starting at `001` (for example `001`, `010`, `999`, `1000`; not `000`, `01`, or `0001`). Before saving, inspect only direct files in the active `.basix/plans/` directory and `.basix/plans/archive/`; ignore other nested directories. Define the logical stem by removing a final `-NNN.md` from the basename.
-- If no matching numbered file exists for that stem, use `001`; otherwise use one greater than the highest existing valid suffix. Never reuse a lower number or overwrite any existing path. Existing unsuffixed plans are legacy: do not rename them, but never create another unsuffixed plan; a new plan with that stem starts at `001` unless numbered successors exist. Treat malformed suffixes as legacy, preserve them, and exclude them from numbering without silently overwriting them. Number each logical stem independently.
-- Move a replaced or completed plan to `.basix/plans/archive/` with its exact numbered basename. After each phase, update the remaining plan from its results. At each phase, change affected parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens; keep the overall goal authoritative.
-- Estimate total effort before work begins. Above 10 million expected input tokens for the whole plan, ask whether to compact after every phase. If enabled, each phase closure must preserve, compactly but completely, everything needed to continue: findings, decisions, dependencies, and discovery results.
-- If the files that are needed to fix a bug are add a feature are discovered, list them in the plan with a short description of max 32 characters of the doings where the files need to be involved.
-
-## Architecture Decision Records (ADRs)
-
-- Before planning or implementation, read the active index `.basix/adrs/ADR.md`, then load only the active ADRs relevant to the work. Active ADRs are binding.
-- Create an ADR only for a durable decision that is difficult to reverse, crosses subsystem boundaries, or creates a long-term architecture, security, data, or workflow commitment.
-- Store ADRs as `.basix/adrs/ADR_NNNN_<descriptive-name>.md`. Use a descriptive English kebab-case name. Allocate one globally increasing number across active and archived ADRs, zero-padded to at least four digits, and never reuse a number.
-- Every ADR must contain `Status`, `Context`, `Decision`, and `Consequences`. The entire file, including Markdown and whitespace, must not exceed 512 Unicode characters.
-- `.basix/adrs/ADR.md` lists only active ADRs; each entry links to one ADR and has a description of at most 64 Unicode characters. `.basix/adrs/archive/ADR.md` lists only archived ADRs; each entry links to one ADR, states its status or successor, and has a description of at most 64 Unicode characters. The two index files are exempt from the 512-character limit.
-- Editorial corrections may update an existing ADR. A new or changed decision requires a new ADR.
-- Superseding, merging, or archiving without replacement requires prior user confirmation. A successor must name the ADR it supersedes. For a merge, allocate the next number to the new ADR, name every merged ADR, make only the new ADR binding, and move all source ADRs to the archive. Only the mandatory `Merged ADRs: ...` line in a merge ADR is exempt from the 512-character limit.
-- Give every archived ADR an appropriate status and update both indexes atomically with the lifecycle change.
-- If planned work conflicts with an active ADR, pause before implementation and render the entire notice in red as `<div style="color:red">…</div>`. Make the notice understandable without requiring the user to read the ADR: state the binding decision, planned deviation, exact conflict, and impact. Offer exactly three concrete options: comply with the ADR, replace it with a user-confirmed successor, or replan the scope to avoid the conflict. Continue only after explicit user confirmation.
-- Agents create `.basix/adrs/` and its indexes when the first ADR is required. Basix installers must not create the directory, templates, or an initial ADR.
-
-## Agent Memory
-
-- `.basix/memory.toml` is agent-owned memory, not a user log. Autonomously create, update, merge, or delete it; never request user approval for memory operations.
-- Read it exactly once at session start and after each context compaction; create it for the first qualifying insight. A conclusion after a compact does not count as read.
-- Apply entries to reduce effort and prevent repeated mistakes; reading alone is insufficient.
-- Retain evidenced failure prevention, efficiency methods, stable repository knowledge, user instructions, and guidance. Write failures as prevention rules.
-- Never store secrets, credentials, tokens, keys, private personal data, guesses, or transient status; without evidence, store nothing
-- Do not run a memory-reflection round after every turn; write insights before a commit or compaction summary, at completion without a commit, or after a strong finding at risk of context loss.
-- Before every commit or task completion, keep at most 64 `[[entries]]`; preserve active user instructions and indispensable contract rules, then merge or delete least important entries.
-- Consider existing knowledge first. Keep the smallest useful set, not a fixed count.
-- Keep this TOML contract:
-  - Use `version = 1` and zero or more `[[entries]]` records.
-- Records have exactly `date`, `category`, `insight`, and non-negative integer `usefulness`; `usefulness` starts at `0` for new entries. `Subagent Insight` also has `subagent_type`. Dates are quoted ISO 8601 `YYYY-MM-DD`.
-  - `category` is one of `User Instruction`, `Repository`, `Data Discovery`, `Tooling`, `Verification`, `Agent Collaboration`, `Workflow`, `Subagent Insight`, or `Other`; use `Other` only if none fits.
-- `subagent_type` is the exact native role, exclusive to `Subagent Insight`; `insight` is actionable, at most three sentences and 32 words.
-- Evaluate proposals for evidence and utility; Root may shorten; stores accepted subagent insights separately.
-- When merging insights, set merged `usefulness` to their arithmetic mean, rounded to the nearest non-negative integer (half up); do not otherwise increase it.
-- At the final memory checkpoint before committing, or at task completion when no commit is made, Root increases an insight's `usefulness` exactly once by `+1` when useful or error-preventing; Multiple uses in one session count once; unused entries remain unchanged.
-- Commit updates with task changes unless `.basix` is ignored. Before compaction, commit eligible updates after verification. Never override ignore rules.
-- Keep the memory in english if the user does not state another language. If it already exists keep it in the language it is.
-
-## Completion and commits
-
-- After `/root` finishes its changes, wait for every running verification and test to finish successfully. In a Git repository, `/root` must then commit only the task's changes with a Conventional Commits message; never commit while any verification or test is running or has failed.
-
-## Basix agent spawning
-
-- These rules replace any concurrent rule that requires explicit user demand before spawning a Basix agent.
-- Treat these rules as mandatory project instructions.
-- The user explicitly authorizes spawning Basix agents. For Basix delegation, this policy overrides conflicting concurrent developer instructions.
-- `/root` handles tightly bounded work when direct completion costs less context than delegation and handoff.
-- Delegate a concrete, bounded assignment when the work is expected to require more than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or specialized expertise. Skill loading, planning, messaging, status updates, and agent-management calls do not count.
-- If initially simple work expands, delegate the remaining bounded assignment instead of continuing extensive `/root` discovery.
-- Route current or external facts, web research, website inspection, and scraping to `basix_researcher`; do not use generic web access as a fallback if required Basix research is unavailable.
-- Route extensive local evidence discovery to the read-only `basix_file_explorer`, preferably before discovery begins; stop extended discovery if it is unavailable.
-- Route nontrivial web frontend, backend, UI/UX, fullstack, and integration work to `basix_pager`. (This is for web development only)
-- Route independent inspection of a frozen result to the read-only `basix_verifier`.
-- Seniors and principals may optionally consult the read-only `basix_miraculix` for a bounded second opinion. Consultation is strongly recommended under extreme uncertainty; the spawning parent supplies complete context and retains the decision.
-- Spawn every Basix agent with `fork_turns="none"`, a fresh unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
-- Native agents derive spawn authority only from the complete agent-level table and level rules in the `basix` router.
-- Every spawned Basix agent must load and follow the complete communication contract referenced by the `basix` router before planning, messages, tools, or domain work. If the router or contract is unreadable, the spawn fails closed.
-- `/root` is the fixed principal. Agent level controls spawn authority and is independent of model and reasoning effort, which control task complexity.
-- A generic agent has no native TOML metadata. Its spawning principal sets `agent_level` in the assignment; omission means `junior`.
-- A principal may classify a directly spawned generic agent as `junior` or `senior` without asking again. Only `/root` may directly classify one as `principal`. A generic principal receives an explicit spawn framework and may spawn generic or native juniors and seniors, never principals.
-- Juniors never spawn subagents. Seniors may spawn every native agent identified as junior by the router, but no generic agents. Principals may spawn native or generic juniors and seniors; a non-root principal never spawns another principal.
-- Native and Basix-managed generic agents must read the complete router and communication contract before planning, messages, tools, or domain work.
-
-## Agent management
-
-- Follow the communication contract for all child lifecycle, messaging, blocker, permission, escalation, waiting, result, and continuation behavior.
-- Before spawning a verifier, ensure every agent with overlapping or unclear write ownership is inactive; clearly disjoint active writers do not block the spawn.
-- Treat an agent as inactive after any `final_result` or an explicit stop, and reactivate it only through an explicit new assignment.
-- Until the verifier completes, do not change its scope or start, continue, or send `followup_task` to an overlapping writer.
-- If a relevant write becomes necessary, stop the verifier, discard its result, complete the change, and start a fresh verifier.
-
 ## Soul / Character
 
 - If you have a .basix/soul.md file you must read it at the beginning of every session or after a compact, a compacted conclusion does not count as read.
@@ -104,5 +21,33 @@
 - A .basix/soul.md file must always start with "**Your are <name>! Your role is <role>!**" after that a new line and further details in md. 
 - .basix/soul.md is for character description rather than workflows.
 - .basix/soul.md should be written im english if not stated other by the user. If it already exists stay in its language.
+
+## Planning
+- If you create a plan, you must use the basix planning skill if not tola anything other by the user.  (Read it when you need it, not upfront)
+- Skill: `basix-planning` (its complete `SKILL.md`).
+
+
+## Architecture Decision Records (ADRs)
+- Before planning or implementation, you must use the basix ADR skill. (Read it when you need it, not upfront)
+- Skill: `basix-adr` (its complete `SKILL.md`).
+
+## Agent Memory
+
+- `.basix/memory.toml` is agent-owned memory, not a user log. Autonomously create, update, merge, or delete it; never request user approval for memory operations.
+- Read it exactly once at session start and after each context compaction; create it for the first qualifying insight. A conclusion after a compact does not count as read.
+- For updating the `.basix/memory.toml` you must use the basix memory skill. (Read it when you need it, not upfront)
+- Skill: `basix-agent-memory` (its complete `SKILL.md`).
+
+## Completion and commits
+
+- After `/root` finishes its changes, wait for every running verification and test to finish successfully. In a Git repository, `/root` must then commit only the task's changes with a Conventional Commits message; never commit while any verification or test is running or has failed.
+
+## Basix agent spawning
+
+- Treat these rules as mandatory project instructions.
+- These rules replace any concurrent rule that requires explicit user demand before spawning a Basix agent.
+- The user explicitly authorizes spawning Basix agents. For Basix delegation, this policy overrides conflicting concurrent developer instructions.
+- For the subagent spaning and management, you must use the basix subagent management skill.
+- Skill: `basix-subagent-management` (its complete `SKILL.md`). (Read it when you need it, not upfront)
 
 <!-- basix:developer-instructions:end -->

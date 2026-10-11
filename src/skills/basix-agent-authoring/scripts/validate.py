@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 import tomllib
 from pathlib import Path
 from typing import Any
 
-TYPES = {"plan", "status", "issue", "permission_request", "report_started", "intermediate_result", "final_result"}
+TYPES = {"issue", "permission_request", "final_result"}
 STATUSES = {"planned", "in_progress", "blocked", "completed", "completed_with_errors", "failed"}
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 OVERRIDE = "# basix-agent-authoring: explicit-model-override"
@@ -35,9 +36,14 @@ LEGACY_SPAWN_CLAUSES = (
 )
 BOOTSTRAP_START = "<!-- basix-agent-authoring:bootstrap:start -->"
 BOOTSTRAP_END = "<!-- basix-agent-authoring:bootstrap:end -->"
-CONTRACT_START = "<!-- basix-agent-authoring:contract:start version=1.4 -->"
+CONTRACT_START = "<!-- basix-agent-authoring:contract:start version=2.0 -->"
 CONTRACT_END = "<!-- basix-agent-authoring:contract:end -->"
-WORD_RE = re.compile(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", re.UNICODE)
+# Explicit whitespace matches the portable schema patterns and Python str.split.
+# Keep word counting independent of punctuation and script-specific word classes.
+WORD_SEPARATOR_RE = re.compile(
+    r"[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680"
+    r"\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+"
+)
 
 
 class Invalid(ValueError):
@@ -45,7 +51,8 @@ class Invalid(ValueError):
 
 
 def words(value: str) -> int:
-    return len(WORD_RE.findall(value))
+    """Count whitespace-delimited words in value using the schema's Unicode class."""
+    return sum(bool(part) for part in WORD_SEPARATOR_RE.split(value))
 
 
 def need(condition: bool, message: str) -> None:
@@ -62,44 +69,39 @@ def object_exact(value: Any, required: set[str], optional: set[str] = set()) -> 
     return value
 
 
+def positive_json_integer(value: Any) -> bool:
+    """Check value against JSON Schema's positive mathematical integer semantics.
+
+    Args:
+        value: Raw parsed JSON value, retained without coercion for replay checks.
+    """
+    return (type(value) is int and value >= 1) or (
+        type(value) is float and math.isfinite(value) and value.is_integer() and value >= 1
+    )
+
+
 def validate_error(value: Any, allow_details: bool) -> None:
     obj = object_exact(value, {"code", "message", "severity", "retryable"}, {"details"})
     for key in ("code", "message"):
         need(isinstance(obj[key], str) and bool(obj[key].strip()), f"error.{key} must be non-empty")
-    need(obj["severity"] in {"warning", "error", "fatal"}, "invalid error severity")
+    need(isinstance(obj["severity"], str) and obj["severity"] in {"warning", "error", "fatal"},
+         "invalid error severity")
     need(type(obj["retryable"]) is bool, "error.retryable must be boolean")
     need(allow_details or "details" not in obj, "error details are forbidden for this message type")
-
-
-def validate_plan_data(value: Any) -> dict[str, Any]:
-    need(isinstance(value, dict), "plan/status data must be an object")
-    need("plan_revision" in value and "checklist" in value, "plan data requires plan_revision and checklist")
-    need(type(value["plan_revision"]) is int and value["plan_revision"] >= 1, "plan_revision must be a positive integer")
-    checklist = value["checklist"]
-    need(isinstance(checklist, list) and 1 <= len(checklist) <= 8, "checklist must contain one to eight items")
-    ids: set[str] = set()
-    for index, item in enumerate(checklist, 1):
-        obj = object_exact(item, {"id", "text", "checked"})
-        need(isinstance(obj["id"], str) and bool(obj["id"].strip()), f"checklist item {index} needs an id")
-        need(obj["id"] not in ids, f"duplicate checklist id: {obj['id']}")
-        ids.add(obj["id"])
-        need(isinstance(obj["text"], str) and 1 <= words(obj["text"]) <= 12, f"checklist item {obj['id']} text exceeds 12 words")
-        need(type(obj["checked"]) is bool, f"checklist item {obj['id']} checked must be boolean")
-    return value
 
 
 def validate_message(value: Any) -> dict[str, Any]:
     required = {"contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"}
     msg = object_exact(value, required)
-    need(msg["contract_version"] == "1.4", "contract_version must be 1.4")
+    need(msg["contract_version"] == "2.0", "contract_version must be 2.0")
     kind = msg["message_type"]
-    need(kind in TYPES, "invalid message_type")
+    need(isinstance(kind, str) and kind in TYPES, "invalid message_type")
     for key in ("agent_name", "task_name", "summary"):
         need(isinstance(msg[key], str) and bool(msg[key].strip()), f"{key} must be non-empty")
-    need(type(msg["sequence"]) is int and msg["sequence"] >= 1, "sequence must be a positive integer")
-    need(type(msg["cycle_revision"]) is int and msg["cycle_revision"] >= 1,
+    need(positive_json_integer(msg["sequence"]), "sequence must be a positive integer")
+    need(positive_json_integer(msg["cycle_revision"]),
          "cycle_revision must be a positive integer")
-    need(msg["status"] in STATUSES, "invalid status")
+    need(isinstance(msg["status"], str) and msg["status"] in STATUSES, "invalid status")
     need(isinstance(msg["errors"], list), "errors must be an array")
     data = msg["data"]
     if isinstance(data, dict) and "subagent_insights" in data:
@@ -111,31 +113,14 @@ def validate_message(value: Any) -> dict[str, Any]:
             need(isinstance(insight, str) and bool(insight.strip()),
                  f"subagent insight {index} must be a non-empty string")
             need(words(insight) <= 24, f"subagent insight {index} exceeds 24 words")
-    concise = kind in {"issue", "intermediate_result"}
+    concise = kind == "issue"
     for error in msg["errors"]:
         validate_error(error, allow_details=not concise)
 
-    limit = 64 if kind in {"plan", "intermediate_result"} else 32 if kind in {"status", "issue", "report_started"} else None
-    need(limit is None or words(msg["summary"]) <= limit, f"{kind} summary exceeds {limit} words")
-    if kind == "plan":
-        need(msg["status"] == "planned", "plan status must be planned")
-        validate_plan_data(msg["data"])
-        need(not msg["errors"], "plan errors must be empty")
-    elif kind == "status":
-        need(msg["status"] == "in_progress", "status message status must be in_progress")
-        validate_plan_data(msg["data"])
-        need(not msg["errors"], "status errors must be empty")
-    elif kind == "report_started":
-        need(msg["status"] == "in_progress", "report_started status must be in_progress")
-        data = object_exact(msg["data"], {"report_type"})
-        need(data["report_type"] in {"intermediate_result", "final_result"},
-             "report_started report_type must be intermediate_result or final_result")
-        need(not msg["errors"], "report_started errors must be empty")
-    elif kind in {"issue", "intermediate_result"}:
-        need(msg["data"] is None, f"{kind} data must be null")
-        need(len(msg["errors"]) <= 3, f"{kind} permits at most three errors")
-        if kind == "issue":
-            need(bool(msg["errors"]), "issue requires at least one error")
+    if kind == "issue":
+        need(words(msg["summary"]) <= 32, "issue summary exceeds 32 words")
+        need(msg["data"] is None, "issue data must be null")
+        need(1 <= len(msg["errors"]) <= 3, "issue requires one to three errors")
     elif kind == "permission_request":
         need(msg["status"] == "blocked", "permission_request status must be blocked")
         data = object_exact(msg["data"], {"request_id", "action", "reason", "required_permission", "scope", "blocks_current_step"})
@@ -155,113 +140,45 @@ def validate_message(value: Any) -> dict[str, Any]:
 
 
 def validate_stream(messages: list[Any]) -> None:
+    """Validate logical deliveries; exact terminal replays are idempotent.
+
+    Explicit continuation authorization, context suitability and per-cycle target
+    freezes are parent policy,
+    not facts that a JSON-lines stream can establish.
+    """
     need(bool(messages), "stream is empty")
-    # State is keyed by agent identity.  Sequence numbers are global for that
-    # agent, while each task is one immutable assignment that may have explicit
-    # continuation cycles.
     state: dict[str, dict[str, Any]] = {}
+    deliveries: dict[tuple[str, str, int, int], dict[str, Any]] = {}
     for line, raw in enumerate(messages, 1):
         try:
             msg = validate_message(raw)
         except Invalid as exc:
             raise Invalid(f"line {line}: {exc}") from exc
-        agent = msg["agent_name"]
-        current = state.setdefault(agent, {
-            "sequence": 0,
-            "task": None,
-            "cycle": None,
-            "plan": None,
-            "final": False,
-            "ids": {},
-            "revision": 0,
-            "cycles": 0,
-            "open_report": None,
-        })
-        task = msg["task_name"]
-        need(msg["sequence"] > current["sequence"],
-             f"line {line}: sequence is not strictly increasing for agent {agent}")
-        if current["task"] is None:
-            current["task"] = task
-        else:
-            need(task == current["task"],
-                 f"line {line}: task_name changed for agent {agent}; use a fresh agent")
-        cycle = msg["cycle_revision"]
-        if current["cycle"] is None:
-            need(msg["message_type"] == "plan", f"line {line}: first task message must be plan")
-            need(cycle == 1, f"line {line}: initial cycle_revision must be 1")
-            current["cycle"] = cycle
-            current["cycles"] = 1
-            current["plan"] = None
-            current["final"] = False
-            current["ids"] = {}
-            current["revision"] = 0
-            current["open_report"] = None
-        elif cycle == current["cycle"]:
-            need(not current["final"], f"line {line}: message follows final_result for task {task}; explicit continuation required")
+        agent, task = msg["agent_name"], msg["task_name"]
+        # Normalize only lifecycle arithmetic; retain the raw object for replay equality.
+        sequence, cycle = int(msg["sequence"]), int(msg["cycle_revision"])
+        key = (agent, task, cycle, sequence)
+        if key in deliveries:
+            need(json.dumps(msg, sort_keys=True) == json.dumps(deliveries[key], sort_keys=True)
+                 and msg["message_type"] == "final_result",
+                 f"line {line}: conflicting or non-terminal replay")
+            continue
+        current = state.setdefault(agent, {"sequence": 0, "task": task, "cycle": 1, "final": False})
+        need(task == current["task"], f"line {line}: task_name changed; use a fresh agent")
+        need(sequence > current["sequence"], f"line {line}: sequence is not strictly increasing")
+        if cycle == current["cycle"]:
+            need(not current["final"], f"line {line}: message follows final_result; explicit continuation required")
         elif cycle == current["cycle"] + 1:
-            need(current["final"], f"line {line}: cycle_revision advanced before final_result")
-            need(msg["message_type"] == "plan",
-                 f"line {line}: continued cycle must begin with a plan")
-            current["cycle"] = cycle
-            current["cycles"] += 1
-            current["plan"] = None
-            current["final"] = False
-            current["ids"] = {}
-            current["revision"] = 0
-            current["open_report"] = None
+            need(current["sequence"] > 0 and current["final"],
+                 f"line {line}: cycle_revision advanced before final_result")
+            current["cycle"], current["final"] = cycle, False
         else:
-            need(False, f"line {line}: cycle_revision must increase by exactly one after explicit continuation")
-
-        current["sequence"] = msg["sequence"]
-        kind = msg["message_type"]
-        if current["open_report"] is not None:
-            if kind in {"status", "issue", "permission_request"}:
-                pass
-            else:
-                need(kind == current["open_report"],
-                     f"line {line}: expected announced {current['open_report']}, got {kind}")
-                current["open_report"] = None
-        elif kind == "report_started":
-            current["open_report"] = msg["data"]["report_type"]
-        elif kind == "intermediate_result":
-            need(False, f"line {line}: intermediate_result requires report_started")
-        if kind in {"plan", "status"}:
-            data = msg["data"]
-            revision = data["plan_revision"]
-            old_ids = current["ids"]
-            new_ids = {item["id"]: item["text"] for item in data["checklist"]}
-            if current["plan"] is None:
-                need(msg["message_type"] == "plan",
-                     f"line {line}: cycle must begin with a plan")
-                need(revision == 1,
-                     f"line {line}: first plan in a cycle must use plan_revision 1")
-            else:
-                need(revision >= current["revision"], f"line {line}: plan_revision decreased")
-                for item_id in old_ids.keys() & new_ids.keys():
-                    need(old_ids[item_id] == new_ids[item_id],
-                         f"line {line}: checklist id {item_id} changed text")
-                if msg["message_type"] == "status":
-                    need(revision == current["revision"],
-                         f"line {line}: structural revision requires a plan message")
-                    need(set(new_ids) == set(old_ids),
-                         f"line {line}: status changed checklist structure")
-                else:
-                    need(revision > current["revision"],
-                         f"line {line}: revised plan must increment plan_revision")
-            if msg["message_type"] == "plan":
-                current["plan"] = data
-                current["ids"] = new_ids
-                current["revision"] = revision
-        if kind == "final_result":
-            need(current["plan"] is not None,
-                 f"line {line}: final_result requires a plan in the current cycle")
-            need(not current["final"],
-                 f"line {line}: duplicate final_result in cycle {cycle}")
-            current["final"] = True
+            need(False, f"line {line}: cycle_revision must start at one and advance exactly one")
+        current["sequence"] = sequence
+        current["final"] = msg["message_type"] == "final_result"
+        deliveries[key] = msg
     for agent, current in state.items():
-        need(current["open_report"] is None,
-             f"agent {agent} stream has an uncompleted report_started announcement")
-        need(current["final"], f"agent {agent} stream must end with exactly one final_result per cycle")
+        need(current["final"], f"agent {agent} stream must end with exactly one logical final_result per cycle")
 
 
 def validate_agent(path: Path) -> None:

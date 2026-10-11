@@ -1,6 +1,6 @@
 ---
 name: basix
-description: Basix-Skill: Use whenever Basix is mentioned or when maintaining or extending its installable standards, skills, agents, installers, or shared structure.
+description: "Basix-Skill: Use whenever Basix is mentioned or when maintaining or extending its installable standards, skills, agents, installers, or shared structure."
 ---
 
 # Basix
@@ -28,19 +28,25 @@ repository, read
 work. Do not load that reference merely because a task uses installed Basix
 components.
 
-## Required communication contract
+## Required subagent management
 
-Every native Basix agent must read and follow
-[agent-communication-contract.md](references/agent-communication-contract.md)
-completely after loading this router and before sending a plan, using domain tools,
-or beginning domain work. This is the sole runtime copy of Contract 1.4. Native
-agent definitions contain only the validated bootstrap. If the contract cannot be
-loaded, the spawn fails closed.
+Before delegating or coordinating agents, and for every native or Basix-managed
+generic assignment, read [basix-subagent-management](../basix-subagent-management/SKILL.md)
+completely, then its complete
+[agent-communication-contract.md](../basix-subagent-management/references/agent-communication-contract.md).
+The management skill owns orchestration and the sole runtime copy of Contract 2.0.
+Load both after this router and before planning, messages, tools, or domain work.
+Read once per fresh context; during explicit parent continuation reread a source
+only after the parent explicitly says it changed. If this router, management skill,
+or contract is unreadable, the spawn fails closed.
 
 ## Basix agent spawning
 
 Agent level governs coordination and spawn authority; model and reasoning effort
-govern assignment complexity. Never infer one axis from the other.
+govern assignment complexity. Never infer one axis from the other. Model/effort
+selection follows the management skill: explicit user override, applicable
+specialist/skill settings, then `gpt-6.1-sol`/`low` runtime fallback, independently
+for each field. Saved plans do not override native specialist configuration.
 
 | Agent | Level |
 |---|---|
@@ -57,20 +63,27 @@ govern assignment complexity. Never infer one axis from the other.
   Their role, write, sandbox, and ownership boundaries still apply.
 - Principals may spawn native or generic juniors and seniors. A non-root principal
   never spawns another principal; only `/root` may directly spawn a generic principal.
-- A generic agent defaults to `agent_level: junior`. Its spawning principal may
-  explicitly set `agent_level` to `junior` or `senior`; `/root` may additionally
+- A generic agent defaults to `agent_level: junior` when omitted. Its spawning
+  principal sets `agent_level` in the assignment and may classify a directly
+  spawned generic agent as `junior` or `senior` without asking again; `/root` may additionally
   set it to `principal` for a direct generic spawn. A generic principal's assignment
   must state its spawn framework and prohibit principal children. Generic agents
   have no native TOML metadata.
 - All Basix-managed native and generic agents load this router and the complete
   communication contract before work. Level changes spawn authorization only;
-  Contract 1.4 messages and direct-parent communication remain unchanged.
+  Contract 2.0 messages and direct-parent communication remain unchanged.
 
-- Keep tightly bounded work with `/root` when direct completion costs less context than delegation and handoff. Delegate a concrete, bounded assignment when work is expected to require more than two substantive domain-tool calls, broad evidence ingestion, multiple steps, or specialized expertise. Skill loading, planning, messaging, status updates, and agent-management calls do not count.
-- If initially simple work expands, delegate the remaining bounded assignment instead of continuing extensive discovery.
-- Choose `basix_researcher` for current or external facts and website inspection, `basix_file_explorer` for extensive local evidence discovery, `basix_pager` for nontrivial web frontend, backend, UI/UX, fullstack, or integration work, and `basix_verifier` for independent read-only inspection of one frozen result.
-- Seniors and principals may optionally consult `basix_miraculix` for a bounded second opinion. Consultation is strongly recommended under extreme uncertainty; the spawning parent supplies the complete goal and questions and retains the decision.
-- Spawn every Basix agent with `fork_turns="none"`, a fresh and unique `task_name`, and a self-contained assignment covering its objective, owned scope, constraints, known changes, and required evidence or acceptance checks.
-- Keep researchers and file explorers read-only. Do not substitute generic web access when required research fails, and do not continue extended local discovery when the required file explorer fails.
-- Native agents derive their spawn authority only from their level and this table.
-- Follow the required communication contract for every spawned agent's lifecycle, messaging, blocker, permission, escalation, waiting, result, and continuation behavior.
+## On-demand workflows
+
+Before creating, revising, executing, completing, or archiving a saved phase plan,
+read [basix-planning](../basix-planning/SKILL.md) completely.
+
+Before planning or implementation, read [basix-adr](../basix-adr/SKILL.md)
+completely, then check the active ADR index and only relevant active decisions.
+Also load it before creating, editing, superseding, merging, or archiving ADRs.
+
+Before creating, updating, merging, deleting, retaining, or scoring agent memory
+or evaluating durable learnings or subagent insight proposals, read
+[basix-agent-memory](../basix-agent-memory/SKILL.md) completely. Startup and
+post-compaction memory reads remain governed by active developer instructions;
+a read alone does not require loading the curation workflow.

@@ -1,116 +1,366 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://basix.local/schemas/agent-message-1.4.json",
+  "$id": "https://basix.local/schemas/agent-message-2.0.json",
   "title": "Basix agent communication message",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contract_version", "message_type", "agent_name", "task_name", "sequence", "cycle_revision", "status", "summary", "data", "errors"],
+  "required": [
+    "contract_version",
+    "message_type",
+    "agent_name",
+    "task_name",
+    "sequence",
+    "cycle_revision",
+    "status",
+    "summary",
+    "data",
+    "errors"
+  ],
   "properties": {
-    "contract_version": {"const": "1.4"},
-    "message_type": {"enum": ["plan", "status", "issue", "permission_request", "report_started", "intermediate_result", "final_result"]},
-    "agent_name": {"type": "string", "minLength": 1},
-    "task_name": {"type": "string", "minLength": 1},
-    "sequence": {"type": "integer", "minimum": 1},
-    "cycle_revision": {"type": "integer", "minimum": 1},
-    "status": {"enum": ["planned", "in_progress", "blocked", "completed", "completed_with_errors", "failed"]},
-    "summary": {"type": "string", "minLength": 1},
+    "contract_version": {
+      "const": "2.0"
+    },
+    "message_type": {
+      "enum": [
+        "issue",
+        "permission_request",
+        "final_result"
+      ]
+    },
+    "agent_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+    },
+    "task_name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cycle_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "in_progress",
+        "blocked",
+        "completed",
+        "completed_with_errors",
+        "failed"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+    },
     "data": {},
     "errors": {
       "type": "array",
-      "items": {"$ref": "#/$defs/error"}
+      "items": {
+        "$ref": "#/$defs/error"
+      }
     }
   },
   "$defs": {
     "error": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message", "severity", "retryable"],
+      "required": [
+        "code",
+        "message",
+        "severity",
+        "retryable"
+      ],
       "properties": {
-        "code": {"type": "string", "minLength": 1},
-        "message": {"type": "string", "minLength": 1},
-        "severity": {"enum": ["warning", "error", "fatal"]},
-        "retryable": {"type": "boolean"},
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "severity": {
+          "enum": [
+            "warning",
+            "error",
+            "fatal"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        },
         "details": {}
-      }
-    },
-    "checklist_item": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "text", "checked"],
-      "properties": {
-        "id": {"type": "string", "minLength": 1},
-        "text": {"type": "string", "minLength": 1},
-        "checked": {"type": "boolean"}
-      }
-    },
-    "plan_data": {
-      "type": "object",
-      "additionalProperties": true,
-      "required": ["plan_revision", "checklist"],
-      "properties": {
-        "plan_revision": {"type": "integer", "minimum": 1},
-        "checklist": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"$ref": "#/$defs/checklist_item"}}
       }
     },
     "permission_data": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["request_id", "action", "reason", "required_permission", "scope", "blocks_current_step"],
+      "required": [
+        "request_id",
+        "action",
+        "reason",
+        "required_permission",
+        "scope",
+        "blocks_current_step"
+      ],
       "properties": {
-        "request_id": {"type": "string", "minLength": 1},
-        "action": {"type": "string", "minLength": 1},
-        "reason": {"type": "string", "minLength": 1},
-        "required_permission": {"type": "string", "minLength": 1},
-        "scope": {"type": "string", "minLength": 1},
-        "blocks_current_step": {"type": "boolean"}
-      }
-    },
-    "report_started_data": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["report_type"],
-      "properties": {
-        "report_type": {"enum": ["intermediate_result", "final_result"]}
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "required_permission": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "blocks_current_step": {
+          "type": "boolean"
+        }
       }
     },
     "concise_error": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message", "severity", "retryable"],
+      "required": [
+        "code",
+        "message",
+        "severity",
+        "retryable"
+      ],
       "properties": {
-        "code": {"type": "string", "minLength": 1},
-        "message": {"type": "string", "minLength": 1},
-        "severity": {"enum": ["warning", "error", "fatal"]},
-        "retryable": {"type": "boolean"}
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+        },
+        "severity": {
+          "enum": [
+            "warning",
+            "error",
+            "fatal"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        }
       }
     },
     "final_data": {
-      "if": {"type": "object"},
+      "if": {
+        "type": "object"
+      },
       "then": {
         "properties": {
           "subagent_insights": {
             "type": "array",
             "minItems": 1,
-            "items": {"type": "string", "minLength": 1, "pattern": "\\S"}
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+(?:[\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+){0,23}[\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+            }
           }
         }
       }
     },
     "non_final_data": {
-      "if": {"type": "object"},
-      "then": {"not": {"required": ["subagent_insights"]}}
+      "if": {
+        "type": "object"
+      },
+      "then": {
+        "not": {
+          "required": [
+            "subagent_insights"
+          ]
+        }
+      }
     }
   },
   "allOf": [
-    {"if": {"properties": {"message_type": {"const": "plan"}}}, "then": {"properties": {"status": {"const": "planned"}, "data": {"$ref": "#/$defs/plan_data"}, "errors": {"maxItems": 0}}}},
-    {"if": {"properties": {"message_type": {"const": "status"}}}, "then": {"properties": {"status": {"const": "in_progress"}, "data": {"$ref": "#/$defs/plan_data"}, "errors": {"maxItems": 0}}}},
-    {"if": {"properties": {"message_type": {"const": "issue"}}}, "then": {"properties": {"data": {"type": "null"}, "errors": {"minItems": 1, "maxItems": 3, "items": {"$ref": "#/$defs/concise_error"}}}}},
-    {"if": {"properties": {"message_type": {"const": "report_started"}}}, "then": {"properties": {"status": {"const": "in_progress"}, "data": {"$ref": "#/$defs/report_started_data"}, "errors": {"maxItems": 0}}}},
-    {"if": {"properties": {"message_type": {"const": "intermediate_result"}}}, "then": {"properties": {"data": {"type": "null"}, "errors": {"maxItems": 3, "items": {"$ref": "#/$defs/concise_error"}}}}},
-    {"if": {"properties": {"message_type": {"const": "permission_request"}}}, "then": {"properties": {"status": {"const": "blocked"}, "data": {"$ref": "#/$defs/permission_data"}, "errors": {"maxItems": 0}}}},
-    {"if": {"properties": {"message_type": {"const": "final_result"}}}, "then": {"properties": {"data": {"$ref": "#/$defs/final_data"}}}, "else": {"properties": {"data": {"$ref": "#/$defs/non_final_data"}}}},
-    {"if": {"properties": {"message_type": {"const": "final_result"}, "status": {"const": "completed"}}}, "then": {"properties": {"errors": {"maxItems": 0}}}},
-    {"if": {"properties": {"message_type": {"const": "final_result"}, "status": {"const": "completed_with_errors"}}}, "then": {"properties": {"data": {"not": {"type": "null"}}, "errors": {"minItems": 1}}}},
-    {"if": {"properties": {"message_type": {"const": "final_result"}, "status": {"const": "failed"}}}, "then": {"properties": {"errors": {"minItems": 1}}}}
-  ]
+    {
+      "if": {
+        "properties": {
+          "message_type": {
+            "const": "issue"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "null"
+          },
+          "errors": {
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/$defs/concise_error"
+            }
+          },
+          "summary": {
+            "pattern": "^[\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+(?:[\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+){0,31}[\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "message_type": {
+            "const": "permission_request"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          },
+          "data": {
+            "$ref": "#/$defs/permission_data"
+          },
+          "errors": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "message_type": {
+            "const": "final_result"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/final_data"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/non_final_data"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "message_type": {
+            "const": "final_result"
+          },
+          "status": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "message_type": {
+            "const": "final_result"
+          },
+          "status": {
+            "const": "completed_with_errors"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "not": {
+              "type": "null"
+            }
+          },
+          "errors": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "message_type": {
+            "const": "final_result"
+          },
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "message_type": {
+            "const": "final_result"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "completed",
+              "completed_with_errors",
+              "failed"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$comment": "Word limits count non-empty runs separated by the explicit Unicode whitespace class in their patterns (Python str.split whitespace); required strings contain a non-whitespace character."
 }

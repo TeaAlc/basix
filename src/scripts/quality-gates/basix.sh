@@ -43,7 +43,7 @@ qg_classify_path() {
       QG_KNOWN=1
       QG_REQUIRED_GATES=(static-policy setup-aggregate)
       ;;
-    src/skills/basix/references/*)
+    src/skills/basix/references/*|src/skills/basix-subagent-management/*|src/skills/basix-planning/*|src/skills/basix-adr/*|src/skills/basix-agent-memory/*)
       QG_KNOWN=1
       QG_REQUIRED_GATES=(static-policy basix-aggregate)
       QG_REVIEW_REQUIRED=1

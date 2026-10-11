@@ -75,14 +75,15 @@ class VerifierSmokeTests(unittest.TestCase):
         self.assertFalse(run.may_follow_up({"src/result.txt"}))
         self.assertTrue(run.may_follow_up({"docs/other.md"}))
 
-    def test_reopening_writes_discards_run_and_requires_fresh_verifier(self):
+    def test_reopening_writes_discards_run_before_new_frozen_cycle(self):
         run = VerificationRun({"src/result.txt"})
         run.reopen_for_write()
         self.assertFalse(run.active)
         self.assertTrue(run.result_discarded)
-        fresh_run = VerificationRun({"src/result.txt"})
-        self.assertIsNot(run, fresh_run)
-        self.assertTrue(fresh_run.active)
+        next_cycle = VerificationRun({"src/remediated.txt"})
+        self.assertTrue(next_cycle.active)
+        self.assertFalse(next_cycle.may_follow_up({"src/remediated.txt"}))
+        self.assertTrue(run.result_discarded)
 
     def test_evidence_verdicts_remain_bounded(self):
         self.assertEqual(verify(b"accepted", b"accepted", True)["verdict"], "pass")

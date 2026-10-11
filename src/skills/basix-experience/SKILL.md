@@ -159,3 +159,12 @@ qualitative effects unless telemetry supports exact values.
 Finish with one prioritized improvement recommendation identifying the single
 best next change for a similar session. Keep it evidence-based and do not repeat
 all five table rows.
+
+## Bounded saved-plan analysis
+
+For an explicitly requested saved-plan companion, follow
+[basix-planning](../basix-planning/SKILL.md) and reuse only relevant evidence rules;
+this independent session-review format and its five opportunities are not imposed
+on that companion. The collector reports thread/tree telemetry, not task/cycle
+attribution. Do not assign aggregate session totals to a task or invent allocation.
+A lightweight task log may support qualitative findings without exact metrics.

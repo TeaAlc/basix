@@ -1,7 +1,7 @@
 # Agents
 
 The persistent Basix developer instructions require Root to load the available
-`basix` router skill and its referenced communication contract before any specialized
+`basix` router skill, the required management skill, and its communication contract before any specialized
 Basix skill or Basix agent. Instructions are reread only when changed or explicitly
 requested. Root completes tightly bounded,
 compact work directly and delegates concrete assignments expected to require more
@@ -57,7 +57,7 @@ TOML metadata.
 
 - `basix_pager` is a Highly complex reference role using `gpt-6-luna` with
   `xhigh` reasoning and is the sole native agent with `workspace-write`. It
-  is a fresh, single-assignment nontrivial web senior selected by its spawning parent with exactly one
+  is a bounded nontrivial web senior selected by its spawning parent with exactly one
   profile: `ui_ux`, `frontend`, `backend_web`, `fullstack`, or `integration`.
   the spawning parent owns the architecture, scope, acceptance gates, and any shared contract;
   the pager owns only its assigned files and may not expand its profile.
@@ -65,12 +65,10 @@ TOML metadata.
 The native read-only agents are:
 
 - `basix_verifier` is a Highly complex reference role using `gpt-6-luna` with
-  `xhigh` reasoning. It receives one immutable, bounded result in fresh context
+  `xhigh` reasoning. It receives one immutable, bounded result per authorized cycle
   and reports `pass`, `pass_with_findings`, `remediation_required`, or
-  `inconclusive` without modifying the target. A continued cycle is allowed only
-  for the same unchanged result when the spawning parent documents why retained
-  context is materially required; changed files, criteria, scope, or remediation
-  always require a fresh verifier.
+  `inconclusive` without modifying the target. Parent-authorized reuse, including
+  related remediation or changed targets between frozen cycles, follows Contract 2.0.
 - `basix_researcher` uses `gpt-6-luna` with medium reasoning for general research. Persistent
   developer instructions require the main agent to delegate all external research, website
   inspection, and scraping to it; the Basix skill supplies fresh-context and bounded-assignment
@@ -91,7 +89,10 @@ The native read-only agents are:
   reads, and forbids Lumen, other MCP search tools, and web search. Persistent developer instructions
   require the main agent to delegate broad evidence discovery, preferably before it begins; the Basix
   skill supplies fresh-context and bounded-assignment orchestration. The explorer discovers evidence read-only; implementation
-  and final code analysis remain the main agent's responsibility.
+  and final code analysis remain the main agent's responsibility. Active scope exclusions
+  apply to inventories, content searches and fallback commands. While developing
+  Basix, exclude repository-local `.codex/` and `.agents/`; in other projects,
+  relevant canonical configuration remains eligible unless instructions exclude it.
 - `basix_miraculix` uses an explicit `gpt-6-astra` override with low reasoning
   for a short, independent second opinion. A senior or principal may consult it,
   and consultation is strongly recommended under extreme uncertainty. Its fresh
@@ -104,8 +105,8 @@ The native read-only agents are:
   continuation is the same topic; a new topic requires a fresh agent.
 
 Every native TOML contains one exact managed bootstrap rather than the complete
-contract. It loads the router, persistent developer instructions, and the router-owned
-Contract 1.4 before any plan, contract message, tool call, or domain work. An
+contract. It loads the router, persistent developer instructions, the management skill, and the management-owned
+Contract 2.0 before any plan, contract message, tool call, or domain work. An
 unreadable source fails closed without an invented message format.
 
 Technical content and handoff payloads use English, while visible chat confirmations and errors use the
@@ -115,11 +116,11 @@ payload at `$CODEX_HOME/basix/agents/`; project setup exposes it at
 managed absolute `[agents.<name>].config_file` entry. Basix never writes its
 TOMLs into the shared global or project `agents/` directories.
 
-Contract 1.4 is the sole source for runtime communication. Every native child sends
+Contract 2.0 is the sole source for runtime communication. Every native child sends
 only to its direct spawning parent. The parent decides whether to resolve, instruct
 the child, or author a new escalation to its own parent; it never forwards a child
-message automatically. The contract also owns cycles, plans, status cadence, issues,
-permissions, reports, continuations, waiting, visible confirmations, and terminality.
+message automatically. The contract also owns silent cycles, genuine issues,
+permissions, mandatory terminal delivery, continuations, waiting and acceptance.
 
 ## Native child spawning
 
@@ -128,7 +129,7 @@ Native juniors spawn nobody; seniors may start every native type identified as
 junior in that table, but no generic agent. Role-specific read/write, sandbox,
 ownership, and domain boundaries remain in force.
 Every direct and nested spawn uses `fork_turns="none"`, a fresh unique task name, a
-self-contained assignment, and its own router-and-contract bootstrap.
+self-contained assignment, and its own router, management, and contract bootstrap.
 
 ## Verification assignment and lifecycle
 
@@ -148,9 +149,10 @@ The verifier treats worker claims as untrusted evidence and keeps the target
 read-only. During the run, the parent may neither change the verification scope nor
 start, continue, or send `followup_task` to an overlapping writer. If a relevant
 write becomes necessary, the parent first stops the verifier, discards its result,
-completes the change, and starts a fresh verifier. A final report contains scoped
+completes the change, and starts a new frozen review with the same eligible agent
+or a fresh verifier under Contract 2.0. A final report contains scoped
 checks, evidence-backed findings, unverified checks, worker-claim mismatches,
-concrete actions, and whether fresh re-verification is required.
+concrete actions, and the required next review scope and evidence.
 
 The parent may also provide explicit read-only paths to plan or ADR files needed as
 verification context; the parent chooses those paths. The verifier reads only the
@@ -184,9 +186,9 @@ constraints: <missing tools, permissions, network, or generated-file limits>
 mutation_window: relevant writers inactive before spawn; write freeze held through verifier completion
 ```
 
-Contract 1.4 governs verifier cycles and continuations. Remediation checks, changed
-acceptance criteria, expanded scope, or a new result require a new
-fresh-context verifier rather than continuation.
+Contract 2.0 governs verifier cycles and continuations. The parent decides context
+suitability and explicitly authorizes updated assignments between cycles. Each
+review freezes its target through completion; unrelated work uses a fresh agent.
 
 ## Pager selection and start assignment
 
@@ -207,8 +209,8 @@ non-goals, acceptance gates, known worktree changes, required skills, allowed
 delegations, exact verification commands, and any interface-contract revision.
 The recommended name shape is `pager_<profile>_<target>_<date>_<run>`.
 
-The pager routes current or external facts to a fresh `basix_researcher` and
-extensive local discovery to a fresh `basix_file_explorer`; child names are
+The pager routes current or external facts to `basix_researcher` and
+extensive local discovery to `basix_file_explorer`; child names are
 unique, bounded, and read-only. The pager receives their messages directly and
 decides whether to resolve, instruct, or escalate. It must request an ownership extension before
 editing shared files and may not broaden its profile or assignment.
@@ -229,7 +231,7 @@ done
 ```
 
 Expected observations are a profile-scoped plan, repository evidence before edits,
-applicable quality gates, and Contract 1.4-compliant communication with the direct
+applicable quality gates, and Contract 2.0-compliant communication with the direct
 parent. The launcher and automated tests verify configuration and argument routing
 only; live web/Scrapling capability and end-to-end review behavior are manual checks.
 
@@ -247,12 +249,13 @@ finishes with a fresh integration pager. Parallel work is safe only when the
 interface is frozen, ownership is disjoint, contract sections are separate,
 shared generated outputs are untouched, and Root has planned integration.
 
-Review, fixes, finalization, and terminal behavior follow Contract 1.4. The pager
-stays within assigned ownership, and new work gets a fresh pager.
+Review, fixes, finalization, and terminal behavior follow Contract 2.0. The pager
+stays within assigned ownership; parent-authorized fixes and context-related
+follow-ups use the contract's reuse policy.
 
 ## Parent coordination
 
-Contract 1.4 defines wait timing, status cadence, escalation, result handling, and
+Contract 2.0 defines exact long waits, silent work, escalation, terminal delivery, and
 continuations for every parent-child level. Role-specific native-agent behavior
 remains outside the managed communication block.
 
@@ -266,3 +269,17 @@ For isolated explorer benchmarks, run:
 This runner extracts only the marked search instructions from the native TOML, ignores user
 configuration and rules, disables web search, retains a read-only sandbox, and can save the JSONL
 event trace for tool-policy audits.
+
+Every dispatch resolves model and effort independently: explicit user override,
+applicable specialist/skill settings, then `gpt-6.1-sol`/`low` runtime fallback.
+A model-only user override retains applicable effort. Saved plans preserve native
+specialist routing and configured settings; generic executors receive fallback
+only when no more explicit setting applies. Unsupported selected settings block
+dispatch without substitution; every dispatch uses `fork_turns="none"`. Root counts at most three
+active descendants, including nested children, and grants nested slots explicitly.
+Parallel work needs independent dependencies, disjoint writes and isolated mutable
+resources; dependent work waits for accepted predecessor results. A delivered
+terminal, inactivity, passing checks and parent acceptance are distinct states.
+All `wait_agent` calls use exactly `timeout_ms: 1800000`; timeout prompts bounded
+budget-aware diagnosis, without automatic cancellation or infinite waiting.
+Success sends one `final_result` through `send_message`; silence is not receipt.

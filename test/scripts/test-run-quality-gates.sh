@@ -77,6 +77,11 @@ if grep -Fq 'All deterministic' <<<"$docs"; then exit 1; fi
 [[ -e $tmp/docs-logs/diff-check.log ]]
 
 hash=$(sha256sum "$ROOT/src/setup/developer_instruction.md" | awk '{print $1}')
+for management_path in src/skills/basix-subagent-management/SKILL.md src/skills/basix-subagent-management/references/agent-communication-contract.md src/skills/basix-planning/SKILL.md src/skills/basix-adr/SKILL.md src/skills/basix-agent-memory/SKILL.md; do
+  management=$($RUNNER --changed-file "$management_path" --dry-run)
+  grep -Fq 'review-required=independent frozen review' <<<"$management"
+done
+
 printf 'review result: pass\n' >"$tmp/review.txt"
 policy=$($RUNNER \
   --changed-file src/setup/developer_instruction.md \

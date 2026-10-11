@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3] / "src/skills/basix-agent-authoring"
 SCRIPT = ROOT / "scripts" / "validate.py"
 BOOTSTRAP_REFERENCE = ROOT / "references" / "native-agent-bootstrap.md"
-CONTRACT_REFERENCE = ROOT.parent / "basix" / "references" / "agent-communication-contract.md"
+CONTRACT_REFERENCE = ROOT.parent / "basix-subagent-management" / "references" / "agent-communication-contract.md"
 PAGER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-pager.toml"
 VERIFIER_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-verifier.toml"
 MIRACULIX_NATIVE = ROOT.parents[1] / "agents" / "native" / "basix-miraculix.toml"
@@ -20,18 +20,6 @@ SPEC = importlib.util.spec_from_file_location("authoring_validate", SCRIPT)
 validator = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader
 SPEC.loader.exec_module(validator)
-
-
-def plan(sequence=1, revision=1, checklist=None, cycle=1, agent="tester", task="task"):
-    return {
-        "contract_version": "1.4", "message_type": "plan", "agent_name": agent,
-        "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "planned",
-        "summary": "Inspect and report.",
-        "data": {"plan_revision": revision, "checklist": checklist or [
-            {"id": "inspect", "text": "Inspect inputs", "checked": False},
-            {"id": "report", "text": "Report findings", "checked": False},
-        ]}, "errors": [],
-    }
 
 
 UNSET = object()
@@ -49,18 +37,10 @@ Scrapling requires Podman and routes all web requests through the Tor network.
 
 def final(sequence=2, status="completed", errors=None, data=UNSET, cycle=1, agent="tester", task="task"):
     return {
-        "contract_version": "1.4", "message_type": "final_result", "agent_name": agent,
+        "contract_version": "2.0", "message_type": "final_result", "agent_name": agent,
         "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": status,
         "summary": "Work finished.", "data": {} if data is UNSET else data,
         "errors": [] if errors is None else errors,
-    }
-
-
-def report_started(sequence, report_type, cycle=1, agent="tester", task="task"):
-    return {
-        "contract_version": "1.4", "message_type": "report_started", "agent_name": agent,
-        "task_name": task, "sequence": sequence, "cycle_revision": cycle, "status": "in_progress",
-        "summary": "Preparing requested report.", "data": {"report_type": report_type}, "errors": [],
     }
 
 
@@ -71,233 +51,210 @@ def error(details=False):
     return value
 
 
+def issue(sequence=1, **kw):
+    return {**final(sequence, **kw), "message_type": "issue", "status": "blocked",
+            "data": None, "errors": [error()]}
+
+
+def permission(sequence=1):
+    return {**final(sequence), "message_type": "permission_request", "status": "blocked",
+            "data": {"request_id": "p1", "action": "read", "reason": "needed",
+                     "required_permission": "read", "scope": "/external", "blocks_current_step": True}}
+
+
 class MessageTests(unittest.TestCase):
-    def test_all_message_types(self):
-        messages = [plan()]
-        messages.append({**plan(2), "message_type": "status", "status": "in_progress"})
-        messages.append({**plan(3), "message_type": "issue", "status": "blocked", "data": None, "errors": [error()]})
-        messages.append({**plan(4), "message_type": "permission_request", "status": "blocked", "data": {
-            "request_id": "p1", "action": "read outside workspace", "reason": "Evidence required",
-            "required_permission": "filesystem read", "scope": "/external/file", "blocks_current_step": True,
-        }})
-        messages.append(report_started(5, "intermediate_result"))
-        messages.append({**plan(6), "message_type": "intermediate_result", "status": "in_progress", "data": None})
-        messages.append(final(7))
-        for message in messages:
+    def test_allowed_and_old_messages(self):
+        for message in (final(), issue(), permission()):
             validator.validate_message(message)
+        for kind in ("plan", "status", "report_started", "intermediate_result"):
+            with self.assertRaises(validator.Invalid):
+                validator.validate_message({**final(), "message_type": kind})
+        for mutation in ({"contract_version": "1.4"}, {"extra": True}, {"sequence": True}, {"cycle_revision": 0}):
+            with self.assertRaises(validator.Invalid):
+                validator.validate_message({**final(), **mutation})
 
-    def test_rejects_extra_field_and_wrong_version(self):
-        with self.assertRaises(validator.Invalid):
-            validator.validate_message({**plan(), "extra": True})
-        with self.assertRaises(validator.Invalid):
-            validator.validate_message({**plan(), "contract_version": "2.0"})
-
-    def test_word_limits(self):
-        message = plan()
-        message["summary"] = " ".join(["word"] * 65)
-        with self.assertRaisesRegex(validator.Invalid, "64"):
+    def test_final_error_semantics(self):
+        for message in (final(status="failed", errors=[error()]),
+                        final(status="completed_with_errors", errors=[error()], data={"result": "partial"})):
             validator.validate_message(message)
-        message = plan()
-        message["data"]["checklist"][0]["text"] = " ".join(["word"] * 13)
-        with self.assertRaisesRegex(validator.Invalid, "12"):
-            validator.validate_message(message)
+        for message in (final(errors=[error()]), final(status="failed"),
+                        final(status="completed_with_errors", errors=[error()], data=None)):
+            with self.assertRaises(validator.Invalid): validator.validate_message(message)
 
-    def test_permission_fields_required(self):
-        message = {**plan(), "message_type": "permission_request", "status": "blocked", "data": {
-            "request_id": "p1", "action": "act", "reason": "why", "required_permission": "network",
-            "scope": "host", "blocks_current_step": True,
-        }}
-        validator.validate_message(message)
-        del message["data"]["scope"]
-        with self.assertRaisesRegex(validator.Invalid, "missing fields"):
-            validator.validate_message(message)
+    def test_blocker_and_permission_boundaries(self):
+        for message in ({**issue(), "summary": "word " * 33},
+                        {**issue(), "errors": [error(details=True)]},
+                        {**issue(), "errors": []}, {**permission(), "data": {}}):
+            with self.assertRaises(validator.Invalid): validator.validate_message(message)
 
-    def test_report_started_fields(self):
-        validator.validate_message(report_started(1, "intermediate_result"))
-        validator.validate_message(report_started(1, "final_result"))
-        for mutation, expected in (
-            ({"status": "blocked"}, "status"),
-            ({"data": {"report_type": "status"}}, "report_type"),
-            ({"data": {}}, "missing fields"),
-            ({"errors": [error()]}, "errors must be empty"),
-        ):
-            with self.subTest(mutation=mutation), self.assertRaisesRegex(validator.Invalid, expected):
-                validator.validate_message({**report_started(1, "intermediate_result"), **mutation})
-
-    def test_issue_and_intermediate_forbid_details(self):
-        for kind in ("issue", "intermediate_result"):
-            message = {**plan(), "message_type": kind, "status": "blocked", "data": None, "errors": [error(True)]}
-            with self.assertRaisesRegex(validator.Invalid, "details"):
-                validator.validate_message(message)
-
-    def test_final_status_error_relationships(self):
+    def test_insight_boundaries(self):
+        validator.validate_message(final(data={"subagent_insights": ["Reuse focused logs"]}))
+        for insights in ([], [""], ["word " * 25], "wrong"):
+            with self.assertRaises(validator.Invalid):
+                validator.validate_message(final(data={"subagent_insights": insights}))
         with self.assertRaises(validator.Invalid):
-            validator.validate_message(final(status="completed", errors=[error()]))
-        with self.assertRaises(validator.Invalid):
-            validator.validate_message(final(status="failed"))
-        with self.assertRaises(validator.Invalid):
-            validator.validate_message(final(status="completed_with_errors", errors=[error()], data=None))
-        validator.validate_message(final(status="failed", errors=[error()], data=None))
+            validator.validate_message({**permission(), "data": {**permission()["data"], "subagent_insights": ["No"]}})
 
-    def test_final_subagent_insights_absent_or_valid(self):
-        validator.validate_message(final())
-        validator.validate_message(final(data={
-            "evidence": ["verified"],
-            "subagent_insights": [
-                "Repository contract blocks must remain byte-for-byte synchronized.",
-                "Parents should independently verify every delegated implementation result.",
-            ],
-        }))
 
-    def test_rejects_empty_malformed_or_overlong_subagent_insights(self):
-        invalid_values = ([], [""], ["   "], "not an array", [42])
-        for value in invalid_values:
-            with self.subTest(value=value), self.assertRaisesRegex(validator.Invalid, "subagent"):
-                validator.validate_message(final(data={"subagent_insights": value}))
-        with self.assertRaisesRegex(validator.Invalid, "24 words"):
-            validator.validate_message(final(data={
-                "subagent_insights": [" ".join(["word"] * 25)],
-            }))
+class SchemaCliParityTests(unittest.TestCase):
+    """Use installed Draft2020-12 tooling, without a runtime dependency."""
 
-    def test_rejects_subagent_insights_on_non_final_messages(self):
-        message = plan()
-        message["data"]["subagent_insights"] = ["This belongs only in final results."]
-        with self.assertRaisesRegex(validator.Invalid, "only in final_result"):
-            validator.validate_message(message)
+    @classmethod
+    def setUpClass(cls):
+        try:
+            from jsonschema import Draft202012Validator
+        except ImportError:
+            raise unittest.SkipTest("optional jsonschema unavailable; portable patterns tested separately")
+        schema = json.loads((ROOT / "references/message.schema.json").read_text())
+        Draft202012Validator.check_schema(schema)
+        cls.schema = Draft202012Validator(schema)
+
+    def assert_parity(self, message, accepted):
+        self.assertEqual(self.schema.is_valid(message), accepted, message)
+        result = subprocess.run([sys.executable, str(SCRIPT), "message", "--stdin"],
+                                input=json.dumps(message), text=True, capture_output=True)
+        self.assertEqual(result.returncode == 0, accepted, result.stderr)
+
+    def test_word_limits_and_unicode_whitespace(self):
+        for separator in (" ", "\t", "\n", "\u001c", "\u0085", "\u00a0", "\u1680",
+                          "\u2003", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000"):
+            for limit, kind in ((24, "insight"), (32, "issue")):
+                for count in (limit, limit + 1):
+                    # Punctuation and non-Latin scripts are whitespace-delimited words too.
+                    value = separator + separator.join(["词-?!"] * count) + separator
+                    message = (final(data={"subagent_insights": [value]}) if kind == "insight"
+                               else {**issue(), "summary": value})
+                    with self.subTest(separator=repr(separator), kind=kind, count=count):
+                        self.assert_parity(message, count == limit)
+        # FEFF and zero-width space are not Python whitespace; do not use ECMAScript \s.
+        for separator in ("\ufeff", "\u200b"):
+            self.assert_parity(final(data={"subagent_insights": [separator.join(["word"] * 25)]}), True)
+
+    def test_empty_whitespace_and_non_string_values(self):
+        for value in ("", " \t\n\u001c\u0085\u3000", None, 1, True, [], {}):
+            messages = [final(data={"subagent_insights": [value]}), {**issue(), "summary": value}]
+            for key in ("agent_name", "task_name", "summary"):
+                messages.append({**final(), key: value})
+            for key in ("code", "message"):
+                messages.append({**issue(), "errors": [{**error(), key: value}]})
+            for key in ("request_id", "action", "reason", "required_permission", "scope"):
+                messages.append({**permission(), "data": {**permission()["data"], key: value}})
+            for message in messages:
+                with self.subTest(value=value, message=message):
+                    self.assert_parity(message, False)
+
+    def test_long_single_word_has_no_arbitrary_character_limit(self):
+        value = "x" * 10000
+        self.assert_parity(final(data={"subagent_insights": [value]}), True)
+        self.assert_parity({**issue(), "summary": value}, True)
+
+    def test_integer_numeric_boundaries(self):
+        """Compare both numeric fields through schema and actual CLI parsing."""
+        for key in ("sequence", "cycle_revision"):
+            for value, accepted in ((1, True), (1.0, True), (2.0, True),
+                                    (1.5, False), (True, False), (False, False),
+                                    (0, False), (0.0, False), (-1, False), (-1.0, False),
+                                    (float("nan"), False), (float("inf"), False),
+                                    (float("-inf"), False)):
+                with self.subTest(key=key, value=value):
+                    self.assert_parity({**final(), key: value}, accepted)
+
+    def test_unhashable_enum_parity(self):
+        """Arrays and objects fail schema and CLI enum constraints without traceback."""
+        for key in ("message_type", "status", "severity"):
+            for value in ([], {}):
+                message = ({**issue(), "errors": [{**error(), key: value}]}
+                           if key == "severity" else {**final(), key: value})
+                with self.subTest(key=key, value=value):
+                    self.assert_parity(message, False)
 
 
 class StreamTests(unittest.TestCase):
-    def test_valid_stream(self):
-        status = {**plan(2), "message_type": "status", "status": "in_progress"}
-        status["data"]["checklist"][0]["checked"] = True
-        validator.validate_stream([plan(), status, final(3)])
+    def test_cli_integral_float_cycles_and_exact_replay(self):
+        """Keep raw numeric representation significant for terminal replay."""
+        terminal = final(1.0, cycle=1.0)
+        fixtures = (([terminal, terminal], True),
+                    ([terminal, final(2.0, cycle=2.0), terminal], True),
+                    ([terminal, final(1, cycle=1.0)], False),
+                    ([terminal, final(1.0, cycle=1)], False),
+                    ([issue(1.0), final(2.0)], True))
+        for stream, accepted in fixtures:
+            with self.subTest(stream=stream):
+                result = subprocess.run([sys.executable, str(SCRIPT), "stream", "--stdin"],
+                                        input="\n".join(json.dumps(m) for m in stream),
+                                        text=True, capture_output=True)
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
 
-    def test_requires_plan_and_one_final(self):
-        with self.assertRaisesRegex(validator.Invalid, "first task message"):
-            validator.validate_stream([final(1)])
-        with self.assertRaisesRegex(validator.Invalid, "exactly one"):
-            validator.validate_stream([plan()])
+    def test_integral_float_sequence_uses_integer_arithmetic(self):
+        """Sequence comparisons preserve exact parsed values above float precision."""
+        large = 2.0 ** 53
+        validator.validate_stream([issue(large), final(int(large) + 1)])
+        with self.assertRaises(validator.Invalid):
+            validator.validate_stream([issue(int(large) + 1), final(large)])
 
-    def test_sequence_strictly_increases(self):
-        with self.assertRaisesRegex(validator.Invalid, "strictly increasing"):
-            validator.validate_stream([plan(2), final(2)])
+    def test_silent_and_blocker_cycles(self):
+        for stream in ([final(1)], [issue(), final(2)], [permission(), final(2)],
+                       [final(1, status="failed", errors=[error()])],
+                       [final(1), final(2, cycle=2)], [issue(), final(2), issue(3, cycle=2), final(4, cycle=2)]):
+            validator.validate_stream(stream)
 
-    def test_no_message_after_final(self):
-        with self.assertRaisesRegex(validator.Invalid, "follows final"):
-            validator.validate_stream([plan(), final(2), final(3)])
+    def test_related_remediation_cycles_keep_identity_and_replays(self):
+        original = final(1, data={"changed_paths": ["src/original.py"]})
+        corrected = final(2, cycle=2, data={"changed_paths": ["src/fix.py"],
+                                               "acceptance_criteria": ["new boundary"]})
+        validator.validate_stream([original, corrected, original])
+        with self.assertRaisesRegex(validator.Invalid, "task_name changed"):
+            validator.validate_stream([original, {**corrected, "task_name": "replacement"}])
+        with self.assertRaisesRegex(validator.Invalid, "replay"):
+            validator.validate_stream([original, corrected, {**original, "summary": "altered"}])
 
-    def test_revision_requires_revised_plan(self):
-        status = {**plan(2, revision=2), "message_type": "status", "status": "in_progress"}
-        with self.assertRaisesRegex(validator.Invalid, "revision requires"):
-            validator.validate_stream([plan(), status, final(3)])
+    def test_exact_terminal_replay_before_and_after_continuation(self):
+        terminal = final(1)
+        validator.validate_stream([terminal, terminal])
+        validator.validate_stream([terminal, final(2, cycle=2), terminal])
+        validator.validate_stream([terminal, issue(2, cycle=2), terminal, final(3, cycle=2)])
+        validator.validate_stream([terminal, final(2, cycle=2), final(3, cycle=3),
+                                   issue(4, cycle=4), terminal, final(5, cycle=4), terminal])
 
-    def test_revised_plan_increments_and_preserves_stable_ids(self):
-        revised = plan(2, revision=2)
-        validator.validate_stream([plan(), revised, final(3)])
-        changed = plan(2, revision=2)
-        changed["data"]["checklist"][0]["text"] = "Changed meaning"
-        with self.assertRaisesRegex(validator.Invalid, "changed text"):
-            validator.validate_stream([plan(), changed, final(3)])
+    def test_invalid_lifecycle(self):
+        terminal = final(1)
+        streams = ([], [issue()], [terminal, final(2)],
+                   [terminal, {**terminal, "summary": "altered"}],
+                   [final(1, data={"value": True}), final(1, data={"value": 1})],
+                   [issue(), issue()], [permission(), permission()], [issue(2), final(1)],
+                   [final(1, cycle=2)], [terminal, final(2, cycle=3)],
+                   [issue(), final(2, cycle=2)], [terminal, final(2, task="other")],
+                   [terminal, final(1, cycle=2)], [terminal, issue(2)],
+                   [terminal, issue(2, cycle=2), terminal])
+        for stream in streams:
+            with self.subTest(stream=stream), self.assertRaises(validator.Invalid):
+                validator.validate_stream(stream)
 
-    def test_complete_contract_flow(self):
-        first = plan()
-        status = {**plan(2), "message_type": "status", "status": "in_progress"}
-        status["data"]["checklist"][0]["checked"] = True
-        issue = {**plan(3), "message_type": "issue", "status": "blocked",
-                 "data": None, "errors": [error()]}
-        permission = {**plan(4), "message_type": "permission_request", "status": "blocked",
-                      "data": {"request_id": "p1", "action": "read evidence", "reason": "Needed",
-                               "required_permission": "filesystem read", "scope": "/outside",
-                               "blocks_current_step": True}, "errors": []}
-        announcement = report_started(5, "intermediate_result")
-        intermediate = {**plan(6), "message_type": "intermediate_result", "status": "in_progress",
-                        "data": None, "errors": []}
-        revised_items = [
-            {"id": "inspect", "text": "Inspect inputs", "checked": True},
-            {"id": "report", "text": "Report findings", "checked": False},
-            {"id": "verify", "text": "Verify new evidence", "checked": False},
-        ]
-        revised = plan(7, revision=2, checklist=revised_items)
-        revised_status = {**plan(8, revision=2, checklist=revised_items),
-                          "message_type": "status", "status": "in_progress"}
-        validator.validate_stream([
-            first, status, issue, permission, announcement, intermediate, revised, revised_status, final(9)
-        ])
+    def test_cli_replay_lifecycle_fixtures(self):
+        terminal = final(1)
+        positive = [terminal, issue(2, cycle=2), terminal, final(3, cycle=2),
+                    final(4, cycle=3), final(5, cycle=4), terminal]
+        fixtures = [(positive, True),
+                    ([terminal, {**terminal, "data": {"changed": True}}], False),
+                    ([final(1, data={"value": True}), final(1, data={"value": 1})], False),
+                    ([permission(), permission(), final(2)], False),
+                    ([issue(), issue(), final(2)], False),
+                    ([terminal, final(2, cycle=3)], False),
+                    ([terminal, final(2, cycle=2, task="other")], False),
+                    ([terminal, final(1, cycle=2)], False),
+                    ([terminal, issue(2, cycle=2), terminal], False)]
+        for stream, accepted in fixtures:
+            with self.subTest(stream=stream):
+                result = subprocess.run([sys.executable, str(SCRIPT), "stream", "--stdin"],
+                                        input="\n".join(json.dumps(m) for m in stream),
+                                        text=True, capture_output=True)
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
 
-    def test_review_fix_final_flow_is_terminal(self):
-        first = plan()
-        announcement = report_started(2, "intermediate_result")
-        review = {**plan(3), "message_type": "intermediate_result", "status": "in_progress", "data": None}
-        revised = plan(4, revision=2)
-        fixed_status = {**plan(5, revision=2), "message_type": "status", "status": "in_progress"}
-        terminal = final(6)
-        validator.validate_stream([first, announcement, review, revised, fixed_status, terminal])
-        with self.assertRaisesRegex(validator.Invalid, "follows final"):
-            validator.validate_stream([first, final(2), {**announcement, "sequence": 3}])
-
-    def test_requested_final_is_announced_and_terminal(self):
-        validator.validate_stream([plan(), report_started(2, "final_result"), final(3)])
-
-    def test_autonomous_final_needs_no_announcement(self):
-        validator.validate_stream([plan(), final(2)])
-
-    def test_report_type_must_match_announcement(self):
-        with self.assertRaisesRegex(validator.Invalid, "expected announced intermediate_result"):
-            validator.validate_stream([plan(), report_started(2, "intermediate_result"), final(3)])
-        intermediate = {**plan(3), "message_type": "intermediate_result", "status": "in_progress", "data": None}
-        with self.assertRaisesRegex(validator.Invalid, "expected announced final_result"):
-            validator.validate_stream([plan(), report_started(2, "final_result"), intermediate, final(4)])
-
-    def test_rejects_duplicate_and_uncompleted_announcement(self):
-        with self.assertRaisesRegex(validator.Invalid, "expected announced intermediate_result"):
-            validator.validate_stream([
-                plan(), report_started(2, "intermediate_result"),
-                report_started(3, "intermediate_result"), final(4),
-            ])
-        with self.assertRaisesRegex(validator.Invalid, "uncompleted report_started"):
-            validator.validate_stream([plan(), report_started(2, "final_result")])
-
-    def test_only_operational_messages_allowed_during_report_preparation(self):
-        status = {**plan(3), "message_type": "status", "status": "in_progress"}
-        issue = {**plan(4), "message_type": "issue", "status": "blocked", "data": None, "errors": [error()]}
-        permission = {**plan(5), "message_type": "permission_request", "status": "blocked", "data": {
-            "request_id": "p1", "action": "read evidence", "reason": "Needed",
-            "required_permission": "filesystem read", "scope": "/outside", "blocks_current_step": True,
-        }}
-        intermediate = {**plan(6), "message_type": "intermediate_result", "status": "in_progress", "data": None}
-        validator.validate_stream([
-            plan(), report_started(2, "intermediate_result"), status, issue, permission,
-            intermediate, final(7),
-        ])
-
-    def test_intermediate_result_requires_announcement(self):
-        intermediate = {**plan(2), "message_type": "intermediate_result", "status": "in_progress", "data": None}
-        with self.assertRaisesRegex(validator.Invalid, "requires report_started"):
-            validator.validate_stream([plan(), intermediate, final(3)])
-
-    def test_continuation_requires_incremented_cycle_and_new_plan(self):
-        continued = plan(3, cycle=2)
-        continued_status = {**plan(4, cycle=2), "message_type": "status", "status": "in_progress"}
-        validator.validate_stream([plan(), final(2), continued, continued_status, final(5, cycle=2)])
-
-    def test_post_final_activity_without_continuation_is_rejected(self):
-        status = {**plan(3), "message_type": "status", "status": "in_progress"}
-        with self.assertRaisesRegex(validator.Invalid, "follows final"):
-            validator.validate_stream([plan(), final(2), status])
-
-    def test_unchanged_cycle_revision_cannot_reactivate(self):
-        with self.assertRaisesRegex(validator.Invalid, "follows final|cycle_revision"):
-            validator.validate_stream([plan(), final(2), plan(3, cycle=1)])
-
-    def test_cycle_revision_must_advance_one_and_reset_plan_revision(self):
-        with self.assertRaisesRegex(validator.Invalid, "increase by exactly one"):
-            validator.validate_stream([plan(), final(2), plan(3, cycle=3)])
-        with self.assertRaisesRegex(validator.Invalid, "plan_revision 1"):
-            validator.validate_stream([plan(), final(2), plan(3, revision=2, cycle=2)])
-
-    def test_sequence_is_global_for_agent_lifetime(self):
-        with self.assertRaisesRegex(validator.Invalid, "strictly increasing"):
-            validator.validate_stream([plan(2), final(3), plan(1, cycle=2), final(4, cycle=2)])
+    def test_independent_agent_identity(self):
+        validator.validate_stream([final(1, agent="a"), final(1, agent="b")])
+        with self.assertRaises(validator.Invalid):
+            validator.validate_stream([final(1, agent="a"), issue(1, agent="b")])
 
 
 class AgentTests(unittest.TestCase):
@@ -337,9 +294,9 @@ class AgentTests(unittest.TestCase):
         instructions = agent["developer_instructions"]
         for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
             self.assertIn(f"`{profile}`", instructions)
-        for phrase in ("fork_turns=\"none\"", ".basix/contracts/<chain-id>.md", "spawning parent", "Contract 1.4"):
+        for phrase in (".basix/contracts/<chain-id>.md", "spawning parent", "Contract 2.0"):
             self.assertIn(phrase, instructions)
-        for phrase in ("intermediate_result", "final_result", "send `/root`"):
+        for phrase in ("intermediate_result", "send `/root`"):
             self.assertNotIn(phrase, instructions)
 
     def test_canonical_verifier_definition(self):
@@ -491,6 +448,19 @@ class AgentTests(unittest.TestCase):
             ))
             with self.assertRaisesRegex(validator.Invalid, "bootstrap block differs"):
                 validator.validate_agent(path)
+
+    def test_rejects_missing_management_or_contract_load_boundary(self):
+        for phrase in (
+            "Read the complete `basix-subagent-management` skill referenced by the router.",
+            "Read completely the agent communication contract referenced by that skill.",
+            "If the router, management skill, or contract cannot be read",
+        ):
+            with self.subTest(phrase=phrase):
+                directory, path = self.write_agent()
+                with directory:
+                    path.write_text(path.read_text().replace(phrase, "Skip this source."))
+                    with self.assertRaisesRegex(validator.Invalid, "bootstrap block differs"):
+                        validator.validate_agent(path)
 
     def test_rejects_embedded_full_contract_copy(self):
         directory, path = self.write_agent()
@@ -687,19 +657,19 @@ class RepositoryPolicyTests(unittest.TestCase):
             self.assertTrue(tomllib.loads(text)["name"].startswith("basix_"), path)
             validator.validate_agent(path)
 
-        contract = (repository / "src/skills/basix/references/agent-communication-contract.md").read_text()
+        contract = (repository / "src/skills/basix-subagent-management/references/agent-communication-contract.md").read_text()
         versions = re.findall(r"(?i)\bcontract(?:\s+version)?\s+(\d+\.\d+)\b", contract)
         self.assertTrue(versions)
-        self.assertEqual(set(versions), {"1.4"})
+        self.assertEqual(set(versions), {"2.0"})
 
-    def test_schema_uses_contract_1_4_and_models_subagent_insights(self):
+    def test_schema_uses_contract_2_0_and_models_subagent_insights(self):
         schema = json.loads((ROOT / "references" / "message.schema.json").read_text())
-        self.assertTrue(schema["$id"].endswith("agent-message-1.4.json"))
-        self.assertEqual(schema["properties"]["contract_version"]["const"], "1.4")
+        self.assertTrue(schema["$id"].endswith("agent-message-2.0.json"))
+        self.assertEqual(schema["properties"]["contract_version"]["const"], "2.0")
         insights = schema["$defs"]["final_data"]["then"]["properties"]["subagent_insights"]
         self.assertEqual(insights["type"], "array")
         self.assertEqual(insights["minItems"], 1)
-        self.assertEqual(insights["items"]["pattern"], "\\S")
+        self.assertIn("{0,23}", insights["items"]["pattern"])
 
     def test_skills_require_selective_repository_verification(self):
         repository = Path(__file__).resolve().parents[3]
@@ -731,20 +701,40 @@ class RepositoryPolicyTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_unhashable_enum_values_are_controlled_invalid(self):
+        """Malformed enum arrays/objects receive Invalid diagnostics through CLI."""
+        for key in ("message_type", "status", "severity"):
+            for value in ([], {}):
+                message = ({**issue(), "errors": [{**error(), key: value}]}
+                           if key == "severity" else {**final(1), key: value})
+                with self.subTest(key=key, value=value):
+                    result = self.run_cli("message", json.dumps(message))
+                    self.assertEqual(result.returncode, 1, result.stderr)
+                    self.assertTrue(result.stderr.startswith("invalid:"), result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+        result = self.run_cli("message", json.dumps(issue()))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def run_cli(self, command, payload):
         return subprocess.run([sys.executable, str(SCRIPT), command, "--stdin"], input=payload,
                               text=True, capture_output=True, check=False)
 
     def test_message_stdin(self):
-        result = self.run_cli("message", json.dumps(plan()))
+        result = self.run_cli("message", json.dumps(final(1)))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "valid")
 
+    def test_serialization_failure_is_not_a_delivery(self):
+        result = self.run_cli("message", "{invalid")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotEqual(result.stdout.strip(), "valid")
+
     def test_stream_is_json_lines_not_array(self):
-        payload = "\n".join(json.dumps(value) for value in (plan(), final()))
+        payload = "\n".join(json.dumps(value) for value in (issue(), final()))
         result = self.run_cli("stream", payload)
         self.assertEqual(result.returncode, 0, result.stderr)
-        result = self.run_cli("stream", json.dumps([plan(), final()]))
+        result = self.run_cli("stream", json.dumps([issue(), final()]))
         self.assertNotEqual(result.returncode, 0)
 
 

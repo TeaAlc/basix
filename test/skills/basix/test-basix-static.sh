@@ -255,7 +255,10 @@ assert pager["sandbox_mode"] == "workspace-write"
 assert "task_profile" in pager["developer_instructions"]
 for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
     assert f"`{profile}`" in pager["developer_instructions"], profile
-assert 'fork_turns="none"' in pager["developer_instructions"]
+assert "## Result evidence" in pager["developer_instructions"]
+assert "After any correction, rerun targeted and complete relevant gates." in pager["developer_instructions"]
+for stale in ("fresh, terminal worker", "New work receives a fresh pager", "Any fix stays within this assignment"):
+    assert stale not in pager["developer_instructions"], stale
 assert ".basix/contracts/<chain-id>.md" in pager["developer_instructions"]
 verifier_path = root / "agents/native/basix-verifier.toml"
 verifier = tomllib.loads(verifier_path.read_text())
@@ -281,17 +284,53 @@ import tomllib
 from pathlib import Path
 
 root = Path(sys.argv[1])
+# Reverse only the four authorized activation lines, then prove all other bytes.
+# The fixed digest is the unchanged source baseline; installed tests need no Git.
+import hashlib
+instruction_bytes = (root / "setup/developer_instruction.md").read_bytes()
+baseline_bytes = instruction_bytes
+for heading, skill, suffix in (
+    ("Planning", "basix-planning", ""),
+    ("Architecture Decision Records (ADRs)", "basix-adr", ""),
+    ("Agent Memory", "basix-agent-memory", ""),
+    ("Basix agent spawning", "basix-subagent-management", " (Read it when you need it, not upfront)"),
+):
+    pattern = rb"(?ms)^## " + re.escape(heading.encode()) + rb"\n.*?(?=^## |^<!-- basix:developer-instructions:end -->)"
+    section = re.search(pattern, baseline_bytes).group(0)
+    replacement = f"- Skill: `{skill}` (its complete `SKILL.md`).{suffix}".encode()
+    assert section.count(replacement) == 1, heading
+    assert (root / "skills" / skill / "SKILL.md").is_file(), skill
+    original = f"- TODO: Add skillname{suffix}".encode()
+    baseline_bytes = baseline_bytes.replace(section, section.replace(replacement, original), 1)
+assert b"TODO: Add skillname" not in instruction_bytes
+assert hashlib.sha256(baseline_bytes).hexdigest() == "9ad2ddcc111dc735392f5ce15d83089ac9bd770361b2a5a5144f62248024fd78", "developer instructions changed outside authorized TODO spans"
 instructions = (root / "setup/developer_instruction.md").read_text()
 assert instructions.count("<!-- basix:developer-instructions:start -->") == 1
 assert instructions.count("<!-- basix:developer-instructions:end -->") == 1
 policy = instructions.split("<!-- basix:developer-instructions:start -->", 1)[1].split(
     "<!-- basix:developer-instructions:end -->", 1
 )[0]
-for phrase in ("`/root` is the fixed principal", "sets `agent_level`",
-               "omission means `junior`", "never spawns another principal"):
-    assert phrase in policy, phrase
+# Compose authoritative workflow skills with retained developer boundaries.
+def replace_policy_section(policy, heading, source):
+    pattern = rf"(?ms)^## {re.escape(heading)}\n.*?(?=^## )"
+    section = re.search(pattern, policy).group(0)
+    if heading == "Agent Memory":
+        retained = "\n".join(line for line in section.splitlines() if line.startswith("- `.basix/memory.toml`") or line.startswith("- Read it exactly once"))
+        source = retained + "\n" + source
+    return policy.replace(section, "## " + heading + "\n\n" + source.strip() + "\n\n")
+for heading, filename in (
+    ("Planning", "../skills/basix-planning/SKILL.md"),
+    ("Architecture Decision Records (ADRs)", "../skills/basix-adr/SKILL.md"),
+    ("Agent Memory", "../skills/basix-agent-memory/SKILL.md"),
+):
+    policy = replace_policy_section(policy, heading, (root / "setup" / filename).read_text())
+policy += (root / "skills/basix/SKILL.md").read_text()
+policy += (root / "skills/basix-subagent-management/SKILL.md").read_text()
+for phrase in ("`/root` is the fixed principal", "sets `agent_level` in the assignment", "without asking again",
+               "defaults to `agent_level: junior`", "never spawns another principal"):
+    assert phrase in " ".join(policy.split()), phrase
 memory_section = re.search(r"(?ms)^## Agent Memory\n.*?(?=^## )", policy).group(0)
-assert len(memory_section) <= 2800, len(memory_section)
+assert len(memory_section) <= 4200, len(memory_section)
 conventions_section = re.search(r"(?ms)^## Basix conventions\n.*?(?=^## )", policy).group(0)
 for removed in (
     "Whenever invoking Python, set `PYTHONDONTWRITEBYTECODE=1`",
@@ -405,14 +444,18 @@ for phrase in (
     "Only the mandatory `Merged ADRs: ...` line in a merge ADR is exempt",
     "Give every archived ADR an appropriate status",
     "update both indexes atomically",
-    "pause before implementation",
+    "pause the affected implementation",
+    "Only `/root` presents the user-facing notice",
+    "exclusively to its direct parent",
+    "each parent independently evaluates",
+    "never skipping a level",
     '`<div style="color:red">…</div>`',
-    "understandable without requiring the user to read the ADR",
+    "so the user need not read the ADR",
     "binding decision, planned deviation, exact conflict, and impact",
     "comply with the ADR",
     "replace it with a user-confirmed successor",
     "replan the scope to avoid the conflict",
-    "Continue only after explicit user confirmation",
+    "Resume conflicting implementation only after explicit user confirmation",
     "Agents create `.basix/adrs/` and its indexes when the first ADR is required",
     "Basix installers must not create the directory, templates, or an initial ADR",
 ):
@@ -568,7 +611,7 @@ for phrase in (
     "self-contained assignment",
     "must load and follow the complete communication contract",
     "the spawn fails closed",
-    "## Agent management",
+    "## Parent management and verification",
     "Follow the communication contract for all child lifecycle",
     "overlapping or unclear write ownership is inactive",
     "clearly disjoint active writers do not block",
@@ -651,18 +694,20 @@ for removed in (
 ):
     assert removed not in policy, removed
 
-skill = (root / "skills/basix/SKILL.md").read_text()
+router = (root / "skills/basix/SKILL.md").read_text()
+management = (root / "skills/basix-subagent-management/SKILL.md").read_text()
+skill = router + management
 for phrase in (
     "## Basix agent spawning",
-    "## Required communication contract",
-    "sole runtime copy of Contract 1.4",
+    "## Required subagent management",
+    "sole runtime copy of Contract 2.0",
     "direct completion costs less context than delegation and handoff",
     "more than two substantive domain-tool calls",
     'fork_turns="none"',
     "unique `task_name`",
     "generic web access",
-    "derive their spawn authority",
-    "Follow the required communication contract",
+    "derive spawn authority",
+    "Follow the communication contract",
     "strongly recommended under extreme uncertainty",
     "`basix_miraculix`",
 ):
@@ -679,7 +724,7 @@ for phrase in (
     "every Basix-managed plan to maximize input-token efficiency",
     "early insights should shrink later context",
     "correctness, safety, and mandatory dependencies remain authoritative",
-    "Contract 1.4 exclusively owns",
+    "Contract 2.0 exclusively owns",
     "ADR governance",
     "read the project-owned active ADR index",
     "Installers never create that directory, an ADR template, or an initial ADR",
@@ -746,7 +791,7 @@ for phrase in (
     "for profile in ui_ux frontend backend_web fullstack integration",
     "direct spawning parent",
     "never forwards a child message automatically",
-    "Contract 1.4 is the sole source for runtime communication",
+    "Contract 2.0 is the sole source for runtime communication",
     "explicit read-only paths to plan or ADR files",
     "the parent chooses those paths",
     "never scans `.basix/`",
@@ -767,29 +812,26 @@ for phrase in (
 ):
     assert phrase in readme, phrase
 
-heartbeat = (root / "skills/basix/references/agent-communication-contract.md").read_text()
+heartbeat = (root / "skills/basix-subagent-management/references/agent-communication-contract.md").read_text()
 heartbeat_flat = " ".join(heartbeat.split())
-assert "version=1.4" in heartbeat
+assert "version=2.0" in heartbeat
 assert "cycle_revision" in heartbeat
-assert "`Report start delivered to parent.`" in heartbeat
 assert "communicates exclusively with its direct spawning parent" in heartbeat
-assert "Escalation is a newly authored parent `issue` or `permission_request`" in heartbeat
+assert "Escalation is a newly authored parent `issue`" in heartbeat_flat
 assert "`cycle_revision + 1`" in heartbeat
-assert "afterward resume\nautomatically" in heartbeat
 assert "subagent_insights" in heartbeat and "at most 24 words" in heartbeat
 for phrase in (
-    "overlapping write ownership must be inactive",
-    "Unknown or overly broad ownership counts as overlap",
-    "inactive after any `final_result`",
-    "Disjoint writers may remain active",
-    "uses `followup_task` on an overlapping writer",
-    "requires first stopping the verifier, discarding its result",
-    "retains `owned_targets` and `mutation_window`",
+    "exactly one logical", "idempotently deduplicated", "Altered same-key",
+    "timeout_ms: 1800000", "no unconditional infinite waiting",
+    "not failure, cancellation", "at most three active descendants",
+    "passing checks and parent acceptance are separate states",
+    "Disjoint writers may remain active", "stop the verifier, discard its result",
+    "`owned_targets` and `mutation_window`", "mandatory `final_result`",
+    "Final result delivered to parent.", "Delivery failed: <short reason>.",
 ):
     assert phrase in heartbeat_flat, phrase
-assert re.search(r"first status 120 seconds after the plan, then every 120 seconds", heartbeat)
-assert "Plan delivered to parent." in heartbeat and "Delivery failed: <short reason>." in heartbeat
-assert len(re.findall(r"\b[\wÀ-ÖØ-öø-ÿ]+(?:[-'][\wÀ-ÖØ-öø-ÿ]+)*\b", heartbeat)) <= 1050
+assert "Plan delivered to parent." not in heartbeat
+assert "120000" not in heartbeat and "first status" not in heartbeat
 bootstrap_reference = (root / "skills/basix-agent-authoring/references/native-agent-bootstrap.md").read_text()
 bootstrap_start = "<!-- basix-agent-authoring:bootstrap:start -->"
 bootstrap_end = "<!-- basix-agent-authoring:bootstrap:end -->"

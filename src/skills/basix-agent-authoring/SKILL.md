@@ -1,6 +1,6 @@
 ---
 name: basix-agent-authoring
-description: Basix-Skill: Use when planning, creating, validating, or updating native Basix agent TOMLs, including model classification and hierarchical communication with their spawning parent.
+description: "Basix-Skill: Use when planning, creating, validating, or updating native Basix agent TOMLs, including model classification and hierarchical communication with their spawning parent."
 ---
 
 # Basix Agent Authoring
@@ -10,10 +10,17 @@ definitions under `<Basix-Repo>/src/agents/native/*.toml`. In an installed
 copy, treat the skill directory containing this `SKILL.md` as the root for all
 skill-local links and scripts. Do not orchestrate running agents.
 
+These native authoring defaults are explicit specialized rules. They remain
+`gpt-6-luna` at classified effort; management's `gpt-6.1-sol`/`low` runtime
+fallback applies only when no more explicit model/effort setting exists.
+At dispatch native configured model and effort remain selected unless explicitly
+overridden by the user. Resolve overrides independently: a model-only override
+retains applicable effort.
+
 1. Read [model-classification.md](references/model-classification.md), classify the
    assignment, and state the classification, reason, model, and effort before writing.
-2. Read the router-owned
-   [agent-communication-contract.md](../basix/references/agent-communication-contract.md)
+2. Read the complete [basix-subagent-management](../basix-subagent-management/SKILL.md) skill, then its
+   [agent-communication-contract.md](../basix-subagent-management/references/agent-communication-contract.md)
    completely and read
    [native-agent-bootstrap.md](references/native-agent-bootstrap.md).
 3. Preserve unrelated TOML fields. Begin every native TOML with exactly one
@@ -71,8 +78,21 @@ Embed the short bootstrap in `developer_instructions` between these exact marker
 ```
 
 The block must require the complete router, active persistent developer instructions,
-and the router-owned contract to be read before planning, messages, tools, or domain
+the management skill, and its contract to be read before planning, messages, tools, or domain
 work. It also defines once-per-context loading, continuation reloads only after an
-explicit parent change notice, and fail-closed behavior when either source is unreadable.
+explicit parent change notice, and fail-closed behavior when any required source is unreadable.
 Re-running authoring replaces this block idempotently. The authoring skill owns the
 schema and validator but not a second runtime copy of the contract text.
+
+## Silent stream interface
+
+Contract 2.0 accepts only `issue`, `permission_request`, and `final_result`.
+Success may consist of a final-only stream. Initial cycle 1 opens implicitly;
+explicit parent-authorized continuation advances exactly one cycle without a plan.
+Context suitability and updated assignment authorization follow Contract 2.0.
+Logical sequences increase for the immutable agent/task identity. The validator
+deduplicates an identical terminal key/object before lifecycle transitions;
+conflicting replays and distinct second finals fail. Only final data accepts
+24-word insight proposals. Schema/message/stream checks cannot prove actual
+`send_message` receipt, continuation authorization, model/tool support, independent
+resources or parent acceptance; those require lifecycle and parent evidence.

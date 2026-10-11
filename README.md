@@ -116,6 +116,10 @@ The installed skills provide these entry points:
 | `basix` | Basix routing, standards, and source maintenance |
 | `basix-agent-authoring` | Creating and validating native agent definitions |
 | `basix-experience` | Session feedback and token-efficiency retrospectives |
+| `basix-subagent-management` | Mandatory delegation, agent lifecycle, and Contract 2.0 workflow |
+| `basix-planning` | Saved phase plans, numbering, revision, and archival |
+| `basix-adr` | Binding decision checks and ADR lifecycle |
+| `basix-agent-memory` | Evidence-based memory curation and retention |
 | `basix-subagent-efficiency` | Task-level analysis of delegation attempts, retries, and recovery |
 | `basix-personality-model` | Evidence-based personality models and agent role specifications |
 | `configure-tmux` | tmux mouse, scrollback, clipboard, and extended-key troubleshooting |
@@ -143,8 +147,9 @@ that shape agent behavior:
 - Children communicate only with their direct parent. Verification freezes its
   target until review completes; changes require a fresh review.
 
-The [Basix router](src/skills/basix/SKILL.md) and
-[communication contract](src/skills/basix/references/agent-communication-contract.md)
+The [Basix router](src/skills/basix/SKILL.md),
+[management skill](src/skills/basix-subagent-management/SKILL.md), and
+[communication contract](src/skills/basix-subagent-management/references/agent-communication-contract.md)
 are the authoritative runtime references.
 
 ## Optional integrations
@@ -259,3 +264,13 @@ bash test/live/run-live-tests.sh
 ```
 
 Every started test must finish successfully before task completion or commit.
+
+Managed children work silently under Contract 2.0, sending genuine blockers and
+one mandatory terminal result to their direct parent. Model and effort resolve
+independently: explicit user override, applicable specialist/skill settings, then
+`gpt-6.1-sol`/`low` runtime fallback. A model-only override retains applicable
+effort. Saved plans preserve native specialist routing and configured settings;
+unsupported selected settings block dispatch without substitution. No forks.
+Root manages at most three independent active descendants and exact 30-minute
+wait calls with bounded diagnosis. Optional requested efficiency companions use
+task-specific evidence and the exact `_efficency_analysis.md` suffix.

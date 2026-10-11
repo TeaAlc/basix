@@ -1,5 +1,12 @@
 # Model classification
 
+These native authoring defaults are explicit specialized rules. They remain
+`gpt-6-luna` at classified effort; management's `gpt-6.1-sol`/`low` runtime
+fallback applies only when no more explicit model/effort setting exists.
+At dispatch native configured model and effort remain selected unless explicitly
+overridden by the user. Resolve overrides independently: a model-only override
+retains applicable effort.
+
 Always choose the lowest level that can reliably complete the assignment. File count
 alone is not complexity. For mixed assignments, use the hardest material component.
 

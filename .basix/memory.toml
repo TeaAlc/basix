@@ -34,7 +34,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Native Basix agents communicate only with their direct spawning parent; parents independently resolve, instruct, or escalate new messages upward, never automatically forwarding child reports."
-usefulness = 0
+usefulness = 2
 
 [[entries]]
 date = "2026-08-08"
@@ -46,7 +46,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 5
+usefulness = 7
 
 [[entries]]
 date = "2026-08-08"
@@ -59,7 +59,7 @@ usefulness = 1
 date = "2026-08-08"
 category = "Verification"
 insight = "Basix skill descriptions containing the required prefix colon need YAML quotes; metadata checks must strip matching quotes before testing the Basix-Skill prefix."
-usefulness = 2
+usefulness = 3
 
 [[entries]]
 date = "2026-08-09"
@@ -78,7 +78,7 @@ usefulness = 0
 date = "2026-08-10"
 category = "Verification"
 insight = "Validate metadata types before set membership; malformed TOML arrays or tables otherwise raise uncaught TypeError instead of the validator's controlled Invalid diagnostic."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-10"
@@ -122,7 +122,7 @@ usefulness = 0
 date = "2026-08-10"
 category = "Repository"
 insight = "All tests are component-owned under test/. verify-basix.sh aggregates deterministic agents, skills, and shared suites; test-setup.sh aggregates setup; live tests remain explicit."
-usefulness = 4
+usefulness = 6
 
 [[entries]]
 date = "2026-08-11"
@@ -140,7 +140,7 @@ usefulness = 0
 date = "2026-08-14"
 category = "Verification"
 insight = "When router policy moves into a required reference, validation must compose both files rather than demand duplicated runtime guidance."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-14"
@@ -302,4 +302,46 @@ usefulness = 0
 date = "2026-09-23"
 category = "Verification"
 insight = "Remove empty untracked directories under canonical src/skills before installer round-trip tests; copied empty directories make uninstall preserve state as foreign content."
+usefulness = 0
+
+[[entries]]
+date = "2026-10-10"
+category = "User Instruction"
+insight = "When migrating Basix workflows into skills, preserve every source obligation and avoid new ambiguity. Reword skills freely; preserve developer-instruction bytes except explicitly authorized TODO replacements."
+usefulness = 2
+
+[[entries]]
+date = "2026-10-10"
+category = "Repository"
+insight = "Runtime Contract 2.0 resides in basix-subagent-management; router retains spawn authority. Planning, ADR, and memory workflows have dedicated skills; static policy checks compose authoritative skills rather than developer prose."
+usefulness = 2
+
+[[entries]]
+date = "2026-10-10"
+category = "User Instruction"
+insight = "Subagents work silently except unresolved blockers; terminal reports through send_message to the spawning parent are mandatory. Parent wait_agent calls use exactly timeout_ms 1800000."
+usefulness = 2
+
+[[entries]]
+date = "2026-10-10"
+category = "User Instruction"
+insight = "Use explicit user model/effort first, then applicable specialist or skill settings; otherwise use gpt-6.1-sol/low. Delegate without context forks, with complete assignments and at most three independent active descendants."
+usefulness = 1
+
+[[entries]]
+date = "2026-10-10"
+category = "User Instruction"
+insight = "Root decides whether plan executors write adjacent <plan_name>_efficency_analysis.md reports. Include only evidenced substantial efficiency losses and high-impact future improvements; never fabricate metrics."
+usefulness = 1
+
+[[entries]]
+date = "2026-10-10"
+category = "User Instruction"
+insight = "Contract 2.0 must fully replace Contract 1.4 as the sole valid protocol; do not introduce special transition rules or compatibility modes."
+usefulness = 1
+
+[[entries]]
+date = "2026-10-10"
+category = "User Instruction"
+insight = "Contract 2.0 centrally permits direct-parent-authorized reuse for fixes and context-related follow-ups, including new frozen verification cycles. Keep continuation policy out of Pager; preserve direct-parent escalation."
 usefulness = 0

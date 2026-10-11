@@ -229,3 +229,11 @@ Average Attempts to Success. Include failure causes, transitions, interventions,
 and cost/latency where known; explicitly mark unavailable measures. Include
 Persistent Failure Rate only under its exhaustion rule. Use tables and, when
 helpful, a recovery curve visualization; do not invent data to fill a report.
+
+## Optional saved-plan companion
+
+A root-requested saved-plan efficiency companion follows
+[basix-planning](../basix-planning/SKILL.md), not this workflow's full recovery
+report format. Reuse task attribution, unknown-value and acceptance distinctions
+only as relevant. This does not require analysis for every delegated task or
+change retry authority, attempt boundaries or runtime communication.

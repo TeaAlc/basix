@@ -24,10 +24,13 @@ chmod +x "$mock/codex"; export PATH="$mock:$PATH"
 
 project="$case_dir/project"
 first_output=$("$ROOT/setup/install_for_project.sh" "$project" --no-local-network --no-test-socket)
-if [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix/references/agent-communication-contract.md && -f $project/.agents/skills/basix-experience/scripts/collect-token-usage.py && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
+if [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix-subagent-management/references/agent-communication-contract.md && -f $project/.agents/skills/basix-experience/scripts/collect-token-usage.py && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
    [[ ! -e $project/.basix ]] &&
    ! find "$project/.agents/skills" "$project/.codex/basix" -type l -print -quit | grep -q . &&
    ! cut -f1 "$project/.codex/.basix-install-state" | grep -Ev '^(copy|dircopy|dirfile)$' | grep -q .; then ok 'fresh project install copies complete trees without ADR artifacts'; else bad 'fresh project install copies complete trees without ADR artifacts'; fi
+for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory; do
+  check "project install preserves $skill tree" diff -r "$ROOT/skills/$skill" "$project/.agents/skills/$skill"
+done
 for agent in "$ROOT"/agents/native/*.toml; do
   check "project install reports $(basename "$agent") as installed" grep -Fq "$(basename "$agent") — installed" <<<"$first_output"
 done
@@ -89,17 +92,23 @@ check 'reinstall preserves foreign config sibling' grep -Fxq 'foreign config sib
 check 'reinstall retains install state after config recreation' test -s "$recreate/.codex/.basix-install-state"
 
 source_copy="$case_dir/source"; cp -R "$ROOT" "$source_copy"; update="$case_dir/update"
+legacy_source="$source_copy/skills/basix/references/agent-communication-contract.md"
+legacy_target="$update/.agents/skills/basix/references/agent-communication-contract.md"
+cp "$source_copy/skills/basix-subagent-management/references/agent-communication-contract.md" "$legacy_source"
 "$source_copy/setup/install_for_project.sh" "$update" --no-local-network --no-test-socket >/dev/null
+rm -- "$legacy_source"
 printf '\ncopy-update\n' >>"$source_copy/skills/basix/SKILL.md"
 printf '\n# report-update\n' >>"$source_copy/agents/native/basix-pager.toml"
 update_output=$("$source_copy/setup/install_for_project.sh" "$update" --no-local-network --no-test-socket)
 check 'project reinstall reports changed agent as updated' grep -Fq 'basix-pager.toml — updated' <<<"$update_output"
+check 'migration removes old router-owned contract path' test ! -e "$legacy_target"
+check 'migration preserves management contract' cmp -s "$source_copy/skills/basix-subagent-management/references/agent-communication-contract.md" "$update/.agents/skills/basix-subagent-management/references/agent-communication-contract.md"
 check 'reinstall synchronizes source updates' grep -Fq copy-update "$update/.agents/skills/basix/SKILL.md"
 for agent in "$source_copy"/agents/native/*.toml; do
   check "project reinstall preserves $(basename "$agent") bytes" cmp -s "$agent" "$update/.codex/basix/agents/$(basename "$agent")"
 done
-stale_source="$source_copy/skills/basix/references/agent-communication-contract.md"
-stale_target="$update/.agents/skills/basix/references/agent-communication-contract.md"
+stale_source="$source_copy/skills/basix-subagent-management/references/agent-communication-contract.md"
+stale_target="$update/.agents/skills/basix-subagent-management/references/agent-communication-contract.md"
 rm -- "$stale_source"; "$source_copy/setup/install_for_project.sh" "$update" --no-local-network --no-test-socket >/dev/null
 check 'reinstall removes deleted manifest files' test ! -e "$stale_target"
 
@@ -113,6 +122,9 @@ if grep -Fq local-change "$changed/.agents/skills/basix/SKILL.md" && [[ -f $chan
 
 clean="$case_dir/clean"; "$ROOT/setup/install_for_project.sh" "$clean" --no-local-network --no-test-socket >/dev/null; "$ROOT/setup/install_for_project.sh" "$clean" --uninstall >/dev/null
 check 'clean uninstall removes payload state' test ! -e "$clean/.codex/.basix-install-state" -a ! -e "$clean/.agents/skills/basix" -a ! -e "$clean/.codex/basix"
+for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory; do
+  check "project uninstall removes managed $skill tree" test ! -e "$clean/.agents/skills/$skill"
+done
 
 foreign="$case_dir/foreign"; mkdir -p "$foreign/.agents/skills/basix"; printf x >"$foreign/.agents/skills/basix/foreign"
 if "$ROOT/setup/install_for_project.sh" "$foreign" --no-local-network --no-test-socket >/dev/null 2>&1; then bad 'foreign directory is rejected'; else ok 'foreign directory is rejected'; fi
