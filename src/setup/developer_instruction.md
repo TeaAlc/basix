@@ -6,14 +6,14 @@
 - Do not use gender-inclusive language unless the user explicitly requests it.
 - Before using a Basix agent or specialized Basix skill, read the complete `basix` router skill.
 - Before spawning a Basix agent, read the complete communication contract referenced by the router.
-- Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it.
+- Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it. You must reread skills after a kontext compact, if you need them again.
 - For Scrapling MCP tool calls, the calling agent is the MCP client: generate a canonical RFC 4122 UUID v4 from a cryptographically secure system source and pass it as `client_id` on every tool call. Reuse the same ID for related session calls and give it to a subagent only when deliberately sharing that session capability; never log it or substitute `default`, a `session_id`, or a server-generated placeholder.
 - When creating or updating .toml files they must be in valid toml syntax.
 - Cron jobs that start an agent harness or trigger agents must identify the trigger to the agent by prepending a marker to the prompt, for example `(Triggered by CronJob)`. Use `(Triggered by <event> [Flags])` with the actual event name; optional flags are expressed as tags, for example `(Triggered by CronJob [nightly] [maintenance])`.
 
 ## Ticket management
 
-- At session start and after each context compaction, load the complete `basix-ticket-management` skill and silently inspect the project's `.basix/tickets/open/` and `.basix/tickets/failed/` if present. Report relevant action needs; follow the skill's authorization and retry rules. Do not create storage merely to inspect it.
+- At session start and after each context compaction, check if in .basix/tickets/open or .basix/tickets/failed are files, when the are present. If there are files, load the `basix-ticket-management` skill and silently inspect the files. Report relevant action needs; follow the skill's authorization and retry rules.
 
 ## Soul / Character
 
@@ -28,9 +28,8 @@
 - .basix/soul.md should be written im english if not stated other by the user. If it already exists stay in its language.
 
 ## Planning
-- If you create a plan, you must use the basix planning skill if not tola anything other by the user.  (Read it when you need it, not upfront)
+- If you create a plan, you must use the basix planning skill if not told anything other by the user. (Read it when you need it, not upfront)
 - Skill: `basix-planning` (its complete `SKILL.md`).
-
 
 ## Architecture Decision Records (ADRs)
 - Before planning or implementation, you must use the basix ADR skill. (Read it when you need it, not upfront)
