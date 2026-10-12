@@ -284,7 +284,7 @@ import tomllib
 from pathlib import Path
 
 root = Path(sys.argv[1])
-# Reverse only the authorized ticket startup addition and four activation lines.
+# Reverse only authorized ticket startup/cron additions and four activation lines.
 # Prove all other bytes remain unchanged.
 # The fixed digest is the unchanged source baseline; installed tests need no Git.
 import hashlib
@@ -292,6 +292,9 @@ instruction_bytes = (root / "setup/developer_instruction.md").read_bytes()
 ticket_startup = "## Ticket management\n\n- At session start and after each context compaction, load the complete `basix-ticket-management` skill and silently inspect the project's `.basix/tickets/open/` and `.basix/tickets/failed/` if present. Report relevant action needs; follow the skill's authorization and retry rules. Do not create storage merely to inspect it.\n\n".encode()
 assert instruction_bytes.count(ticket_startup) == 1
 baseline_bytes = instruction_bytes.replace(ticket_startup, b"", 1)
+cron_trigger_rule = '- Cron jobs that start an agent harness or trigger agents must identify the trigger to the agent by prepending a marker to the prompt, for example `(Triggered by CronJob)`. Use `(Triggered by <event> [Flags])` with the actual event name; optional flags are expressed as tags, for example `(Triggered by CronJob [nightly] [maintenance])`.\n'.encode()
+assert instruction_bytes.count(cron_trigger_rule) == 1
+baseline_bytes = baseline_bytes.replace(cron_trigger_rule, b"", 1)
 assert (root / "skills/basix-ticket-management/SKILL.md").is_file()
 for heading, skill, suffix in (
     ("Planning", "basix-planning", ""),
@@ -307,7 +310,7 @@ for heading, skill, suffix in (
     original = f"- TODO: Add skillname{suffix}".encode()
     baseline_bytes = baseline_bytes.replace(section, section.replace(replacement, original), 1)
 assert b"TODO: Add skillname" not in instruction_bytes
-assert hashlib.sha256(baseline_bytes).hexdigest() == "9ad2ddcc111dc735392f5ce15d83089ac9bd770361b2a5a5144f62248024fd78", "developer instructions changed outside authorized TODO spans and ticket startup addition"
+assert hashlib.sha256(baseline_bytes).hexdigest() == "9ad2ddcc111dc735392f5ce15d83089ac9bd770361b2a5a5144f62248024fd78", "developer instructions changed outside authorized TODO spans, ticket startup addition and cron trigger rule"
 # Validate the documented ticket data examples, not just skill discovery.
 import json
 ticket_skill = (root / "skills/basix-ticket-management/SKILL.md").read_text()
