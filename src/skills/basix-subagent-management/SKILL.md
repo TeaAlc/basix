@@ -115,6 +115,12 @@ Track delivered final, inactivity, successful tests and accepted result separate
 release an inactive child's slot once, never twice for duplicate final delivery.
 Silence and a tool finishing do not establish terminal receipt or acceptance.
 
+When waiting for subagent results with no independent work currently in progress,
+always use `wait_agent`; never use `clock.sleep` for that idle wait. `clock.sleep`
+is allowed alongside waiting for subagent results only while the agent itself is
+actively performing other independent work in parallel. Merely having unfinished
+subagents or planned work does not qualify as ongoing work.
+
 Every `wait_agent` uses exactly `timeout_ms: 1800000`; bounded root budgets are
 separate from tool timeout. Early delivery returns promptly. Timeout or a finished
 child missing its final triggers one bounded lifecycle diagnosis, not automatic

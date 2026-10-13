@@ -86,8 +86,13 @@ review cycle with the same eligible agent or a fresh agent under the reuse polic
 Verify every delegated implementation result; parallel workers normally receive
 one aggregate verification. Assignments must be independently complete.
 
-Every `wait_agent` call uses exactly `timeout_ms: 1800000`. Prefer independent
-work. Early return and timeout are not failure, cancellation or permission to
+Prefer independent work while awaiting subagent results. When no independent work
+is currently in progress, always wait with `wait_agent`; `clock.sleep` is forbidden
+for that idle wait. Use `clock.sleep` alongside waiting for subagent results only
+while the agent itself actively performs other independent work in parallel.
+Unfinished subagents or merely planned work do not satisfy this condition.
+Every `wait_agent` call uses exactly `timeout_ms: 1800000`.
+Early return and timeout are not failure, cancellation or permission to
 short-poll. Root sets a bounded assignment/review budget and recovery criteria;
 no unconditional infinite waiting or automatic cancellation at 30 minutes.
 Timeout, delivery error, explicit cancellation or tool-finished-without-report
