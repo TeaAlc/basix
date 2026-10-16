@@ -103,7 +103,10 @@ research, specialized work, and larger assignments to dedicated agents.
 | `basix_verifier` | Independent inspection of a frozen result | Read-only |
 | `basix_miraculix` | Bounded second opinion, especially under extreme uncertainty | Read-only |
 
-Native agents use `gpt-6-luna`, except Miraculix, which uses `gpt-6-astra`.
+Native agents default to `gpt-6-luna`, except Miraculix, which uses `gpt-6-astra`.
+Reasoning effort varies by role: low for Explorer and Miraculix, medium for
+Researcher, and `xhigh` for Pager and Verifier. Explicit user overrides follow
+the model and effort precedence described under [Development](#development).
 Agent level governs delegation separately from model and reasoning effort: Root
 is principal; Pager and Verifier are seniors; Explorer, Researcher, and Miraculix
 are juniors. See the [agent reference](src/docs/agents.md) for profiles, assignment
@@ -133,14 +136,19 @@ Mention the relevant skill or agent naturally in Codex. The
 Installing Basix also adds [shared developer instructions](src/setup/developer_instruction.md)
 that shape agent behavior:
 
+- Python runs use `PYTHONDONTWRITEBYTECODE=1`.
+- Cron jobs that start an agent harness or trigger agents prepend a prompt marker
+  identifying the event, such as `(Triggered by CronJob)`, with optional tags
+  such as `[nightly]` and `[maintenance]`.
 - Root commits its completed task changes with Conventional Commits in Git
   repositories after all started tests and verification finish successfully.
 - Plans, persistent memory, and optional character instructions live under
   project-owned `.basix/`. Agents curate `.basix/memory.toml` autonomously and
   apply useful findings across sessions.
-- At session start and after compaction, agents load
-  [ticket management](src/skills/basix-ticket-management/SKILL.md) and silently
-  inspect existing open tickets and failed creation drafts. Coordinators own
+- At session start and after compaction, agents check for existing open tickets
+  and failed creation drafts. When present, they load
+  [ticket management](src/skills/basix-ticket-management/SKILL.md), inspect the
+  files silently, and report relevant action needs. Coordinators own
   project-local ticket metadata; retries require active authorized work and
   verified persistence of the problem, with at most five additional attempts.
 - Basix provides binding ADR governance for durable, hard-to-reverse,
@@ -277,6 +285,9 @@ independently: explicit user override, applicable specialist/skill settings, the
 `gpt-6.1-sol`/`low` runtime fallback. A model-only override retains applicable
 effort. Saved plans preserve native specialist routing and configured settings;
 unsupported selected settings block dispatch without substitution. No forks.
-Root manages at most three independent active descendants and exact 30-minute
-wait calls with bounded diagnosis. Optional requested efficiency companions use
+Root manages at most three active descendants, including nested children.
+When no independent work is active, parents wait with `wait_agent`; `clock.sleep`
+is allowed alongside subagent waiting only while the parent actively performs
+other independent work. Every wait uses exactly `timeout_ms: 1800000` (30 minutes);
+timeouts trigger bounded diagnosis. Optional requested efficiency companions use
 task-specific evidence and the exact `_efficency_analysis.md` suffix.

@@ -46,7 +46,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 9
+usefulness = 10
 
 [[entries]]
 date = "2026-08-08"
@@ -314,13 +314,13 @@ usefulness = 3
 date = "2026-10-10"
 category = "Repository"
 insight = "Runtime Contract 2.0 resides in basix-subagent-management; router retains spawn authority. Planning, ADR, and memory workflows have dedicated skills; static policy checks compose authoritative skills rather than developer prose."
-usefulness = 4
+usefulness = 5
 
 [[entries]]
 date = "2026-10-10"
 category = "User Instruction"
 insight = "Subagents work silently except unresolved blockers; terminal reports through send_message to the spawning parent are mandatory. Parent wait_agent calls use exactly timeout_ms 1800000."
-usefulness = 3
+usefulness = 4
 
 [[entries]]
 date = "2026-10-10"
@@ -350,4 +350,4 @@ usefulness = 0
 date = "2026-10-13"
 category = "User Instruction"
 insight = "When idle awaiting subagents, always use wait_agent; never clock.sleep. Allow clock.sleep alongside subagent waiting only while the agent actively performs other independent work in parallel."
-usefulness = 1
+usefulness = 2
