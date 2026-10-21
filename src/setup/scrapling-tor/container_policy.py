@@ -17,6 +17,7 @@ INTERNAL = "basix-scrapling-internal"
 EGRESS = "basix-tor-egress"
 PYTHON = "/app/.venv/bin/python"
 POLICY = "/opt/basix/policy_mcp.py"
+SUPERVISOR = "/opt/basix/service_supervisor.py"
 TOR_HOST = "basix-tor-proxy"
 
 
@@ -29,6 +30,18 @@ def sequence(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     return []
+
+
+def scalar_entrypoint_matches(container: dict[str, Any], argv: list[str]) -> bool:
+    """Match container's Podman scalar entrypoint to fixed argv and executed Path/Args."""
+    config, _ = base(container)
+    command = config.get("Cmd")
+    return (
+        config.get("Entrypoint") == " ".join(argv)
+        and (command is None or (isinstance(command, list) and not command))
+        and container.get("Path") == argv[0]
+        and container.get("Args") == argv[1:]
+    )
 
 
 def normalized_image(value: Any) -> str:
@@ -122,14 +135,23 @@ def proxy_env_valid(config: dict[str, Any], require_port: str | None, require_to
     return proxy_env_kind(config, require_port, expected) is not None
 
 
-def policy_mount_valid(container: dict[str, Any], source: str) -> bool:
-    """Check container has the exact read-only policy source mount."""
+def policy_mount_valid(container: dict[str, Any], source: str, supervised: bool = False) -> bool:
+    """Check container mounts match source, adding its sibling supervisor when supervised."""
     mounts = container.get("Mounts") or []
-    if not isinstance(mounts, list) or len(mounts) != 1 or not isinstance(mounts[0], dict):
+    expected = {POLICY: os.path.realpath(source)}
+    if supervised:
+        expected[SUPERVISOR] = os.path.realpath(os.path.join(os.path.dirname(source), "service_supervisor.py"))
+    if not isinstance(mounts, list) or len(mounts) != len(expected):
         return False
-    mount = mounts[0]
-    actual_source = os.path.realpath(str(mount.get("Source") or ""))
-    return mount.get("Destination") == POLICY and mount.get("RW") is False and actual_source == os.path.realpath(source)
+    for mount in mounts:
+        if not isinstance(mount, dict):
+            return False
+        destination = mount.get("Destination")
+        if not isinstance(destination, str) or destination not in expected or mount.get("RW") is not False:
+            return False
+        if os.path.realpath(str(mount.get("Source") or "")) != expected.pop(destination):
+            return False
+    return not expected
 
 
 def bound_loopback_port(host: dict[str, Any]) -> str | None:
@@ -191,23 +213,56 @@ def managed(container: dict[str, Any], args: argparse.Namespace) -> int:
     networks = set(((container.get("NetworkSettings") or {}).get("Networks") or {}))
     restart = (host.get("RestartPolicy") or {}).get("Name")
     if not secure_base(container) or restart not in (None, "", "unless-stopped"):
+        print(f"Managed {args.kind} policy rejected: security={secure_base(container)} restart_allowed={restart in (None, '', 'unless-stopped')}", file=sys.stderr)
         return 1
     if args.kind == "tor":
         health = config.get("Healthcheck") or {}
-        expected = ["CMD-SHELL", "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log"]
+        old_health = ["CMD-SHELL", "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log"]
+        new_health = ["CMD-SHELL", "python3 /opt/basix/service_supervisor.py --probe tor"]
+        entrypoint, command = sequence(config.get("Entrypoint")), sequence(config.get("Cmd"))
+        supervised_argv = ["python3", SUPERVISOR, "tor"]
+        supervised_command = (
+            (entrypoint == supervised_argv and not command)
+            or scalar_entrypoint_matches(container, supervised_argv)
+        )
+        supervised_health = health.get("Test") == new_health
+        supervised = supervised_command and supervised_health
+        old_command = (
+            (entrypoint == ["tor", "-f", "/etc/tor/torrc"] and not command)
+            or (entrypoint == ["tor"] and command == ["-f", "/etc/tor/torrc"])
+            or scalar_entrypoint_matches(container, ["tor", "-f", "/etc/tor/torrc"])
+        )
+        old_probe = health.get("Test") == old_health
+        old = old_command and old_probe
         aliases = ((container.get("NetworkSettings") or {}).get("Networks") or {}).get(INTERNAL, {}).get("Aliases") or []
-        valid = networks == {EGRESS, INTERNAL} and not (container.get("Mounts") or []) and not (host.get("PortBindings") or {}) and health.get("Test") == expected
+        networks_valid = networks == {EGRESS, INTERNAL}
+        mounts_valid = not (container.get("Mounts") or [])
+        ports_valid = not (host.get("PortBindings") or {})
+        valid = networks_valid and mounts_valid and ports_valid and (supervised or old)
     else:
         bound_port = bound_loopback_port(host)
         proxy_kind = proxy_env_kind(config, bound_port, args.tor_host) if bound_port else None
-        valid = networks == {INTERNAL} and bound_port is not None and policy_mount_valid(container, args.policy) and proxy_kind is not None and sequence(config.get("Entrypoint")) == [PYTHON] and sequence(config.get("Cmd")) == [POLICY]
+        health = config.get("Healthcheck") or {}
+        command = sequence(config.get("Cmd"))
+        entrypoint_valid = sequence(config.get("Entrypoint")) == [PYTHON]
+        supervised_command = entrypoint_valid and command == [SUPERVISOR, "mcp"]
+        supervised_health = health.get("Test") == ["CMD-SHELL", f"{PYTHON} {SUPERVISOR} --probe mcp"]
+        supervised = supervised_command and supervised_health
+        old_command, old_probe = entrypoint_valid and command == [POLICY], not health
+        old = old_command and old_probe
+        networks_valid, ports_valid = networks == {INTERNAL}, bound_port is not None
+        mounts_valid = policy_mount_valid(container, args.policy, supervised)
+        valid = networks_valid and ports_valid and mounts_valid and proxy_kind is not None and (supervised or old)
     if not valid:
+        print(f"Managed {args.kind} policy rejected: networks={networks_valid} mounts={mounts_valid} ports={ports_valid} supervised_command={supervised_command} supervised_health={supervised_health} legacy_command={old_command} legacy_health={old_probe}" + (f" proxy={proxy_kind is not None}" if args.kind == "scrapling" else ""), file=sys.stderr)
         return 1
-    exact = restart == "unless-stopped" and normalized_image(container.get("Image")) == normalized_image(args.actual) and normalized_image(config.get("Image")) == normalized_image(args.configured)
+    exact = supervised and restart == "unless-stopped" and normalized_image(container.get("Image")) == normalized_image(args.actual) and normalized_image(config.get("Image")) == normalized_image(args.configured)
     if args.kind == "scrapling":
         exact = exact and proxy_kind == "canonical" and bound_port == args.port
     elif args.kind == "tor":
         exact = exact and TOR_HOST in aliases
+    if not exact:
+        print(f"Managed {args.kind} requires replacement: supervised={supervised} restart={restart == 'unless-stopped'} actual_image={normalized_image(container.get('Image')) == normalized_image(args.actual)} configured_image={normalized_image(config.get('Image')) == normalized_image(args.configured)}" + (f" alias={TOR_HOST in aliases}" if args.kind == "tor" else f" proxy={proxy_kind == 'canonical'} port={bound_port == args.port}"), file=sys.stderr)
     return 0 if exact else 10
 
 

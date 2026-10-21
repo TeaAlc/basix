@@ -1,0 +1,10 @@
+[
+  {
+    "Config": {
+      "Entrypoint": "python3 /opt/basix/service_supervisor.py tor",
+      "Cmd": null
+    },
+    "Path": "python3",
+    "Args": ["/opt/basix/service_supervisor.py", "tor"]
+  }
+]

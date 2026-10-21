@@ -5,5 +5,6 @@ bash -n "$ROOT/src/setup/install-scrapling-codex.sh" "$ROOT/src/setup/scrapling-
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/test/setup/install-scrapling-codex/test_container_policy.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/test/setup/install-scrapling-codex/test_codex_scan.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/test/setup/install-scrapling-codex/test_health_check.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/test/setup/install-scrapling-codex/test_service_supervisor.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/test/setup/install-scrapling-codex/test_scrapling_policy.py"
 "$ROOT/test/setup/install-scrapling-codex/test-installer.sh"

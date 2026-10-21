@@ -34,6 +34,37 @@ with socket.socket() as probe:
 PY
 )
 
+# Parameters: $1 MCP endpoint. Verify the application route and bounded direct
+# TCP/UDP isolation; managed-alias DNS metadata remains permitted by ADR 0007.
+verify_traffic_boundary() {
+  podman exec basix-scrapling-mcp /app/.venv/bin/python -c '
+import os,socket
+socket.getaddrinfo("basix-tor-proxy",9050)
+with socket.create_connection(("basix-tor-proxy",9050),2) as proxy:
+    proxy.sendall(b"\x05\x01\x00")
+    with proxy.makefile("rb") as reply:
+        if reply.read(2) != b"\x05\x00": raise SystemExit("managed Tor SOCKS negotiation failed")
+with socket.socket() as direct:
+    direct.settimeout(2)
+    try: connected=direct.connect_ex(("1.1.1.1",443)) == 0
+    except OSError: connected=False
+    if connected: raise SystemExit("direct TCP egress unexpectedly connected")
+# UDP connect/send success does not demonstrate egress. Only an actual DNS
+# response fails this check; timeout or an unreachable route has no reply.
+query=os.urandom(2)+b"\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x07invalid\x00\x00\x01\x00\x01"
+with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as direct:
+    direct.settimeout(2)
+    try:
+        direct.connect(("1.1.1.1",53))
+        direct.send(query)
+        direct.recv(512)
+    except OSError: pass
+    else: raise SystemExit("direct UDP DNS egress unexpectedly received a reply")
+print("Managed Tor alias/SOCKS reachable; direct TCP blocked; direct UDP DNS has no reply.")
+'
+  PYTHONDONTWRITEBYTECODE=1 python3 "$CODEX_HOME/basix/scrapling-tor/health_check.py" "$1"
+}
+
 image=${SCRAPLING_RELEASE_IMAGE:-docker.io/pyd4vinci/scrapling:latest}
 podman pull "$image" >/dev/null
 pinned=$(podman image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{else}}{{.Id}}{{end}}' "$image")
@@ -55,7 +86,7 @@ podman run -d --name basix-scrapling-tor --label io.basix.scrapling-tor.managed=
   --network basix-tor-egress --cap-drop ALL --security-opt no-new-privileges \
   --health-cmd "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log" \
   --health-interval 5s --health-timeout 3s --health-start-period 10s --health-retries 24 \
-  localhost/basix-scrapling-tor:legacy >/dev/null
+  --entrypoint tor localhost/basix-scrapling-tor:legacy -f /etc/tor/torrc >/dev/null
 podman network connect basix-scrapling-internal basix-scrapling-tor
 
 tor_bootstrap=false
@@ -107,14 +138,7 @@ assert not (n.get("NetworkDNSServers",n.get("DNSServers",n.get("dns_servers",[])
 assert not bool(n.get("EnableIPv6",n.get("IPv6Enabled",n.get("ipv6_enabled",False))))
 assert (n.get("Labels",n.get("labels",{})) or {}).get("io.basix.scrapling-tor.managed") == "true"
 '
-podman exec basix-scrapling-mcp /app/.venv/bin/python -c '
-import socket
-socket.getaddrinfo("basix-tor-proxy",9050)
-s=socket.socket(); s.settimeout(2)
-if s.connect_ex(("1.1.1.1",443)) == 0: raise SystemExit("direct egress unexpectedly connected")
-s=socket.create_connection(("basix-tor-proxy",9050),2); s.close()
-'
-PYTHONDONTWRITEBYTECODE=1 python3 "$CODEX_HOME/basix/scrapling-tor/health_check.py" "http://127.0.0.1:$port/mcp"
+verify_traffic_boundary "http://127.0.0.1:$port/mcp"
 "$ROOT/src/setup/install-scrapling-codex.sh" --runtime podman --image "$pinned" --port "$port" --force
 scrapling_id=$(podman inspect --format '{{.Id}}' basix-scrapling-mcp)
 scrapling_started=$(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-mcp)
@@ -128,6 +152,54 @@ new_tor_ip=$(podman inspect --format '{{with index .NetworkSettings.Networks "ba
 [[ $(podman inspect --format '{{.Id}}' basix-scrapling-mcp) == "$scrapling_id" ]]
 [[ $(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-mcp) == "$scrapling_started" ]]
 podman rm -f basix-ip-holder >/dev/null
-PYTHONDONTWRITEBYTECODE=1 python3 "$CODEX_HOME/basix/scrapling-tor/health_check.py" "http://127.0.0.1:$port/mcp"
+verify_traffic_boundary "http://127.0.0.1:$port/mcp"
+
+# Exercise actual child failure and a stopped event loop without host health timers.
+# Parameters: $1 container name; $2 Python executable; $3 child argv marker;
+# $4 signal number. Print the exact signalled PID for later replacement checks.
+# Exclude PID 1: the supervisor command also contains its service marker.
+signal_managed_child() {
+  podman exec "$1" "$2" -c '
+import os,pathlib,signal,sys
+marker,number=sys.argv[1],int(sys.argv[2])
+matches=[]
+for item in pathlib.Path("/proc").iterdir():
+    if not item.name.isdigit() or int(item.name) in (1,os.getpid()): continue
+    try: argv=(item/"cmdline").read_bytes().split(b"\0")
+    except (FileNotFoundError,ProcessLookupError,PermissionError): continue
+    if marker.encode() in argv: matches.append(int(item.name))
+if len(matches)!=1: raise SystemExit(f"expected one managed child, got {matches}")
+os.kill(matches[0],number)
+print(matches[0])
+' "$3" "$4"
+}
+
+tor_started=$(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-tor)
+signal_managed_child basix-scrapling-tor python3 tor 9 >/dev/null
+recovered=false
+for _ in $(seq 1 180); do
+  if [[ $(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-tor) != "$tor_started" ]] && \
+    podman exec basix-scrapling-tor python3 /opt/basix/service_supervisor.py --probe tor >/dev/null 2>&1; then
+    recovered=true; break
+  fi
+  sleep 2
+done
+if ! $recovered; then podman logs --tail 100 basix-scrapling-tor >&2; printf 'Tor child-exit recovery failed\n' >&2; exit 9; fi
+verify_traffic_boundary "http://127.0.0.1:$port/mcp"
+
+mcp_started=$(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-mcp)
+stopped_pid=$(signal_managed_child basix-scrapling-mcp /app/.venv/bin/python /opt/basix/policy_mcp.py 19)
+recovered=false
+for _ in $(seq 1 120); do
+  if podman logs basix-scrapling-mcp 2>&1 | grep -F 'restarting mcp after cooldown=' >/dev/null && \
+    podman exec basix-scrapling-mcp /app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp >/dev/null 2>&1; then
+    recovered=true; break
+  fi
+  sleep 2
+done
+if ! $recovered; then podman logs --tail 100 basix-scrapling-mcp >&2; printf 'MCP hung-child recovery failed\n' >&2; exit 9; fi
+[[ $(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-mcp) == "$mcp_started" ]]
+podman exec basix-scrapling-mcp /app/.venv/bin/python -c 'import os,sys; assert not os.path.exists("/proc/"+sys.argv[1])' "$stopped_pid"
+verify_traffic_boundary "http://127.0.0.1:$port/mcp"
 codex mcp list --json | PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/src/setup/scrapling-tor/codex_scan.py" verify --endpoint "http://127.0.0.1:$port/mcp"
 printf 'Isolated Podman Scrapling release gate passed.\n'

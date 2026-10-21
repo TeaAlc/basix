@@ -16,12 +16,14 @@ source "$HERE/config"
 TRANSACTION_ID=${BASIX_SETUP_TRANSACTION_ID:-}
 readonly ENDPOINT="http://127.0.0.1:$PORT/mcp"
 
-created_internal=false created_egress=false created_tor=false created_scrapling=false probe_created=false
+created_internal=false created_egress=false created_tor=false created_scrapling=false probe_created=false diagnostics_collected=false
 created_internal_id='' created_egress_id='' created_tor_ref='' created_scrapling_ref=''
 migration_old_removed=false migration_original_internal_id='' migration_new_internal_id='' migration_disconnected_ids=() migration_disconnected_names=()
 legacy_ids=() legacy_names=()
 rollback() {
-  local status=$?; trap - ERR
+  local status=$? failed_line=${1:-unknown}; trap - ERR
+  printf 'Managed service preparation failed at launcher line %s (exit %s).\n' "$failed_line" "$status" >&2
+  if ! $diagnostics_collected; then container_diagnostics || true; fi
   if $probe_created; then "$RUNTIME" rm -f "$PROBE_CONTAINER" >/dev/null 2>&1 || true; fi
   if $created_scrapling && [[ -n $created_scrapling_ref ]]; then "$RUNTIME" rm -f "$created_scrapling_ref" >/dev/null 2>&1 || true; fi
   if $created_tor && [[ -n $created_tor_ref ]]; then "$RUNTIME" rm -f "$created_tor_ref" >/dev/null 2>&1 || true; fi
@@ -59,7 +61,7 @@ rollback() {
   fi
   return "$status"
 }
-trap rollback ERR
+trap 'rollback "$LINENO"' ERR
 
 network_json() { "$RUNTIME" network inspect "$1"; }
 container_json() { "$RUNTIME" inspect "$1"; }
@@ -269,10 +271,8 @@ tor_bootstrap_verified() {
   local state
   state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$TOR_CONTAINER" 2>/dev/null || true)
   [[ $state == running ]] || return 1
-  # Podman does not run healthchecks by itself unless a healthcheck manager is
-  # active.  Check Tor's notice file directly so rootless installs do not wait
-  # forever on a perpetually "starting" runtime health state.
-  "$RUNTIME" exec "$TOR_CONTAINER" grep -q 'Bootstrapped 100%' /var/log/tor/notices.log
+  # Explicit current readiness works even without a host healthcheck manager.
+  "$RUNTIME" exec "$TOR_CONTAINER" python3 /opt/basix/service_supervisor.py --probe tor
 }
 
 runtime_diagnostics() {
@@ -360,8 +360,8 @@ ensure_tor() {
     created_tor=true
     run_created_container created_tor_ref -d --name "$TOR_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
       --network "$EGRESS_NET" --cap-drop ALL --security-opt no-new-privileges \
-      --health-cmd "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log" \
-      --health-interval 5s --health-timeout 3s --health-start-period 10s --health-retries 24 "$TOR_IMAGE" >/dev/null
+      --health-cmd 'python3 /opt/basix/service_supervisor.py --probe tor' \
+      --health-interval 15s --health-timeout 8s --health-start-period 120s --health-retries 3 "$TOR_IMAGE" >/dev/null
     "$RUNTIME" network connect --alias "$BASIX_TOR_HOST" "$INTERNAL_NET" "$TOR_CONTAINER" >/dev/null
     classify_container "$TOR_CONTAINER" tor "$TOR_IMAGE" "$TOR_IMAGE"
   fi
@@ -375,7 +375,7 @@ ensure_tor() {
   if ! $verified; then
     health=$("$RUNTIME" inspect --format '{{.State.Health.Status}}' "$TOR_CONTAINER" 2>/dev/null || true)
     state=$("$RUNTIME" inspect --format '{{.State.Status}}' "$TOR_CONTAINER" 2>/dev/null || true)
-    printf 'Tor sidecar did not reach 100%% bootstrap (state: %s; runtime health: %s; direct notice check: failed).\n' "${state:-unknown}" "${health:-unknown}" >&2
+    printf 'Tor sidecar did not reach current readiness (state: %s; runtime health: %s; local control/SOCKS/circuit check: failed).\n' "${state:-unknown}" "${health:-unknown}" >&2
     return 9
   fi
 }
@@ -394,9 +394,10 @@ PY
 
 container_diagnostics() {
   local listing name state health bootstrap ip
-  printf 'MCP verification failed; collecting container diagnostics before rollback.\n' >&2
+  diagnostics_collected=true
+  printf 'Managed service preparation failed; collecting container diagnostics before rollback.\n' >&2
   printf '%s\n' "$(runtime_diagnostics)" >&2
-  if listing=$("$RUNTIME" ps -a --no-trunc 2>&1); then
+  if listing=$("$RUNTIME" ps -a --no-trunc --format '{{.ID}} {{.Names}} {{.Status}}' 2>&1); then
     printf '%s\n' 'Container status (all containers):' >&2
     printf '%s\n' "$listing" >&2
   else
@@ -411,6 +412,10 @@ container_diagnostics() {
     printf 'Logs for %s (last 200 lines):\n' "$name" >&2
     if ! "$RUNTIME" logs --tail 200 "$name" >&2; then
       printf 'Could not collect logs for %s.\n' "$name" >&2
+    fi
+    if [[ $name == "$TOR_CONTAINER" ]]; then
+      printf 'Current Tor notices (last 100 lines):\n' >&2
+      "$RUNTIME" exec "$name" tail -n 100 /var/log/tor/notices.log >&2 || true
     fi
   done
   ip=$(tor_ip 2>/dev/null || true)
@@ -505,7 +510,12 @@ ensure_scrapling() {
       --network "$INTERNAL_NET" --cap-drop ALL --security-opt no-new-privileges -p "127.0.0.1:$PORT:$PORT" \
       -e "BASIX_TOR_HOST=$BASIX_TOR_HOST" -e "BASIX_PORT=$PORT" -e "HTTP_PROXY=socks5h://$BASIX_TOR_HOST:9050" -e "HTTPS_PROXY=socks5h://$BASIX_TOR_HOST:9050" -e "ALL_PROXY=socks5h://$BASIX_TOR_HOST:9050" \
       -e "http_proxy=socks5h://$BASIX_TOR_HOST:9050" -e "https_proxy=socks5h://$BASIX_TOR_HOST:9050" -e "all_proxy=socks5h://$BASIX_TOR_HOST:9050" -e 'NO_PROXY=' -e 'no_proxy=' \
-      -v "$HERE/policy_mcp.py:/opt/basix/policy_mcp.py:ro" --entrypoint /app/.venv/bin/python "$SCRAPLING_IMAGE" /opt/basix/policy_mcp.py >/dev/null
+      -e 'PYTHONDONTWRITEBYTECODE=1' \
+      --health-cmd '/app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp' \
+      --health-interval 15s --health-timeout 8s --health-start-period 120s --health-retries 3 \
+      -v "$HERE/policy_mcp.py:/opt/basix/policy_mcp.py:ro" \
+      -v "$HERE/service_supervisor.py:/opt/basix/service_supervisor.py:ro" \
+      --entrypoint /app/.venv/bin/python "$SCRAPLING_IMAGE" /opt/basix/service_supervisor.py mcp >/dev/null
     classify_container "$SCRAPLING_CONTAINER" scrapling "$SCRAPLING_IMAGE" "$SCRAPLING_ID" "$BASIX_TOR_HOST" "$HERE/policy_mcp.py"
   fi
 }

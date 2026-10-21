@@ -4,13 +4,13 @@ version = 1
 date = "2026-08-29"
 category = "Verification"
 insight = "Podman 4.9.3-era Aardvark cannot guarantee peer aliases plus blocked external DNS; relaxed policy permits DNS metadata but still requires alias resolution and failed direct TCP egress."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-29"
 category = "Verification"
 insight = "Tor container restarts can change its internal IP while Scrapling retains a literal SOCKS address; test restart drift and safely reconcile managed containers."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-29"
@@ -46,7 +46,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 10
+usefulness = 11
 
 [[entries]]
 date = "2026-08-08"
@@ -122,7 +122,7 @@ usefulness = 0
 date = "2026-08-10"
 category = "Repository"
 insight = "All tests are component-owned under test/. verify-basix.sh aggregates deterministic agents, skills, and shared suites; test-setup.sh aggregates setup; live tests remain explicit."
-usefulness = 8
+usefulness = 9
 
 [[entries]]
 date = "2026-08-11"
@@ -161,10 +161,10 @@ insight = "Legacy Basix Scrapling containers may have an empty Podman restart po
 usefulness = 0
 
 [[entries]]
-date = "2026-08-21"
+date = "2026-10-21"
 category = "Verification"
-insight = "Podman inspect may serialize Config.Entrypoint as a string and Config.Cmd as a list; normalize both before combining commands during foreign-container scans."
-usefulness = 0
+insight = "Podman inspect serializes multiargument entrypoints as strings. Accept only exact known strings with matching Path/Args and raw Cmd null or empty list; never shell-split or normalize malformed Cmd types."
+usefulness = 1
 
 [[entries]]
 date = "2026-08-21"
@@ -191,10 +191,10 @@ insight = "urllib build_opener may omit an empty ProxyHandler from handlers; ret
 usefulness = 0
 
 [[entries]]
-date = "2026-08-21"
+date = "2026-10-21"
 category = "Verification"
-insight = "Rootless Podman may leave State.Health.Status at starting because no healthcheck manager is active; verify Tor bootstrap with an explicit exec notice-file check and keep runtime health diagnostic-only."
-usefulness = 0
+insight = "Rootless Podman health timers may be inactive. Use container-local supervisors and live SOCKS/control or MCP probes; historical Tor bootstrap notices do not prove current readiness."
+usefulness = 1
 
 [[entries]]
 date = "2026-08-21"
@@ -351,3 +351,15 @@ date = "2026-10-13"
 category = "User Instruction"
 insight = "When idle awaiting subagents, always use wait_agent; never clock.sleep. Allow clock.sleep alongside subagent waiting only while the agent actively performs other independent work in parallel."
 usefulness = 2
+
+[[entries]]
+date = "2026-10-21"
+category = "Verification"
+insight = "Before diagnosing a SOCKS error as Tor failure, compare HTTP/browser control destinations and raw SOCKS RESOLVE replies; target-specific host failures must not restart the proxy."
+usefulness = 0
+
+[[entries]]
+date = "2026-10-21"
+category = "Verification"
+insight = "Tor supervision requires full Python stdlib, not python3-minimal. Run the supervisor --help as the image runtime user during build to catch missing imports and permissions."
+usefulness = 0

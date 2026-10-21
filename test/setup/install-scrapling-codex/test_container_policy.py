@@ -122,5 +122,129 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse(policy.legacy(changed, "/home/codex/.codex/basix/scrapling-tor/policy_mcp.py"))
 
 
+class SupervisorPolicyTests(unittest.TestCase):
+    """Prove legacy migration and strict ownership of the new supervisor."""
+
+    def setUp(self):
+        """Prepare self's canonical alias service based on a real inspect fixture."""
+        self.current = fixture("podman-current-http.json")
+        self.current["Config"]["Env"] = [
+            item.replace("BASIX_TOR_IP=10.89.1.2", "BASIX_TOR_HOST=basix-tor-proxy")
+            .replace("socks5h://10.89.1.2:9050", "socks5h://basix-tor-proxy:9050")
+            for item in self.current["Config"]["Env"]
+        ]
+        self.args = Namespace(kind="scrapling", configured=self.current["Config"]["Image"],
+                              actual=self.current["Image"], port="8002",
+                              policy="/tmp/codex/basix/scrapling-tor/policy_mcp.py", tor_host=policy.TOR_HOST)
+
+    def supervised(self):
+        """Return self's fixture with the exact canonical supervisor mount and probe."""
+        current = copy.deepcopy(self.current)
+        current["Config"]["Cmd"] = [policy.SUPERVISOR, "mcp"]
+        current["Config"]["Healthcheck"] = {"Test": ["CMD-SHELL", f"{policy.PYTHON} {policy.SUPERVISOR} --probe mcp"]}
+        current["Mounts"].append({"Source": "/tmp/codex/basix/scrapling-tor/service_supervisor.py", "Destination": policy.SUPERVISOR, "RW": False})
+        return current
+
+    def test_existing_managed_alias_service_is_replaceable(self):
+        """Assert self's prior unsupervised canonical runtime is safe migration drift."""
+        self.assertEqual(policy.managed(self.current, self.args), 10)
+        self.assertEqual(policy.managed(self.supervised(), self.args), 0)
+
+    def test_supervisor_mount_command_health_and_foreign_resources_fail_closed(self):
+        """Reject each mutation of self's otherwise canonical supervisor resources."""
+        mutations = (
+            lambda c: c["Mounts"][1].update(RW=True),
+            lambda c: c["Mounts"][1].update(Source="/tmp/foreign/service_supervisor.py"),
+            lambda c: c["Mounts"].pop(),
+            lambda c: c["Config"].update(Cmd=[policy.SUPERVISOR, "tor"]),
+            lambda c: c["Config"].update(Healthcheck={"Test": ["CMD-SHELL", "true"]}),
+            lambda c: c["NetworkSettings"]["Networks"].update({"host": {}}),
+            lambda c: c["Config"]["Labels"].clear(),
+        )
+        for mutation in mutations:
+            current = self.supervised()
+            mutation(current)
+            with self.subTest(mutation=mutation):
+                self.assertEqual(policy.managed(current, self.args), 1)
+
+    def test_tor_legacy_command_is_migrated_and_unknown_command_rejected(self):
+        """Check self's Tor ownership requires known old or supervised commands."""
+        current = copy.deepcopy(self.current)
+        current["Mounts"] = []
+        current["HostConfig"]["PortBindings"] = {}
+        current["NetworkSettings"]["Networks"] = {policy.EGRESS: {}, policy.INTERNAL: {"Aliases": [policy.TOR_HOST]}}
+        current["Config"]["Healthcheck"] = {"Test": ["CMD-SHELL", "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log"]}
+        self.args.kind = "tor"
+        legitimate_forms = (
+            (["tor", "-f", "/etc/tor/torrc"], []),
+            (["tor"], ["-f", "/etc/tor/torrc"]),
+        )
+        for entrypoint, command in legitimate_forms:
+            with self.subTest(entrypoint=entrypoint, command=command):
+                current["Config"]["Entrypoint"] = entrypoint
+                current["Config"]["Cmd"] = command
+                self.assertEqual(policy.managed(current, self.args), 10)
+                for field in ("Entrypoint", "Cmd"):
+                    modified = copy.deepcopy(current)
+                    modified["Config"][field].append("--SocksPort=0.0.0.0:9999")
+                    self.assertEqual(policy.managed(modified, self.args), 1)
+                modified = copy.deepcopy(current)
+                modified["Config"]["Healthcheck"]["Test"] = ["CMD-SHELL", "true"]
+                self.assertEqual(policy.managed(modified, self.args), 1)
+        current["Config"]["Entrypoint"] = ["python3", policy.SUPERVISOR, "tor"]
+        current["Config"]["Cmd"] = []
+        current["Config"]["Healthcheck"]["Test"] = ["CMD-SHELL", f"python3 {policy.SUPERVISOR} --probe tor"]
+        self.assertEqual(policy.managed(current, self.args), 0)
+        current["Config"]["Entrypoint"] = ["sh", "-c", "sleep infinity"]
+        self.assertEqual(policy.managed(current, self.args), 1)
+
+    def test_podman_scalar_tor_entrypoint_requires_exact_executed_argv(self):
+        """Check self's observed Podman serialization without accepting shell variations."""
+        current = copy.deepcopy(self.current)
+        observed = fixture("podman-supervised-tor-command.json")
+        current["Config"].update(observed["Config"])
+        current.update(Path=observed["Path"], Args=observed["Args"])
+        current["Mounts"] = []
+        current["HostConfig"]["PortBindings"] = {}
+        current["NetworkSettings"]["Networks"] = {policy.EGRESS: {}, policy.INTERNAL: {"Aliases": [policy.TOR_HOST]}}
+        self.args.kind = "tor"
+        for argv, probe, expected in (
+            (["python3", policy.SUPERVISOR, "tor"], f"python3 {policy.SUPERVISOR} --probe tor", 0),
+            (["tor", "-f", "/etc/tor/torrc"], "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log", 10),
+        ):
+            if expected == 10:
+                current["Config"]["Entrypoint"] = " ".join(argv)
+                current.update(Path=argv[0], Args=argv[1:])
+            current["Config"]["Healthcheck"] = {"Test": ["CMD-SHELL", probe]}
+            with self.subTest(argv=argv):
+                self.assertEqual(policy.managed(current, self.args), expected)
+                for command in (None, []):
+                    modified = copy.deepcopy(current)
+                    modified["Config"]["Cmd"] = command
+                    self.assertEqual(policy.managed(modified, self.args), expected)
+                for command in ({}, 0, False, "", ()):
+                    modified = copy.deepcopy(current)
+                    modified["Config"]["Cmd"] = command
+                    with self.subTest(command=command):
+                        self.assertEqual(policy.managed(modified, self.args), 1)
+                mutations = (
+                    lambda c: c["Config"].update(Entrypoint=c["Config"]["Entrypoint"] + " --extra"),
+                    lambda c: c["Config"].update(Cmd=["--extra"]),
+                    lambda c: c.update(Path="sh"),
+                    lambda c: c["Args"].append("--extra"),
+                    lambda c: c.pop("Path"),
+                    lambda c: c.pop("Args"),
+                    lambda c: c["Config"].update(Entrypoint='["' + '","'.join(argv) + '"]'),
+                    lambda c: c["Config"].update(Entrypoint="  ".join(argv)),
+                    lambda c: c["Config"]["Labels"].clear(),
+                    lambda c: c["NetworkSettings"]["Networks"].update({"host": {}}),
+                    lambda c: c["Mounts"].append({"Destination": "/tmp", "RW": True}),
+                )
+                for mutation in mutations:
+                    modified = copy.deepcopy(current)
+                    mutation(modified)
+                    self.assertEqual(policy.managed(modified, self.args), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

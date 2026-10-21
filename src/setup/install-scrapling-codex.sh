@@ -717,10 +717,10 @@ tor_pinned=$(normalize_image_reference "$tor_inspected") || fail "$EXIT_IMAGE_CH
 
 mkdir -p "$work/support"
 cp "$SOURCE_DIR/launcher.sh" "$SOURCE_DIR/policy_mcp.py" "$SOURCE_DIR/codex_scan.py" \
-  "$SOURCE_DIR/container_policy.py" "$SOURCE_DIR/health_check.py" "$work/support/"
+  "$SOURCE_DIR/container_policy.py" "$SOURCE_DIR/health_check.py" "$SOURCE_DIR/service_supervisor.py" "$work/support/"
 printf 'RUNTIME=%q\nSCRAPLING_IMAGE=%q\nSCRAPLING_ID=%q\nTOR_IMAGE=%q\nPORT=%q\n' "$runtime" "$scrapling_pinned" "$scrapling_id" "$tor_pinned" "$port" >"$work/support/config"
 chmod 755 "$work/support/launcher.sh" "$work/support/codex_scan.py" \
-  "$work/support/container_policy.py" "$work/support/health_check.py"
+  "$work/support/container_policy.py" "$work/support/health_check.py" "$work/support/service_supervisor.py"
 mkdir -p "$(dirname "$install_dir")"
 if [[ -e $install_dir ]]; then mv "$install_dir" "$backup_support"; old_support_saved=true; fi
 if ! mv "$work/support" "$install_dir"; then
