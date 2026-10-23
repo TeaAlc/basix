@@ -9,6 +9,7 @@ import unittest
 import urllib.error
 import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -329,6 +330,198 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ConnectionRefusedError):
             await monitor.execute(target_transport_failure)
         self.assertEqual(len(target_calls), 1)
+
+    async def test_failed_stateless_retry_requires_fresh_external_evidence(self):
+        """Check classification, sanitization, and the two-operation budget."""
+        for evidence in (True, False, RuntimeError("secret diagnostic URL"), None):
+            with self.subTest(evidence=evidence):
+                confirmer = None if evidence is None else AsyncMock(side_effect=[True, evidence])
+                monitor = policy.TorMonitor(
+                    resolver=lambda _: "10.77.0.2", probe=lambda *_: True,
+                    confirmer=confirmer,
+                )
+                operation = AsyncMock(side_effect=ConnectionResetError(
+                    "SOCKS failure https://user:secret@example.invalid/private"
+                ))
+                expected = policy.TOR_REQUEST_FAILED if evidence is True else policy.TOR_UNAVAILABLE
+                with self.assertRaises(RuntimeError) as raised:
+                    await monitor.execute(operation)
+                self.assertEqual(str(raised.exception), expected["error"])
+                self.assertTrue(raised.exception.__suppress_context__)
+                self.assertEqual(operation.await_count, 2)
+                self.assertEqual(monitor.valid, evidence is True)
+                if confirmer is not None:
+                    self.assertEqual(confirmer.await_count, 2)
+
+    async def test_retry_diagnostic_timeout_is_bounded_and_sanitized(self):
+        """A diagnostic that never completes cannot extend the request budget."""
+        confirmations = []
+
+        async def confirm():
+            """Confirm recovery once, then simulate a stuck diagnostic."""
+            confirmations.append(True)
+            if len(confirmations) == 1:
+                return True
+            await asyncio.Future()
+
+        monitor = policy.TorMonitor(
+            resolver=lambda _: "10.77.0.2", probe=lambda *_: True, confirmer=confirm,
+        )
+        operation = AsyncMock(side_effect=ConnectionResetError("SOCKS secret"))
+        with patch.object(policy, "TOR_CONFIRM_TIMEOUT", .01):
+            with self.assertRaisesRegex(RuntimeError, "^Tor transport temporarily unavailable$"):
+                await asyncio.wait_for(monitor.execute(operation), .5)
+        self.assertEqual(len(confirmations), 2)
+        self.assertEqual(operation.await_count, 2)
+        self.assertFalse(monitor.valid)
+
+    async def test_configured_diagnostic_uses_a_fresh_forced_tor_request(self):
+        """Exercise the real confirmer wiring after the destination retry fails."""
+        server = FakeServer()
+        calls = []
+
+        async def request(url, method="GET", proxy=None, proxy_auth=None, auth=None, http3=True):
+            """Record the upstream request and fail only the private destination.
+
+            :param url: Requested destination or external confirmation endpoint.
+            :param method: HTTP method.
+            :param proxy: Forced Tor proxy.
+            :param proxy_auth: Optional proxy authentication.
+            :param auth: Optional HTTP authentication.
+            :param http3: Whether the HTTP/3 transport is enabled.
+            """
+            calls.append((url, proxy, http3))
+            if url == "https://check.torproject.org/api/ip":
+                return {"body": '{"IsTor":true}'}
+            raise ConnectionResetError("SOCKS private URL failure")
+
+        server.make_request = request
+        owner = policy.configure_server(server)
+        owner.monitor.resolver = lambda _: "10.77.0.2"
+        owner.monitor.probe = lambda *_: True
+        with self.assertRaisesRegex(RuntimeError, "^Request or destination failed through Tor;"):
+            await server.make_request("https://private.invalid/secret", client_id=self.client)
+        self.assertEqual([call[0] for call in calls], [
+            "https://private.invalid/secret", "https://check.torproject.org/api/ip",
+            "https://private.invalid/secret", "https://check.torproject.org/api/ip",
+        ])
+        self.assertTrue(all(call[1:] == (policy.HTTP_PROXY, False) for call in calls))
+
+    async def test_failed_recovery_confirmation_stops_before_operation_retry(self):
+        """Unconfirmed global recovery exposes no diagnostic or upstream secrets."""
+        for evidence in (False, RuntimeError("secret diagnostic failure")):
+            with self.subTest(evidence=evidence):
+                confirmer = AsyncMock(side_effect=[evidence])
+                monitor = policy.TorMonitor(
+                    resolver=lambda _: "10.77.0.2", probe=lambda *_: True,
+                    confirmer=confirmer,
+                )
+                operation = AsyncMock(side_effect=ConnectionResetError("SOCKS secret URL"))
+                with self.assertRaisesRegex(RuntimeError, "^Tor transport temporarily unavailable$") as raised:
+                    await monitor.execute(operation)
+                self.assertTrue(raised.exception.__suppress_context__)
+                self.assertEqual(operation.await_count, 1)
+                self.assertEqual(confirmer.await_count, 1)
+                self.assertFalse(monitor.valid)
+
+    async def test_alias_loss_after_retry_invalidates_without_external_confirmation(self):
+        """Fresh local failure overrides earlier successful external evidence."""
+        confirmer = AsyncMock(return_value=True)
+        monitor = policy.TorMonitor(
+            resolver=Mock(side_effect=["10.77.0.2", OSError("alias gone")]),
+            probe=lambda *_: True, confirmer=confirmer,
+        )
+        operation = AsyncMock(side_effect=ConnectionResetError("SOCKS failed"))
+        with self.assertRaisesRegex(RuntimeError, "^Tor transport temporarily unavailable$"):
+            await monitor.execute(operation)
+        self.assertEqual(operation.await_count, 2)
+        self.assertEqual(confirmer.await_count, 1)
+        self.assertFalse(monitor.valid)
+
+    async def test_failed_owned_session_retry_uses_fresh_evidence_and_keeps_ownership(self):
+        """Both session types recreate once and classify only the retried request."""
+        for kind in ("browser", "request"):
+            for evidence in (True, False, RuntimeError("secret diagnostic"), None):
+                with self.subTest(kind=kind, evidence=evidence):
+                    confirmer = None if evidence is None else AsyncMock(side_effect=[True, evidence])
+                    monitor = policy.TorMonitor(
+                        resolver=lambda _: "10.77.0.2", probe=lambda *_: True,
+                        confirmer=confirmer,
+                    )
+                    server = FakeServer()
+                    calls = []
+
+                    async def failure(url, session_id, http3=True):
+                        """Fail a session request.
+
+                        :param url: Requested destination.
+                        :param session_id: Upstream session identifier.
+                        :param http3: Whether the HTTP/3 transport is enabled.
+                        """
+                        calls.append((session_id, http3))
+                        raise ConnectionResetError("ERR_SOCKS_CONNECTION_FAILED secret URL")
+
+                    method = "session_fetch" if kind == "browser" else "session_make_request"
+                    setattr(server, method, failure)
+                    owner = policy.configure_server(server, monitor)
+                    opened = await (server.open_session("browser", client_id=self.client)
+                                    if kind == "browser" else
+                                    server.open_request_session(client_id=self.client))
+                    public_id = opened["session_id"]
+                    request = getattr(server, method)
+                    self.assertEqual(await request(
+                        "https://private.invalid", public_id, client_id=self.other
+                    ), policy.SESSION_UNAVAILABLE)
+                    self.assertEqual(calls, [])
+                    expected = policy.TOR_REQUEST_FAILED if evidence is True else policy.TOR_UNAVAILABLE
+                    with self.assertRaises(RuntimeError) as raised:
+                        await request("https://private.invalid", public_id, client_id=self.client)
+                    self.assertEqual(str(raised.exception), expected["error"])
+                    self.assertTrue(raised.exception.__suppress_context__)
+                    self.assertEqual([call[0] for call in calls], ["server-1", "server-2"])
+                    self.assertEqual(server.next_id, 2)
+                    self.assertEqual(owner.owners[public_id], self.client)
+                    self.assertEqual(owner.session_state[public_id]["upstream_id"], "server-2")
+                    self.assertEqual((await server.list_sessions(client_id=self.client))[0], opened)
+                    self.assertEqual(monitor.valid, evidence is True)
+                    if confirmer is not None:
+                        self.assertEqual(confirmer.await_count, 2)
+                    if kind == "request":
+                        self.assertTrue(all(call[1] is False for call in calls))
+
+    async def test_session_recreation_proxy_failure_is_not_a_destination_diagnosis(self):
+        """A failed session recreation performs no retried destination operation."""
+        confirmer = AsyncMock(return_value=True)
+        monitor = policy.TorMonitor(
+            resolver=lambda _: "10.77.0.2", probe=lambda *_: True, confirmer=confirmer,
+        )
+        server = FakeServer()
+        calls = []
+
+        async def failure(url, session_id):
+            """Fail the initial request.
+
+            :param url: Requested destination.
+            :param session_id: Upstream session identifier.
+            """
+            calls.append(session_id)
+            raise ConnectionResetError("SOCKS secret request")
+
+        server.session_fetch = failure
+        owner = policy.configure_server(server, monitor)
+        opened = await server.open_session("browser", client_id=self.client)
+        recreate = AsyncMock(side_effect=ConnectionResetError("proxy secret recreation"))
+        owner.session_state[opened["session_id"]]["method"] = recreate
+        with self.assertRaisesRegex(RuntimeError, "^Tor transport temporarily unavailable$") as raised:
+            await server.session_fetch(
+                "https://private.invalid", opened["session_id"], client_id=self.client
+            )
+        self.assertTrue(raised.exception.__suppress_context__)
+        self.assertEqual(calls, ["server-1"])
+        self.assertEqual(recreate.await_count, 1)
+        self.assertEqual(confirmer.await_count, 1)
+        self.assertEqual(owner.session_state[opened["session_id"]]["upstream_id"], "server-1")
+        self.assertFalse(monitor.valid)
 
     async def test_browser_session_recreates_atomically_after_transport_failure(self):
         class ReadyMonitor(policy.TorMonitor):

@@ -361,8 +361,8 @@ usefulness = 2
 [[entries]]
 date = "2026-10-21"
 category = "Verification"
-insight = "Before diagnosing a SOCKS error as Tor failure, compare HTTP/browser control destinations and raw SOCKS RESOLVE replies; target-specific host failures must not restart the proxy."
-usefulness = 0
+insight = "Before diagnosing SOCKS errors as global Tor failure, compare fresh HTTP/browser controls and raw SOCKS replies. Circuit-established=false alone is insufficient; target failures must not restart Tor."
+usefulness = 1
 
 [[entries]]
 date = "2026-10-21"

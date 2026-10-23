@@ -43,6 +43,10 @@ SUSPICIOUS_NETWORK_NAME = re.compile(
 )
 SESSION_UNAVAILABLE = {"error": "session not available"}
 TOR_UNAVAILABLE = {"error": "Tor transport temporarily unavailable"}
+TOR_REQUEST_FAILED = {
+    "error": "Request or destination failed through Tor; external Tor egress confirmed"
+}
+TOR_CONFIRM_TIMEOUT = 10.0
 RECOVERY_DELAYS = (0.0, 0.5, 1.0, 2.0)
 CLIENT_ID_GUIDANCE = (
     "The calling agent is the MCP client. Before calling this tool, generate a "
@@ -227,6 +231,22 @@ class TorMonitor:
         """Immediately invalidate the current Tor generation."""
         self.valid = False
 
+    async def confirm_external(self):
+        """Obtain bounded fresh external evidence without exposing probe errors."""
+        if self.confirmer is None:
+            return False
+        try:
+            return (await asyncio.wait_for(self.confirmer(), TOR_CONFIRM_TIMEOUT)) is True
+        except Exception:
+            return False
+
+    async def retry_failure(self):
+        """Classify a failed retry using current local and fresh external evidence."""
+        if self.check(force=True) and await self.confirm_external():
+            return RuntimeError(TOR_REQUEST_FAILED["error"])
+        self.invalidate()
+        return RuntimeError(TOR_UNAVAILABLE["error"])
+
     async def recover(self):
         """Run or share bounded local recovery and external confirmation."""
         async with self._recovery_lock:
@@ -236,7 +256,7 @@ class TorMonitor:
                 if delay:
                     await self.sleeper(self.jitter(delay))
                 if self.check(force=True):
-                    confirmed = self.confirmer is None or await self.confirmer()
+                    confirmed = self.confirmer is None or await self.confirm_external()
                     if confirmed:
                         return True
                     self.invalidate()
@@ -256,13 +276,12 @@ class TorMonitor:
                 raise
             self.invalidate()
             if not await self.recover():
-                raise RuntimeError(TOR_UNAVAILABLE["error"]) from exc
+                raise RuntimeError(TOR_UNAVAILABLE["error"]) from None
             try:
                 return await operation()
             except Exception as retry_exc:
                 if _proxy_failure(retry_exc):
-                    self.invalidate()
-                    raise RuntimeError(TOR_UNAVAILABLE["error"]) from retry_exc
+                    raise await self.retry_failure() from None
                 raise
 
 
@@ -336,21 +355,20 @@ class ClientPolicy:
                             raise
                         self.monitor.invalidate()
                         if not await self.monitor.recover():
-                            raise RuntimeError(TOR_UNAVAILABLE["error"]) from exc
+                            raise RuntimeError(TOR_UNAVAILABLE["error"]) from None
                         try:
                             await self._recreate_session(session_id)
                         except Exception as recreate_exc:
                             if _proxy_failure(recreate_exc):
                                 self.monitor.invalidate()
-                                raise RuntimeError(TOR_UNAVAILABLE["error"]) from recreate_exc
+                                raise RuntimeError(TOR_UNAVAILABLE["error"]) from None
                             raise
                         bound.arguments["session_id"] = state["upstream_id"]
                         try:
                             return await invoke()
                         except Exception as retry_exc:
                             if _proxy_failure(retry_exc):
-                                self.monitor.invalidate()
-                                raise RuntimeError(TOR_UNAVAILABLE["error"]) from retry_exc
+                                raise await self.monitor.retry_failure() from None
                             raise
             return await self.monitor.execute(invoke)
 
