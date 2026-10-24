@@ -379,5 +379,5 @@ usefulness = 0
 [[entries]]
 date = "2026-10-24"
 category = "User Instruction"
-insight = "Source-memory categories must include software development documentation, programming languages, best practices, guides, and API descriptions from the initial seed."
+insight = "Seed source categories for software documentation, programming languages, best practices, guides, and APIs. Keep guides domain-independent; combine it with subject tags rather than reserving it for software."
 usefulness = 0
