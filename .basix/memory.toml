@@ -379,7 +379,7 @@ usefulness = 1
 [[entries]]
 date = "2026-10-24"
 category = "User Instruction"
-insight = "When proposing planning improvements, consider parallel independent planning and research, isolated feature branches for parallel writers, and explicit synchronization and merge phases before dependent serial work."
+insight = "Root plans; each multiphase plan has one executor and feature branch. Design for three concurrent executors, each with two read-only exploration/research children; executors never delegate implementation."
 usefulness = 1
 
 [[entries]]
