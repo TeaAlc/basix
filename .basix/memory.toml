@@ -89,12 +89,6 @@ usefulness = 0
 
 [[entries]]
 date = "2026-08-10"
-category = "Verification"
-insight = "Compare live tmux bindings against same-version isolated list-keys output; hand-built config text differs after tmux normalization."
-usefulness = 0
-
-[[entries]]
-date = "2026-08-10"
 category = "Tooling"
 insight = "Keep tmux extended-keys negotiated with `on`; forcing `always` may rewrite legacy controls for unaware applications. Never compensate with application keymaps or per-key tmux bindings."
 usefulness = 0
@@ -386,4 +380,10 @@ usefulness = 1
 date = "2026-10-24"
 category = "User Instruction"
 insight = "When testing a skill, improve the skill and validate a fresh independent run; never repair generated demo output to present it as successful skill behavior."
+usefulness = 1
+
+[[entries]]
+date = "2026-10-24"
+category = "User Instruction"
+insight = "Choose coherent feature-sized plans, grouping small related features. Dependencies reference only fully accepted integrated plans, never another plan's internal phases. Balance useful parallelism against coordination and integration cost."
 usefulness = 1
