@@ -374,10 +374,16 @@ usefulness = 0
 date = "2026-10-24"
 category = "User Instruction"
 insight = "Store research sources in .basix/sources/sources.toml and distinct broad categories in categories.toml; preserve category meanings, bounded descriptions, usefulness counts, and justified trustability reassessments."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-10-24"
 category = "User Instruction"
 insight = "Seed source categories for software documentation, programming languages, best practices, guides, and APIs. Keep guides domain-independent; combine it with subject tags rather than reserving it for software."
-usefulness = 0
+usefulness = 1
+
+[[entries]]
+date = "2026-10-24"
+category = "User Instruction"
+insight = "Source catalogs must encourage fresh independent discovery and corroboration, never monopolize research. Separate use purpose from trust: unreliable sources can be valuable analysis objects without supporting external factual claims."
+usefulness = 1

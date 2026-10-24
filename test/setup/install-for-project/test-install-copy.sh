@@ -28,7 +28,7 @@ if [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/ba
    [[ ! -e $project/.basix ]] &&
    ! find "$project/.agents/skills" "$project/.codex/basix" -type l -print -quit | grep -q . &&
    ! cut -f1 "$project/.codex/.basix-install-state" | grep -Ev '^(copy|dircopy|dirfile)$' | grep -q .; then ok 'fresh project install copies complete trees without ADR artifacts'; else bad 'fresh project install copies complete trees without ADR artifacts'; fi
-for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory; do
+for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory basix-source-memory; do
   check "project install preserves $skill tree" diff -r "$ROOT/skills/$skill" "$project/.agents/skills/$skill"
 done
 for agent in "$ROOT"/agents/native/*.toml; do
@@ -50,6 +50,11 @@ renamed_source="$case_dir/rename-source"
 printf 'keep me\n' >"$renamed_source/foreign.keep"
 mkdir -p "$renamed_source/.codex"
 printf 'foreign config sibling\n' >"$renamed_source/.codex/foreign.toml"
+mkdir -p "$renamed_source/.basix/sources"
+printf 'version = 1\n# project source knowledge\n' >"$renamed_source/.basix/sources/sources.toml"
+printf 'version = 1\n# project category meanings\n' >"$renamed_source/.basix/sources/categories.toml"
+cp "$renamed_source/.basix/sources/sources.toml" "$case_dir/sources.before"
+cp "$renamed_source/.basix/sources/categories.toml" "$case_dir/categories.before"
 check 'project state records are relative to the project root' \
   state_targets_are_relative "$renamed_source/.codex/.basix-install-state"
 renamed_target="$case_dir/rename-target"
@@ -60,6 +65,8 @@ check 'renamed project keeps foreign root file' grep -Fxq 'keep me' "$renamed_ta
 check 'renamed project keeps foreign config sibling' grep -Fxq 'foreign config sibling' "$renamed_target/.codex/foreign.toml"
 check 'renamed project state remains relative' \
   state_targets_are_relative "$renamed_target/.codex/.basix-install-state"
+check 'project reinstall preserves source knowledge bytes' cmp -s "$case_dir/sources.before" "$renamed_target/.basix/sources/sources.toml"
+check 'project reinstall preserves category meanings bytes' cmp -s "$case_dir/categories.before" "$renamed_target/.basix/sources/categories.toml"
 check 'renamed project uninstall succeeds' \
   "$ROOT/setup/install_for_project.sh" "$renamed_target" --uninstall
 check 'renamed project uninstall preserves foreign files' \
@@ -67,6 +74,8 @@ check 'renamed project uninstall preserves foreign files' \
   "$renamed_target/foreign.keep" "$renamed_target/.codex/foreign.toml"
 check 'renamed project uninstall removes managed payloads' test ! -e "$renamed_target/.agents/skills/basix" -a ! -e "$renamed_target/.codex/basix"
 check 'renamed project uninstall removes install state' test ! -e "$renamed_target/.codex/.basix-install-state"
+check 'project uninstall preserves source knowledge bytes' cmp -s "$case_dir/sources.before" "$renamed_target/.basix/sources/sources.toml"
+check 'project uninstall preserves category meanings bytes' cmp -s "$case_dir/categories.before" "$renamed_target/.basix/sources/categories.toml"
 
 legacy_source="$case_dir/legacy-source"
 "$ROOT/setup/install_for_project.sh" "$legacy_source" --no-local-network --no-test-socket >/dev/null
@@ -122,7 +131,7 @@ if grep -Fq local-change "$changed/.agents/skills/basix/SKILL.md" && [[ -f $chan
 
 clean="$case_dir/clean"; "$ROOT/setup/install_for_project.sh" "$clean" --no-local-network --no-test-socket >/dev/null; "$ROOT/setup/install_for_project.sh" "$clean" --uninstall >/dev/null
 check 'clean uninstall removes payload state' test ! -e "$clean/.codex/.basix-install-state" -a ! -e "$clean/.agents/skills/basix" -a ! -e "$clean/.codex/basix"
-for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory; do
+for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory basix-source-memory; do
   check "project uninstall removes managed $skill tree" test ! -e "$clean/.agents/skills/$skill"
 done
 

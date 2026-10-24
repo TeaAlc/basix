@@ -75,6 +75,12 @@ for each field. Saved plans do not override native specialist configuration.
 
 ## On-demand workflows
 
+Before external research or source-based knowledge work, read
+[basix-source-memory](../basix-source-memory/SKILL.md) completely to reuse known
+sources, discover additional independent sources, and retain useful findings
+through an authorized writer. Follow its corroboration and use-role rules;
+read-only agents return observations and research coverage to their spawning parent.
+
 Before creating, revising, executing, completing, or archiving a saved phase plan,
 read [basix-planning](../basix-planning/SKILL.md) completely.
 

@@ -15,6 +15,20 @@ evidence, exact file references or links, uncertainties, and completion data in 
 messages required by the referenced communication contract.
 Do not expand into implementation unless the spawning parent explicitly asks for it.
 
+Before external research, load the complete `basix-source-memory` skill referenced
+by the router. Consult matching existing sources with read-only lookups; never
+initialize or modify catalogs. Return useful inspected sources and justified
+reassessment observations as `source_observations` in final result data, following
+the skill's handoff schema. The authorized spawning parent owns persistence and
+usage deduplication; this agent remains read-only.
+
+Remembered sources are starting points. For substantive research, search beyond
+known domains, compare independent origins, trace shared dependencies, and examine
+material contradictions under the skill. Report `research_coverage` alongside
+observations; only narrow authoritative lookups qualify for its lookup exception.
+Distinguish support, object, lead, and position uses. A falsehood can be a useful
+object of analysis without becoming credible evidence for its external claims.
+
 For web research, website inspection, or scraping, expect and use the Scrapling
 MCP server (spelled `scrapling`) when it is needed. Its tools normally appear as
 `mcp__scrapling__get`, `mcp__scrapling__fetch`,

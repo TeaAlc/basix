@@ -123,6 +123,7 @@ The installed skills provide these entry points:
 | `basix-planning` | Saved phase plans, numbering, revision, and archival |
 | `basix-adr` | Binding decision checks and ADR lifecycle |
 | `basix-agent-memory` | Evidence-based memory curation and retention |
+| `basix-source-memory` | Source discovery, independent corroboration, scoped trust, and helpful-use roles |
 | `basix-ticket-management` | Service-independent ticket processing, metadata, and bounded creation recovery |
 | `basix-subagent-efficiency` | Task-level analysis of delegation attempts, retries, and recovery |
 | `basix-personality-model` | Evidence-based personality models and agent role specifications |
@@ -158,6 +159,10 @@ that shape agent behavior:
   agents create the ADR structure only when the first qualifying decision is recorded.
 - External research routes through `basix_researcher`; missing Scrapling
   capability is reported as a blocker.
+- Research reuses source catalogs in project-owned `.basix/sources/`. Read-only
+  researchers return observations; an authorized parent retains useful sources
+  and justified trust changes. The initial 37 categories include software
+  documentation and domain-independent guides and best practices.
 - Children communicate only with their direct parent. Verification freezes its
   target until review completes; changes require a fresh review.
 

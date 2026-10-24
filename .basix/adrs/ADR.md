@@ -9,3 +9,4 @@
 - [ADR 0011: Context-related agent continuations](ADR_0011_context-related-agent-continuations.md) — Parent-authorized fixes and related follow-ups
 
 - [ADR 0012: Ticket data and retry model](ADR_0012_ticket-data-and-retry-model.md) — Durable ticket metadata and bounded recovery
+- [ADR 0013: Source memory](ADR_0013_source-memory-storage-and-ownership.md) — Project-owned source catalogs and write ownership

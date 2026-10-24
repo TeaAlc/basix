@@ -10,6 +10,22 @@ The [`basix-subagent-efficiency`](../skills/basix-subagent-efficiency/SKILL.md) 
 
 The `basix-personality-model` skill creates, assesses, and improves evidence-grounded personality models and standalone agent role specifications. It keeps fourteen dimensions, distinguishes observed behavior from inferred motives, and preserves uncertainty. Internal models are written in English unless the user explicitly requests another language; user-facing communication follows the conversation language. It loads the `basix` router for external research and agent routing. Adapting a model to `.basix/soul.md` is a separate, requested character update that preserves the managed soul header and existing language unless the user explicitly requests a change.
 
+The [`basix-source-memory`](../skills/basix-source-memory/SKILL.md) skill retains inspected research sources in project-owned `.basix/sources/sources.toml` and a controlled `.basix/sources/categories.toml`. It uses domain/subdomain identities with justified path scopes, short retrieval and content descriptions, up to five category facets, retry-safe helpful-use counts, and evidence-based trust assessments. Its 37-category seed includes `software-docs`, `programming`, `api`, and domain-independent `guides` and `best-practices`. Read-only researchers consult existing catalogs and return structured observations; an authorized parent persists them. The standard-library helper performs no network requests, preserves category meanings, and retains justified trust changes. Catalogs are initialized on demand and remain outside installer ownership.
+
+Remembered sources are starting points: substantive research searches beyond known domains, checks whether sources share an origin, and weighs material contradictions. The research handoff records discovery, independence, and limitations; narrow authoritative lookups have a documented exception. Per-use roles (`support`, `object`, `lead`, `position`) separate helpfulness from credibility: an unreliable source can be a useful object of analysis, while new factual support from a source rated -1 is rejected. Helpful events retain a short purpose and count once per task/source, including retries and multiple roles.
+
+From the source checkout, look up remembered guides without creating a catalog:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 src/skills/basix-source-memory/scripts/source_memory.py --project /path/to/project list --category guides
+```
+
+Use `record --input observation.json` to merge an inspected source, or `init` to
+create the initial catalogs explicitly. See the skill's
+[schema and CLI reference](../skills/basix-source-memory/references/schema.md)
+for observations, assessment evidence, stable task IDs, and read-only handoff.
+Installed copies resolve the helper relative to their own skill directory.
+
 The `configure-tmux` skill diagnoses tmux before changing it, selects between tmux-managed mouse behavior, native terminal scrollback, and keyboard-only copy mode, and applies a confirmed deterministic fragment without replacing unrelated bindings or sessions. It supports Linux and Termux hosts, treats MobaXterm as a manually verified external client, and includes isolated and live read-only verification plus an opt-in clipboard helper.
 
 Add each future workflow under `skills/<name>/SKILL.md` with a specific trigger description. Put its scripts, references, and assets in that skill directory. Put only launchers shared by multiple skills or agents under top-level `scripts/`.
