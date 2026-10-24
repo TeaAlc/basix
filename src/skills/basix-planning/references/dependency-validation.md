@@ -1,6 +1,8 @@
 # Mechanical dependency reconciliation
 
-Use this workflow before finalizing parallel plans whose source inventory has
+This is an intra-plan file/task check; never use it for cross-plan handoffs.
+Use the separate [whole-plan check](whole-plan-validation.md) for work-order edges.
+Use this workflow before finalizing parallel tasks whose source inventory has
 explicit machine-readable file dependencies. Adapt the complete authoritative
 inventory and proposed plan into the normalized JSON below; do not infer source
 edges from runtime, schema, migration or deployment relationships. Simple tasks

@@ -17,7 +17,7 @@ finish first. Freeze disjoint write scopes and shared interface
 contracts before dispatch. Overlapping scopes or an unsettled interface require
 sequential acceptance or explicit replanning.
 
-Give each writer a task-owned feature branch and separate worktree, plus isolated
+Give each complete feature plan one responsible executor, a task-owned feature branch and separate worktree, plus isolated
 logs, generated outputs and other mutable resources. Shared Git metadata and ref
 operations are serialized by root: branch/worktree creation, commits, merges,
 ref updates and removal. Writers edit and run assigned local checks within their
@@ -34,10 +34,9 @@ unverified scope is not accepted and its descendants remain blocked.
 Only root creates a feature checkpoint commit, limited to the accepted writer's
 task changes after that writer is inactive and its assigned scope-local checks
 have passed, with no unresolved relevant failure. Future integration checks are
-not checkpoint prerequisites. Under the active developer policy's scoped
-checkpoint exception, unrelated writers or checks may continue. Never commit changing, failed
-or unverified scope, and never stage another task's or the user's changes.
-If the active policy does not permit the exception, wait for its required gates.
+not checkpoint prerequisites. Existing commit permissions and required gates remain binding: no scoped
+checkpoint exception is granted here. Never commit changing, failed or unverified
+scope, and never stage another task's or the user's changes.
 Record the exact accepted checkpoint SHA and evidence for integration.
 
 ## Integrate and verify
@@ -51,21 +50,48 @@ Integrate accepted subsets when they enable meaningful risk-based feedback,
 using the checks and infrastructure needed for that subset; retain the final gates
 below for the complete integrated result.
 
-Run aggregate checks on the integrated result, then obtain a frozen independent
-review before updating the target. Record the tested tree and reviewed result;
-all overlapping writers must be inactive and the review freeze lasts through
-completion under Contract 2.0. Any correction to the reviewed target requires
-affected checks and a new frozen review cycle. All checks and reviews covering
-the integrated scope must finish successfully before target update.
+For each merge candidate, record feature baseline, expected target tip, exact
+feature result and candidate tree. Inspect the incoming delta, relevant target
+changes since the feature baseline, conflict-resolution edits and changed
+configuration, dependencies, toolchain or environment assumptions. Clean textual
+merges may still change semantic interactions. Root selects the narrowest
+sufficient affected behavior/interaction/conflict checks, with impact rationale;
+no automatic full-suite rerun for each plan. Shared API, schema, security or
+build/test conflicts may need broader boundary checks. If impact is unclear,
+first use bounded inspection; withhold the affected merge if adequate coverage
+still cannot be justified. An aggregate may be necessary for demonstrable impact
+or unresolved uncertainty; record why rather than making it the merge default.
+
+Reuse accepted plan/target evidence only where checked code, relevant contracts,
+configuration, dependencies and environment assumptions remain applicable. Bind
+reuse to the candidate and original scope; a feature SHA alone does not prove a
+rebased, squashed or merged candidate. Record baseline/target/feature identities,
+candidate tree, affected deltas/conflicts and repair owner, impact rationale,
+selected checks/results, reused/invalidated evidence, review scope and acceptance.
+Reference existing evidence rather than copying logs. Corrections retain explicit
+ownership, invalidate affected evidence and require affected checks and frozen
+review. Reuse an unchanged accepted feature review only for its applicable scope;
+review resolution/new code and affected interactions on the frozen candidate.
+Reviewing resolution edits alone suffices only if relevant interactions cannot
+change. All overlapping writers must be inactive throughout the review freeze.
+All selected checks/reviews must pass before the guarded target update.
+
+After every plan is integrated and writers are inactive, run required whole-task
+aggregate checks on the integrated result and final frozen independent review of
+the exact final candidate. Intermediate merge acceptance is not whole-system
+test evidence. Final failures keep the work order open; assign bounded repair,
+rerun affected checks and the full final gate for the corrected result.
 
 Root atomically guards the target update against its recorded expected tip
 (compare-and-swap or exclusive coordination) and confirms the proposed update
 contains the exact integrated tested tree; comparing then blindly updating is
 insufficient. Keep any checked-out target's index/worktree consistent through a
 worktree-safe update that preserves unrelated changes; a raw ref update alone
-does not suffice there. If the target drifted, incorporate its new accepted base, reintegrate, rerun affected
-and aggregate checks, and obtain a new frozen review before retrying the guarded
-update. Never force-overwrite intervening changes. Updating a local target does
+does not suffice there. If the target drifted, the old candidate is invalid: incorporate the new accepted
+base and derive a new candidate, reassess affected checks/evidence and obtain a
+new frozen review for changed scope before retrying the guarded update. Reuse
+independent evidence whose assumptions still hold; target drift alone does not
+require another aggregate. The complete final candidate still needs the final gate. Never force-overwrite intervening changes. Updating a local target does
 not imply permission to push or publish.
 
 ## Failure and cleanup

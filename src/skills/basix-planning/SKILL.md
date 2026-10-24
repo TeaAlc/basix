@@ -19,7 +19,7 @@ as practical phases and stated dependencies. Define each phase briefly in order:
 
 - **Goal:** Required end state.
 - **Work:** A numbered list labeled **Task 1:** through **Task n:** in topological
-  presentation order; explicit dependencies govern execution, including across phases.
+  presentation order; explicit dependencies govern execution, including across phases within this plan.
 - **QS:** Concrete completion checks.
 - **Learnings:** Empty initially; populate only after the entire phase QS succeeds,
   with findings useful to later phases, never placeholders such as `Pending`.
@@ -27,8 +27,11 @@ as practical phases and stated dependencies. Define each phase briefly in order:
   [basix-agent-memory](../basix-agent-memory/SKILL.md).
 
 Optimize input-token efficiency without compromising correctness, safety or
-mandatory dependencies. Delegate bounded work when its benefit outweighs added
-context, labeling tasks `(Subagent Task: <subagent_type>)`. For discovered bug/feature
+mandatory dependencies. Name the implementation executor once at plan level.
+Within its phases, `(Subagent Task: <subagent_type>)` labels identify only explicitly
+granted read-only exploration/research children, never the executor's implementation.
+Delegate those bounded reads when their benefit outweighs added context.
+For discovered bug/feature
 files, list every affected file with a work description of at most 32 characters,
 inline or through a complete canonical manifest. For a manifest, record its stable
 path and full content hash; verify it exists, is readable and matches that identity.
@@ -59,16 +62,32 @@ numbered basenames. Root owns plan consolidation, approval/ADRs, dispatch, revie
 archival and commit; executors may write only explicitly assigned implementation,
 checks, plan checkpoints and requested analysis. Read-only agents propose changes.
 
+## Feature plans and dependencies
+
+Root normally plans the work order, using read-only exploration/research as useful.
+Read [feature-execution.md](references/feature-execution.md) completely before
+choosing plan boundaries or dispatching a plan. Choose coherent feature-sized
+plans, including several small related features when they share implementation
+and acceptance; a small task may need only one plan. Do not optimize plan count
+or split to fill slots. Each plan has one responsible executor, branch and worktree.
+Internal phases belong to that executor. Cross-plan dependencies name only whole
+completed, checked, verified, Root-accepted and integrated predecessor plans;
+never another plan's phases, tasks or intermediate checkpoints.
+
 ## Dependencies and parallel work
 
-Audit actual dependencies, including those introduced by baselines, phase gates,
+Within each plan, audit actual dependencies, including those introduced by baselines, phase gates,
 shared resources and acceptance aggregation. Distinguish source prerequisites,
 semantic readiness for implementation and readiness for integration/release;
-integration needs must not silently become implementation blockers. Retain genuine
+integration needs must not silently become extra intra-plan implementation blockers.
+Whole-plan predecessors still require complete integration before consumer start. Retain genuine
 safety and contract gates; explain extra gates that constrain otherwise independent
 work. Phase labels and waves create no implicit global barrier.
-Before finalizing parallel plans with explicit machine-readable file dependencies,
-mechanically reconcile full-inventory ownership, direct task source inputs and
+Before finalizing a multi-plan work order, validate its whole-plan graph using
+[whole-plan-validation.md](references/whole-plan-validation.md). This complements,
+and never replaces, the following intra-plan source/task check.
+Before finalizing parallel tasks within a plan with explicit machine-readable file dependencies,
+mechanically reconcile full-inventory ownership, direct intra-plan task source inputs and
 start conditions; record the validation command, input identities and result.
 Read [dependency-validation.md](references/dependency-validation.md) for the
 normalized contract and validator. Do not substitute future implementation tests
@@ -77,18 +96,19 @@ for this planning evidence.
 A task is ready when named predecessors and required inputs/contracts are accepted
 by their responsible parents, ownership/scope is clear, concurrent writes are
 disjoint, mutable resources/logs are isolated and management's slot capacity is
-available (maximum three active descendants, including nested children). Predecessor-free tasks still need the
-other conditions. Parallelize planning, research or implementation only when
-expected benefit outweighs dispatch/context/synthesis costs; choose phases for
-the goal, not a universal sequence.
+available under management's executor/helper limits and the harder runtime cap. Predecessor-free tasks still need the
+other conditions. Parallel implementation runs across independent whole plans;
+within a plan, delegated parallel work is limited to granted read-only
+exploration/research. Parallelize only when expected benefit outweighs
+dispatch/context/synthesis costs; choose phases for the goal, not a universal sequence.
 For parallel tasks or handoffs only, record needed dependencies/results,
 owner/scope, accepted inputs/contracts, resources/logs, acceptance checks and
 synthesis/integration owner. Ordinary serial work needs no parallel template.
 
 Schedule the earliest meaningful partial integration or feedback for the risks at
 hand. Stage harness/infrastructure work to support the next useful checks rather
-than automatically requiring a complete harness before all implementation. Partial
-checks supplement required final aggregate checks and frozen independent review;
+than automatically requiring a complete harness before all implementation. Plan-specific and incremental merge checks supplement required final whole-task
+aggregate checks and frozen independent review;
 they do not replace them. Choose their scope and timing from actual dependencies
 and risks, not a universal sequence.
 

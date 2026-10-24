@@ -310,9 +310,18 @@ independently: explicit user override, applicable specialist/skill settings, the
 `gpt-6.1-sol`/`low` runtime fallback. A model-only override retains applicable
 effort. Saved plans preserve native specialist routing and configured settings;
 unsupported selected settings block dispatch without substitution. No forks.
-Root manages at most three active descendants, including nested children.
+Root allows at most three active plan executors, six read-only helpers and nine
+active descendants overall; lower runtime limits bind. Each executor may use two
+read-only exploration/research children and performs implementation itself.
+Root-direct exploration, research and verification share the helper pool.
 When no independent work is active, parents wait with `wait_agent`; `clock.sleep`
 is allowed alongside subagent waiting only while the parent actively performs
 other independent work. Every wait uses exactly `timeout_ms: 1800000` (30 minutes);
 timeouts trigger bounded diagnosis. Optional requested efficiency companions use
 task-specific evidence and the exact `_efficency_analysis.md` suffix.
+
+Root normally plans coherent feature-sized work, with one executor, branch and
+worktree per plan. Whole-plan dependencies require complete accepted integrated
+public results; internal phases/tasks/checkpoints remain private. Plan checks and
+incremental merge checks complement the final whole-task aggregate and frozen
+review after all plans are integrated. See the [planning workflow](src/skills/basix-planning/SKILL.md).

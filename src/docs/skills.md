@@ -35,7 +35,13 @@ Add each future workflow under `skills/<name>/SKILL.md` with a specific trigger 
 The [`basix-subagent-management`](../skills/basix-subagent-management/SKILL.md) skill is mandatory before delegation, coordination, and every managed agent assignment. It owns role routing, assignments, parent lifecycle, verification freezes, and the sole runtime Contract 2.0 reference. Agents load router, management skill, and complete contract before planning, messages, tools, or domain work; unreadable required sources fail closed. The router retains the sole authority table, while authoring retains schema and validation.
 
 The [`basix-planning`](../skills/basix-planning/SKILL.md) skill owns saved phase plans, canonical per-stem numbering, affected-file descriptions, and phase closure. Saved plans are not transmitted; silent message cycles remain governed by Contract 2.0.
-Dependencies govern execution across phases. Parallel planning, research and
+Root normally plans coherent features; one executor, branch and worktree owns each
+plan and its internal phases. Cross-plan dependencies use only completed, checked,
+verified, Root-accepted and integrated public results, never internal phases/tasks.
+The [whole-plan graph validator](../skills/basix-planning/references/whole-plan-validation.md)
+complements the unchanged intra-plan source/task validator. Plan-local checks,
+incremental merge interaction checks and final whole-task aggregate/frozen review
+have distinct scopes. Parallel planning, research and
 implementation use accepted inputs, explicit ownership, isolated resources and
 joins over named results. Git writers additionally load the
 [Git reference](../skills/basix-planning/references/parallel-git.md) for separate

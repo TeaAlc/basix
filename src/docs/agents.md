@@ -278,20 +278,26 @@ applicable specialist/skill settings, then `gpt-6.1-sol`/`low` runtime fallback.
 A model-only user override retains applicable effort. Saved plans preserve native
 specialist routing and configured settings; generic executors receive fallback
 only when no more explicit setting applies. Unsupported selected settings block
-dispatch without substitution; every dispatch uses `fork_turns="none"`. Root counts at most three
-active descendants, including nested children, and grants nested slots explicitly.
+dispatch without substitution; every dispatch uses `fork_turns="none"`. Root counts at most three active plan executors, six read-only helpers and nine
+active descendants overall, excluding Root; lower runtime limits bind. Each
+executor may have two read-only exploration/research children, never implementation
+children; Root-direct exploration/research/verification share the helper pool.
+Root grants nested slots explicitly.
 Parallel work needs independent dependencies, disjoint writes and isolated mutable
 resources; dependent work waits for accepted predecessor results. A delivered
 terminal, inactivity, passing checks and parent acceptance are distinct states.
-Assignments contain the relevant dependency subgraph, accepted predecessor evidence
-and shared contracts rather than unrelated plan phases; a plan pointer does not
+Assignments contain the complete assigned feature plan, accepted whole-plan public
+predecessor evidence and shared contracts, never predecessor phases/tasks/checkpoints; a plan pointer does not
 replace required context. Planning and research may run concurrently. Joins name
 the accepted results they need; failures block affected successors, and changes to
 shared invariants require reassessment. Root owns consolidation of the saved plan.
 Parallel Git writers use separate feature branches/worktrees and isolated resources
 under [the Git workflow](../skills/basix-planning/references/parallel-git.md).
 Root serializes shared Git operations, checkpoints accepted results and integrates
-their exact commits before aggregate tests and frozen review. Only the tested,
+their exact commits. Each plan has scoped checks and frozen review; merge candidates
+receive affected interaction/conflict checks with conditional evidence reuse.
+After all plans are integrated, whole-task aggregate tests and final frozen review
+cover the exact final tree. Only the tested,
 reviewed result may update the recorded target tip; drift requires reintegration
 and renewed affected checks/review. Read-only work requires no branch.
 All `wait_agent` calls use exactly `timeout_ms: 1800000`; timeout prompts bounded

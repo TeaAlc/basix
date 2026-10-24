@@ -99,17 +99,23 @@ fallback; its Luna defaults remain unchanged. Every dispatch uses
 substitute, including unsupported selected effort. Native specialist roles,
 sandbox and authority remain unchanged.
 Supply agent level, task identity, goal, an independently complete assignment:
-the relevant plan subgraph with ordered dependencies, accepted predecessor
-evidence, shared invariants/contracts and a canonical plan path; the path never
-substitutes required context. Omit unrelated phases. Include exact source paths
+the complete assigned feature plan with its internal ordered dependencies, accepted predecessor
+evidence limited to whole-plan public results, shared invariants/contracts and a canonical plan path; the path never
+substitutes required context. Never expose another plan's phases, tasks or intermediate checkpoints. Include exact source paths
 and baseline, constraints, owned files, known findings and
 permissions, mandatory skills, resources/log paths, acceptance checks, review
 budget and bounded recovery criteria, terminal delivery requirement, checkpoint
 path and explicit efficiency-report decision. Distinguish root-owned approval,
 ADR activation, dispatch, review, archival and commit from assigned executor work.
 
-Root tracks at most three ACTIVE descendants including nested children before
-every spawn. Grant nested slots explicitly within existing router authority.
+Root tracks at most three ACTIVE plan executors, six ACTIVE read-only helpers
+and nine ACTIVE descendants overall, excluding Root, before every spawn.
+Root-direct exploration, research and verification share the six-helper pool.
+Each plan executor may have at most two read-only exploration/research children;
+no implementation children. The executor implements its own complete plan and
+ensures all helpers are inactive before its terminal result. Grant nested slots explicitly
+within existing router authority; lower runtime/tool limits always bind.
+Throttle dispatch when no actual slot is available; do not promise all nine slots.
 Track identity, ownership, dependencies, resource isolation and slot grants using
 available lifecycle evidence; do not add a monitoring service. Parallelize only
 independent assignments with disjoint writes and isolated mutable resources/logs.
@@ -123,6 +129,10 @@ Root explicitly replans any omitted scope; inactivity alone never removes it.
 Track delivered final, inactivity, successful tests and accepted result separately;
 release an inactive child's slot once, never twice for duplicate final delivery.
 Silence and a tool finishing do not establish terminal receipt or acceptance.
+
+Root normally owns planning; use coherent feature-sized assignments under
+[feature-execution.md](../basix-planning/references/feature-execution.md), not
+phase-sized implementation dispatches.
 
 Before planning or executing parallel Git writers, load planning's
 [parallel-git.md](../basix-planning/references/parallel-git.md).
@@ -144,7 +154,7 @@ failure/cancellation, short polling, status demands or unconditional infinite wa
 Assess remaining budget and evidence before explicit recovery or continuation.
 
 Examples: disjoint UI/docs writes with separate logs may run together; frontend
-and backend sharing a contract/output wait for acceptance. Two nested children
-plus their active parent exhaust three slots. A final replay releases no extra
+and backend sharing a contract/output wait for acceptance. Two read-only nested children
+exhaust their executor's helper grant and also consume the shared helper/runtime capacity. A final replay releases no extra
 slot. A child with failed checks cannot be accepted merely because it is inactive.
 A timed-out review requires diagnosis within its root budget, not automatic kill.

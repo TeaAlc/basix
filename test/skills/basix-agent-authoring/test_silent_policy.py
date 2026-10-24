@@ -46,15 +46,15 @@ class SilentPolicyTests(unittest.TestCase):
         for requirement in (
             'model="gpt-6.1-sol"', 'reasoning_effort="low"', 'fork_turns="none"',
             'Unsupported model/tool settings block dispatch', 'never silently substitute',
-            'at most three ACTIVE descendants including nested children before every spawn',
+            'at most three ACTIVE plan executors, six ACTIVE read-only helpers and nine ACTIVE descendants overall',
             'Grant nested slots explicitly', 'disjoint writes and isolated mutable resources/logs',
             'sequential predecessor acceptance', 'delivered final, inactivity, successful tests and accepted result separately',
             'never twice for duplicate final delivery', 'independently complete assignment',
-            'relevant plan subgraph', 'accepted predecessor evidence', 'canonical plan path',
-            'the path never substitutes required context', 'Omit unrelated phases', 'baseline',
+            'complete assigned feature plan', 'accepted predecessor evidence', 'canonical plan path',
+            'the path never substitutes required context', "Never expose another plan's phases, tasks or intermediate checkpoints", 'baseline',
             'permissions', 'resources/log paths', 'acceptance checks', 'review budget',
             'bounded recovery criteria', 'checkpoint path', 'explicit efficiency-report decision',
-            'Two nested children plus their active parent exhaust three slots',
+            "Two read-only nested children exhaust their executor's helper grant",
         ):
             self.assertIn(requirement, management)
 
@@ -150,7 +150,9 @@ class SilentPolicyTests(unittest.TestCase):
         for requirement in (
             'explicit dependencies govern execution, including across phases',
             'accepted by their responsible parents', 'concurrent writes are disjoint',
-            'Parallelize planning, research or implementation only when expected benefit outweighs dispatch/context/synthesis costs',
+            'Parallel implementation runs across independent whole plans',
+            'within a plan, delegated parallel work is limited to granted read-only exploration/research',
+            'Parallelize only when expected benefit outweighs dispatch/context/synthesis costs',
             'Ordinary serial work needs no parallel template',
             'Joins await named accepted results, not every agent or a phase boundary',
             'terminal delivery, inactivity, passing checks and parent acceptance',
@@ -164,19 +166,39 @@ class SilentPolicyTests(unittest.TestCase):
             'accepted integrated predecessor base', 'separate worktree',
             'Shared Git metadata and ref operations are serialized by root',
             'Only root creates a feature checkpoint commit', 'assigned scope-local checks',
-            'Future integration checks are not checkpoint prerequisites',
+            'Future integration checks are not checkpoint prerequisites', 'no scoped checkpoint exception is granted here',
             'no unresolved relevant failure', 'exact accepted checkpoint SHA',
             'merges exact accepted SHAs in dependency order',
             'Corrections invalidate affected acceptance and test evidence',
             'aggregate checks on the integrated result', 'frozen independent review',
             'atomically guards the target update', 'comparing then blindly updating is insufficient',
             'exact integrated tested tree', "checked-out target's index/worktree consistent",
-            'obtain a new frozen review', 'Never force-overwrite intervening changes',
+            'new frozen review', 'Never force-overwrite intervening changes',
             'does not imply permission to push or publish',
             'only identified task-owned branches', 'unmerged or uncommitted work',
             "Never reset, discard or clean the user's changes",
         ):
             self.assertIn(requirement, git)
+
+    def test_feature_plan_opacity_and_incremental_evidence(self):
+        """Keep opaque dispatch and final verification distinct from merge checks."""
+        feature = ' '.join((SKILLS / 'basix-planning/references/feature-execution.md').read_text().split())
+        for rule in ('Root normally creates and consolidates plans',
+                     'not an empty plan', 'never release a dependent plan',
+                     'never repair a cycle by exposing',
+                     'performs implementation itself', 'explicit exclusive transfer',
+                     'Final-gate failure keeps the work order open',
+                     'Declare that executor once at plan level',
+                     "internal implementation tasks belong to it without subagent labels",
+                     'executor never waits for its own Root acceptance/integration before delivering its terminal result'):
+            self.assertIn(rule, feature)
+        git = ' '.join((SKILLS / 'basix-planning/references/parallel-git.md').read_text().split())
+        for rule in ('no automatic full-suite rerun for each plan',
+                     'environment assumptions remain applicable',
+                     'target drift alone does not require another aggregate',
+                     'After every plan is integrated and writers are inactive',
+                     'full final gate for the corrected result'):
+            self.assertIn(rule, git)
 
     def test_independent_analytical_workflows_stay_separate(self):
         """Verify this policy boundary; self is the unittest test instance."""

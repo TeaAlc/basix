@@ -1,7 +1,7 @@
 # ADR 0010: Subagent model precedence
 
 ## Status
-Active
+Superseded by ADR0015
 
 ## Context
 Specialist settings outrank generic defaults.

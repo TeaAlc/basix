@@ -212,7 +212,7 @@ usefulness = 0
 date = "2026-08-21"
 category = "User Instruction"
 insight = "Every persistent function, whether in an MCP server or script, must document every parameter in its respective docstring."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-22"
@@ -307,7 +307,7 @@ usefulness = 4
 [[entries]]
 date = "2026-10-10"
 category = "User Instruction"
-insight = "Use explicit user model/effort first, then applicable specialist or skill settings; otherwise use gpt-6.1-sol/low. Delegate without context forks, with complete assignments and at most three independent active descendants."
+insight = "Use explicit user model/effort first, then applicable specialist or skill settings; otherwise use gpt-6.1-sol/low. Delegate without context forks and with complete assignments; apply current executor/helper and runtime capacity limits."
 usefulness = 3
 
 [[entries]]

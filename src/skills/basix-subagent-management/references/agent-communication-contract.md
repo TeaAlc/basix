@@ -99,10 +99,16 @@ Timeout, delivery error, explicit cancellation or tool-finished-without-report
 triggers one bounded lifecycle diagnosis using available evidence. Preserve user
 cancellation and safe interruption handling. A delivered terminal, inactive child,
 passing checks and parent acceptance are separate states; silence proves none.
-Root counts at most three active descendants, including nested children, grants
-nested slots explicitly, and releases slots only once when inactivity is evidenced.
+Root counts at most three active plan executors, six active read-only helpers and
+nine active descendants overall, excluding Root, subject to lower runtime limits.
+Root-direct exploration, research and verification share the helper pool. Each
+executor implements one complete plan and may have at most two read-only
+exploration/research children, never implementation children. Helpers must be
+inactive before the executor's terminal result. Root grants nested slots explicitly
+and releases slots only once when inactivity is evidenced.
 Parallel assignments require independent dependencies, disjoint writes and isolated
-mutable resources; dependent work waits for predecessor acceptance. This applies
+mutable resources; dependent plans wait for complete, checked, verified, Root-accepted and integrated
+whole-plan public results; no cross-plan phase, task or checkpoint handoffs. This applies
 to planning and research as well as implementation. Dispatch requires accepted
 inputs/contracts, clear ownership, isolated resources and available slot grants.
 A synchronization point names the accepted results it requires; unrelated work

@@ -56,4 +56,4 @@ Memory curation belongs to `skills/basix-agent-memory/SKILL.md`, loaded for upda
 Contract 2.0 has only blocker/permission/terminal messages, implicit cycle starts
 and idempotent identical terminal retransmission. Schema and stream validation
 check protocol structure; parent lifecycle evidence establishes actual delivery,
-authorization, three-slot allocation, resource independence and acceptance.
+authorization, bounded executor/helper allocation, resource independence and acceptance.

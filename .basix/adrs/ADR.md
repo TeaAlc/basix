@@ -5,7 +5,7 @@
 - [ADR 0005: Relative installer state](ADR_0005_relative_installer_state.md) — Root-relative state survives moved installs
 - [ADR 0007: Internal Tor alias egress](ADR_0007_internal-tor-alias-egress.md) — Alias with direct-egress isolation
 - [ADR 0008: GPT-6 agent models](ADR_0008_gpt-6-agent-models.md) — Luna default; Astra for Miraculix
-- [ADR 0010: Subagent model precedence](ADR_0010_subagent-model-selection-precedence.md) — Specialist selection before generic fallback
+- [ADR 0015: Plan executor capacity](ADR_0015_plan-executor-capacity.md) — Feature executors and bounded read-only helpers
 - [ADR 0011: Context-related agent continuations](ADR_0011_context-related-agent-continuations.md) — Parent-authorized fixes and related follow-ups
 
 - [ADR 0012: Ticket data and retry model](ADR_0012_ticket-data-and-retry-model.md) — Durable ticket metadata and bounded recovery

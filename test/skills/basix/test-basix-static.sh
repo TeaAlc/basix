@@ -838,7 +838,8 @@ assert "subagent_insights" in heartbeat and "at most 24 words" in heartbeat
 for phrase in (
     "exactly one logical", "idempotently deduplicated", "Altered same-key",
     "timeout_ms: 1800000", "no unconditional infinite waiting",
-    "not failure, cancellation", "at most three active descendants",
+    "not failure, cancellation", "at most three active plan executors", "six active read-only helpers",
+    "nine active descendants overall", "never implementation children",
     "passing checks and parent acceptance are separate states",
     "Disjoint writers may remain active", "stop the verifier, discard its result",
     "`owned_targets` and `mutation_window`", "mandatory `final_result`",
