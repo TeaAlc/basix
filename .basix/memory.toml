@@ -27,20 +27,14 @@ usefulness = 0
 [[entries]]
 date = "2026-08-04"
 category = "User Instruction"
-insight = "Treat memory as agent-owned: curate it proactively and selectively to improve efficiency, inform decisions, and prevent repeated mistakes without requesting user approval."
-usefulness = 0
-
-[[entries]]
-date = "2026-08-04"
-category = "User Instruction"
-insight = "Allow strongly evidenced subagent insights to be proposed in final results, reviewed by Root, and selectively retained with the originating subagent type."
-usefulness = 0
+insight = "Curate agent-owned memory proactively without user approval; retain only evidenced, useful findings, including parent-reviewed subagent insights stored separately with their exact originating role."
+usefulness = 1
 
 [[entries]]
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Native Basix agents communicate only with their direct spawning parent; parents independently resolve, instruct, or escalate new messages upward, never automatically forwarding child reports."
-usefulness = 3
+usefulness = 4
 
 [[entries]]
 date = "2026-08-08"
@@ -52,7 +46,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 13
+usefulness = 14
 
 [[entries]]
 date = "2026-08-08"
@@ -320,7 +314,7 @@ usefulness = 4
 date = "2026-10-10"
 category = "Repository"
 insight = "Runtime Contract 2.0 resides in basix-subagent-management; router retains spawn authority. Planning, ADR, and memory workflows have dedicated skills; static policy checks compose authoritative skills rather than developer prose."
-usefulness = 7
+usefulness = 8
 
 [[entries]]
 date = "2026-10-10"
@@ -332,7 +326,7 @@ usefulness = 4
 date = "2026-10-10"
 category = "User Instruction"
 insight = "Use explicit user model/effort first, then applicable specialist or skill settings; otherwise use gpt-6.1-sol/low. Delegate without context forks, with complete assignments and at most three independent active descendants."
-usefulness = 2
+usefulness = 3
 
 [[entries]]
 date = "2026-10-10"
@@ -344,13 +338,13 @@ usefulness = 1
 date = "2026-10-10"
 category = "User Instruction"
 insight = "Contract 2.0 must fully replace Contract 1.4 as the sole valid protocol; do not introduce special transition rules or compatibility modes."
-usefulness = 2
+usefulness = 3
 
 [[entries]]
 date = "2026-10-10"
 category = "User Instruction"
 insight = "Contract 2.0 centrally permits direct-parent-authorized reuse for fixes and context-related follow-ups, including new frozen verification cycles. Keep continuation policy out of Pager; preserve direct-parent escalation."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-10-13"
@@ -387,3 +381,9 @@ date = "2026-10-24"
 category = "User Instruction"
 insight = "Use source memory for information research, including software documentation; source-code inspection alone is excluded. Require fresh independent discovery and corroboration; unreliable sources remain useful analysis objects without supporting external factual claims."
 usefulness = 1
+
+[[entries]]
+date = "2026-10-24"
+category = "User Instruction"
+insight = "When proposing planning improvements, consider parallel independent planning and research, isolated feature branches for parallel writers, and explicit synchronization and merge phases before dependent serial work."
+usefulness = 0
