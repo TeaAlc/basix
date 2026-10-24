@@ -98,8 +98,11 @@ fallback; its Luna defaults remain unchanged. Every dispatch uses
 `fork_turns="none"`. Unsupported model/tool settings block dispatch; never silently
 substitute, including unsupported selected effort. Native specialist roles,
 sandbox and authority remain unchanged.
-Supply agent level, task identity, goal, complete plan, ordered dependencies,
-exact source paths and baseline, constraints, owned files, known findings and
+Supply agent level, task identity, goal, an independently complete assignment:
+the relevant plan subgraph with ordered dependencies, accepted predecessor
+evidence, shared invariants/contracts and a canonical plan path; the path never
+substitutes required context. Omit unrelated phases. Include exact source paths
+and baseline, constraints, owned files, known findings and
 permissions, mandatory skills, resources/log paths, acceptance checks, review
 budget and bounded recovery criteria, terminal delivery requirement, checkpoint
 path and explicit efficiency-report decision. Distinguish root-owned approval,
@@ -111,9 +114,22 @@ Track identity, ownership, dependencies, resource isolation and slot grants usin
 available lifecycle evidence; do not add a monitoring service. Parallelize only
 independent assignments with disjoint writes and isolated mutable resources/logs.
 Shared files, outputs or dependencies require sequential predecessor acceptance.
+Dispatch only when required inputs and contracts are accepted, ownership and
+resource isolation are clear, and a granted slot is available. Independent
+planning and research may run concurrently; root consolidates the saved plan.
+Joins wait for named accepted results, not unrelated work. Failures block affected
+successors; changed shared invariants require reassessing all affected work.
+Root explicitly replans any omitted scope; inactivity alone never removes it.
 Track delivered final, inactivity, successful tests and accepted result separately;
 release an inactive child's slot once, never twice for duplicate final delivery.
 Silence and a tool finishing do not establish terminal receipt or acceptance.
+
+Before planning or executing parallel Git writers, load planning's
+[parallel-git.md](../basix-planning/references/parallel-git.md).
+Each writer receives a feature branch, separate worktree and isolated mutable
+resources; read-only assignments need no branch. Root serializes shared Git
+operations and owns scoped checkpoint commits, integration and target updates.
+The developer instructions distinguish checkpoint timing from final completion.
 
 When waiting for subagent results with no independent work currently in progress,
 always use `wait_agent`; never use `clock.sleep` for that idle wait. `clock.sleep`

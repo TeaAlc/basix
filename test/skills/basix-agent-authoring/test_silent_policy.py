@@ -49,7 +49,9 @@ class SilentPolicyTests(unittest.TestCase):
             'at most three ACTIVE descendants including nested children before every spawn',
             'Grant nested slots explicitly', 'disjoint writes and isolated mutable resources/logs',
             'sequential predecessor acceptance', 'delivered final, inactivity, successful tests and accepted result separately',
-            'never twice for duplicate final delivery', 'complete plan', 'baseline',
+            'never twice for duplicate final delivery', 'independently complete assignment',
+            'relevant plan subgraph', 'accepted predecessor evidence', 'canonical plan path',
+            'the path never substitutes required context', 'Omit unrelated phases', 'baseline',
             'permissions', 'resources/log paths', 'acceptance checks', 'review budget',
             'bounded recovery criteria', 'checkpoint path', 'explicit efficiency-report decision',
             'Two nested children plus their active parent exhaust three slots',
@@ -90,8 +92,9 @@ class SilentPolicyTests(unittest.TestCase):
                 self.assertIn('preserve native specialist routing and configured settings', content)
                 self.assertIn('unsupported selected settings block dispatch without substitution', content.lower())
         planning = text('basix-planning')
-        self.assertIn('for each unspecified field independently', planning)
-        self.assertIn('Saved plans do not replace native specialist routing or configured model/effort', planning)
+        for requirement in ('mandatory management/Contract 2.0 boundary', 'model/effort precedence',
+                            'specialist routing, defaults, no-fork dispatch', 'unsupported-setting rejection'):
+            self.assertIn(requirement, planning)
         for path in ('SKILL.md', 'references/model-classification.md'):
             content = ' '.join((SKILLS / 'basix-agent-authoring' / path).read_text().split())
             with self.subTest(path=path):
@@ -116,18 +119,64 @@ class SilentPolicyTests(unittest.TestCase):
         planning = text('basix-planning')
         for requirement in (
             'task/goal, next steps', 'owned scope/resources/permissions', 'completed QS and log paths',
-            'pending blockers, report flag, contract version, logical sequence and cycle revision',
-            'Never use memory for transient state', 'Resume without a plan or status message',
-            'no compulsory report for every task', 'foo-001_efficency_analysis.md',
-            'A companion is not a numbered plan', 'explicit write ownership',
-            'read-only context permission does not grant writes',
-            'explicit authorized update/merge or preservation', 'task/cycle attribution',
-            'check both destination collisions before moving either', 'Respect ignore rules',
-            'Failed attempts still need requested analysis', 'no filler',
-            'Session-only totals cannot prove task waste', 'parent waiting/review and human delay',
-            'cause, evidence, effect on work, intervention, likely benefit and uncertainty',
+            'blockers, report flag, contract version, logical sequence and cycle revision',
+            'Never put transient state in memory', 'Resume without a transmitted plan, status message or context fork',
+            'it is not compulsory', 'Before assigning/performing requested analysis',
+            'Check for an adjacent', 'even without a new report request',
+            '[efficiency-analysis.md](references/efficiency-analysis.md)',
         ):
             self.assertIn(requirement, planning)
+        reference = SKILLS / 'basix-planning/references/efficiency-analysis.md'
+        analysis = ' '.join(reference.read_text().split())
+        for requirement in (
+            'foo-001_efficency_analysis.md', 'A companion is not a numbered plan',
+            'explicitly grant write ownership', 'read-only context permission never grants writes',
+            'explicitly authorized update/merge or preservation', 'task/cycle attribution',
+            'check both destination collisions before moving either', 'Respect ignore rules',
+            'Failed attempts still require requested analysis', 'no filler',
+            'Session-only totals cannot establish task waste or be allocated by guess',
+            'parent waiting/review and human delay',
+            'cause, evidence, effect on work, intervention, likely benefit and uncertainty',
+            'newly authorized frozen cycle',
+            'Unchanged-target compaction restores checkpoint state',
+        ):
+            self.assertIn(requirement, analysis)
+        for target in re.findall(r'\[[^]]+\]\(([^)]+)\)', reference.read_text()):
+            self.assertTrue((reference.parent / target).is_file(), target)
+
+    def test_parallel_dependencies_and_git_boundaries(self):
+        """Check scheduling and Git safeguards; self is the test instance."""
+        planning = text('basix-planning')
+        for requirement in (
+            'explicit dependencies govern execution, including across phases',
+            'accepted by their responsible parents', 'concurrent writes are disjoint',
+            'Parallelize planning, research or implementation only when expected benefit outweighs dispatch/context/synthesis costs',
+            'Ordinary serial work needs no parallel template',
+            'Joins await named accepted results, not every agent or a phase boundary',
+            'terminal delivery, inactivity, passing checks and parent acceptance',
+            'Failures block descendants', 'requiring reassessment', 'replans omitted/deferred scope',
+            'research and non-Git work too', '[parallel-git.md](references/parallel-git.md) completely',
+        ):
+            self.assertIn(requirement, planning)
+        git = ' '.join((SKILLS / 'basix-planning/references/parallel-git.md').read_text().split())
+        for requirement in (
+            'Read-only agents need no feature branch or worktree', 'expected tip',
+            'accepted integrated predecessor base', 'separate worktree',
+            'Shared Git metadata and ref operations are serialized by root',
+            'Only root creates a feature checkpoint commit', 'assigned scope-local checks',
+            'Future integration checks are not checkpoint prerequisites',
+            'no unresolved relevant failure', 'exact accepted checkpoint SHA',
+            'merges exact accepted SHAs in dependency order',
+            'Corrections invalidate affected acceptance and test evidence',
+            'aggregate checks on the integrated result', 'frozen independent review',
+            'atomically guards the target update', 'comparing then blindly updating is insufficient',
+            'exact integrated tested tree', "checked-out target's index/worktree consistent",
+            'obtain a new frozen review', 'Never force-overwrite intervening changes',
+            'does not imply permission to push or publish',
+            'only identified task-owned branches', 'unmerged or uncommitted work',
+            "Never reset, discard or clean the user's changes",
+        ):
+            self.assertIn(requirement, git)
 
     def test_independent_analytical_workflows_stay_separate(self):
         """Verify this policy boundary; self is the unittest test instance."""

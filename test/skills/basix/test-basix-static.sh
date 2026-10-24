@@ -285,14 +285,17 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 # Reverse only authorized source research/ticket startup/cron additions,
-# the reread clarification, and four activation lines.
+# the reread clarification, scoped checkpoint exception, and four activation lines.
 # Prove all other bytes remain unchanged.
 # The fixed digest matches the pre-source-memory HEAD baseline; installed tests need no Git.
 import hashlib
 instruction_bytes = (root / "setup/developer_instruction.md").read_bytes()
+checkpoint_exception = "- Exception to the preceding commit timing rule: `/root` may create a Conventional Commit checkpoint on an assigned feature branch after its writer is inactive, its local checks pass and its result is accepted. Commit only that frozen, verified scope; unrelated checks may continue. This grants no child commit authority and does not relax final completion checks. Follow `basix-planning`'s parallel Git reference for isolation, integration and target updates.\n".encode()
+assert instruction_bytes.count(checkpoint_exception) == 1
+baseline_bytes = instruction_bytes.replace(checkpoint_exception, b"", 1)
 ticket_startup = "## Ticket management\n\n- At session start and after each context compaction, check if in .basix/tickets/open or .basix/tickets/failed are files, when the are present. If there are files, load the `basix-ticket-management` skill and silently inspect the files. Report relevant action needs; follow the skill's authorization and retry rules.\n\n".encode()
 assert instruction_bytes.count(ticket_startup) == 1
-baseline_bytes = instruction_bytes.replace(ticket_startup, b"", 1)
+baseline_bytes = baseline_bytes.replace(ticket_startup, b"", 1)
 source_research = '## Information-source research\n\n- Agents researching information sources (websites, documentation, articles, publications) must read and follow the complete `basix-source-memory` skill before research; source-code inspection alone does not trigger it.\n- This includes subagents; the spawning parent must explicitly mandate the skill in every such assignment.\n- Read-only agents return observations and research coverage to their parent for persistence.\n\n'.encode()
 assert instruction_bytes.count(source_research) == 1
 assert len(source_research.decode().split()) <= 64
@@ -320,7 +323,7 @@ for heading, skill, suffix in (
     original = f"- TODO: Add skillname{suffix}".encode()
     baseline_bytes = baseline_bytes.replace(section, section.replace(replacement, original), 1)
 assert b"TODO: Add skillname" not in instruction_bytes
-assert hashlib.sha256(baseline_bytes).hexdigest() == "6db1bb7097aa51fe35d90107686237a87972e8379b75f93ae7dd64120ebe83ff", "developer instructions changed outside authorized TODO spans, source research/ticket startup additions, cron trigger rule and reread clarification"
+assert hashlib.sha256(baseline_bytes).hexdigest() == "6db1bb7097aa51fe35d90107686237a87972e8379b75f93ae7dd64120ebe83ff", "developer instructions changed outside authorized TODO spans, source research/ticket startup additions, cron trigger rule, reread clarification and scoped checkpoint exception"
 # Validate the documented ticket data examples, not just skill discovery.
 import json
 ticket_skill = (root / "skills/basix-ticket-management/SKILL.md").read_text()
@@ -393,67 +396,34 @@ for phrase in (
     "never log it or substitute `default`, a `session_id`, or a server-generated placeholder",
 ):
     assert phrase in conventions_section, phrase
-planning_section = re.search(r"(?ms)^## Planning\n.*?(?=^## )", policy).group(0)
+# Check the authoritative entrypoint across its own headings, not just the
+# first subsection embedded in the composed developer-policy view.
+planning_section = (root / "skills/basix-planning/SKILL.md").read_text()
+planning_flat = " ".join(planning_section.split())
 assert policy.count("## Planning") == 1
 assert policy.index("## Basix conventions") < policy.index("## Planning") < policy.index("## Agent Memory")
-for phrase in (
-    "clearly bounded phases serving one explicit overall goal",
-    "independent and self-contained as practical",
-    "state required dependencies",
-    "Define each phase briefly and in this order:",
-    "**Goal:** Required end state",
-    "**Work:** Numbered planned work items labeled **Task 1:** through **Task n:** in execution order, including dependencies",
-    "**Task 1:** through **Task n:**",
-    "**QS:** Concrete completion checks",
-    "**Learnings:** Leave this field empty when creating a phase",
-    "Populate it only after that phase's QS succeeds",
-    "only with findings relevant to later phases",
-    "do not use placeholder text such as `Pending`",
-    "assess durable insights for `memory.toml`",
-    "maximum input-token efficiency without compromising correctness, safety, or mandatory dependencies",
-    "Delegate token-intensive, bounded work when its result outweighs the added context",
-    "`(Subagent Task: <subagent_type>)`",
-    "Save every new plan as `.basix/plans/<stem>-NNN.md`",
-    "canonical decimal suffix of at least three digits",
-    "zero-padded to a minimum width of three without redundant leading zeros",
-    "starting at `001` (for example `001`, `010`, `999`, `1000`; not `000`, `01`, or `0001`)",
-    "inspect only direct files in the active `.basix/plans/` directory and `.basix/plans/archive/`",
-    "ignore other nested directories",
-    "logical stem by removing a final `-NNN.md` from the basename",
-    "If no matching numbered file exists for that stem, use `001`",
-    "one greater than the highest existing valid suffix",
-    "Never reuse a lower number or overwrite any existing path",
-    "Existing unsuffixed plans are legacy",
-    "do not rename them",
-    "never create another unsuffixed plan",
-    "starts at `001` unless numbered successors exist",
-    "Treat malformed suffixes as legacy",
-    "preserve them",
-    "exclude them from numbering",
-    "without silently overwriting them",
-    "Number each logical stem independently",
-    "Move a replaced or completed plan to `.basix/plans/archive/` with its exact numbered basename",
-    "After each phase, update the remaining plan from its results",
-    "At each phase, change affected parts when new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens; keep the overall goal authoritative",
-    "new evidence can reduce risk, improve quality or workflow, save work, or materially reduce tokens",
-    "keep the overall goal authoritative",
-    "Estimate total effort before work begins",
-    "Above 10 million expected input tokens",
-    "ask whether to compact after every phase",
-    "findings, decisions, dependencies, and discovery results",
+phase_fields = ("**Goal:**", "**Work:**", "**QS:**", "**Learnings:**")
+positions = [planning_section.index(field) for field in phase_fields]
+assert positions == sorted(positions)
+for requirement in (
+    "one explicit overall goal", "self-contained", "stated dependencies",
+    "**Task 1:** through **Task n:**", "topological", "Concrete completion checks",
+    "Empty initially", "entire phase QS succeeds", "findings useful to later phases",
+    "never placeholders such as `Pending`", "memory.toml", "basix-agent-memory",
+    "input-token efficiency", "correctness, safety", "mandatory dependencies",
+    "(Subagent Task: <subagent_type>)", "at most 32 characters",
+    "10 million expected input tokens", "whether to compact after every phase",
+    "findings, decisions, dependencies and discovery results",
+    ".basix/plans/<stem>-NNN.md", "only direct files", ".basix/plans/archive/",
+    "ignoring other nested directories", "at least three digits",
+    "`001`, `010`, `999`, `1000`", "never `000`, `01`, `0001`",
+    "logical stem", "independently per stem", "highest valid suffix plus one",
+    "both directories", "Never reuse a lower number or overwrite a path",
+    "unsuffixed and malformed legacy files", "without renaming or counting them",
+    "create no new unsuffixed plan", "After each phase, update remaining work",
+    "overall goal", "completed/replaced plans", "exact numbered basenames",
 ):
-    assert planning_section.count(phrase) == 1, phrase
-
-phase_fields = (
-    "  - **Goal:** Required end state.",
-    "  - **Work:** Numbered planned work items labeled **Task 1:** through **Task n:** in execution order, including dependencies.",
-    "  - **QS:** Concrete completion checks.",
-    "  - **Learnings:** Leave this field empty when creating a phase.",
-)
-assert all(field in planning_section for field in phase_fields)
-assert [planning_section.index(field) for field in phase_fields] == sorted(
-    planning_section.index(field) for field in phase_fields
-)
+    assert requirement in planning_flat, requirement
 assert "initially `Pending`" not in planning_section
 
 adr_section = re.search(r"(?ms)^## Architecture Decision Records \(ADRs\)\n.*?(?=^## )", policy).group(0)

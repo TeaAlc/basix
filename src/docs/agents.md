@@ -11,6 +11,9 @@ User-facing text avoids
 gender-inclusive forms unless the user explicitly requests them. After Root's changes
 and all running verification and tests complete successfully, Root commits only the
 task's changes with a Conventional Commits message when working in a Git repository.
+Root may also checkpoint an accepted feature-branch result after its writer is
+inactive and its local checks pass, while unrelated checks continue. This scoped
+timing exception grants no child commit authority or exemption from final checks.
 The instructions define `.basix/memory.toml` as agent-owned persistent memory, not
 a user log or documentation substitute. Root reads it once at session start and
 once after each context compaction, then actively applies relevant entries during
@@ -280,6 +283,17 @@ active descendants, including nested children, and grants nested slots explicitl
 Parallel work needs independent dependencies, disjoint writes and isolated mutable
 resources; dependent work waits for accepted predecessor results. A delivered
 terminal, inactivity, passing checks and parent acceptance are distinct states.
+Assignments contain the relevant dependency subgraph, accepted predecessor evidence
+and shared contracts rather than unrelated plan phases; a plan pointer does not
+replace required context. Planning and research may run concurrently. Joins name
+the accepted results they need; failures block affected successors, and changes to
+shared invariants require reassessment. Root owns consolidation of the saved plan.
+Parallel Git writers use separate feature branches/worktrees and isolated resources
+under [the Git workflow](../skills/basix-planning/references/parallel-git.md).
+Root serializes shared Git operations, checkpoints accepted results and integrates
+their exact commits before aggregate tests and frozen review. Only the tested,
+reviewed result may update the recorded target tip; drift requires reintegration
+and renewed affected checks/review. Read-only work requires no branch.
 All `wait_agent` calls use exactly `timeout_ms: 1800000`; timeout prompts bounded
 budget-aware diagnosis, without automatic cancellation or infinite waiting.
 Success sends one `final_result` through `send_message`; silence is not receipt.

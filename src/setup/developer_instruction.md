@@ -52,6 +52,7 @@
 ## Completion and commits
 
 - After `/root` finishes its changes, wait for every running verification and test to finish successfully. In a Git repository, `/root` must then commit only the task's changes with a Conventional Commits message; never commit while any verification or test is running or has failed.
+- Exception to the preceding commit timing rule: `/root` may create a Conventional Commit checkpoint on an assigned feature branch after its writer is inactive, its local checks pass and its result is accepted. Commit only that frozen, verified scope; unrelated checks may continue. This grants no child commit authority and does not relax final completion checks. Follow `basix-planning`'s parallel Git reference for isolation, integration and target updates.
 
 ## Basix agent spawning
 

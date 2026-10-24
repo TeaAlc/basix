@@ -102,7 +102,12 @@ passing checks and parent acceptance are separate states; silence proves none.
 Root counts at most three active descendants, including nested children, grants
 nested slots explicitly, and releases slots only once when inactivity is evidenced.
 Parallel assignments require independent dependencies, disjoint writes and isolated
-mutable resources; dependent work waits for predecessor acceptance.
+mutable resources; dependent work waits for predecessor acceptance. This applies
+to planning and research as well as implementation. Dispatch requires accepted
+inputs/contracts, clear ownership, isolated resources and available slot grants.
+A synchronization point names the accepted results it requires; unrelated work
+need not finish. Failures block affected successors; changed shared invariants
+require reassessing affected work before continuation.
 
 Root does not print routine child start or status confirmations. After successful
 transmission visible output is only `Issue delivered to parent.`,

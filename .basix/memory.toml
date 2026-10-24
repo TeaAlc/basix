@@ -72,7 +72,7 @@ usefulness = 0
 date = "2026-08-10"
 category = "Workflow"
 insight = "Run focused negative tests before freezing verifier targets. After corrections, rerun focused checks first, then run the full verification once."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-10"
@@ -122,7 +122,7 @@ usefulness = 0
 date = "2026-08-10"
 category = "Repository"
 insight = "All tests are component-owned under test/. verify-basix.sh aggregates deterministic agents, skills, and shared suites; test-setup.sh aggregates setup; live tests remain explicit."
-usefulness = 9
+usefulness = 10
 
 [[entries]]
 date = "2026-08-11"
@@ -140,7 +140,7 @@ usefulness = 0
 date = "2026-08-14"
 category = "Verification"
 insight = "When router policy moves into a required reference, validation must compose both files rather than demand duplicated runtime guidance."
-usefulness = 1
+usefulness = 2
 
 [[entries]]
 date = "2026-08-14"
@@ -307,8 +307,8 @@ usefulness = 0
 [[entries]]
 date = "2026-10-10"
 category = "User Instruction"
-insight = "When migrating Basix workflows into skills, preserve every source obligation and avoid new ambiguity. Reword skills freely; preserve developer-instruction bytes except explicitly authorized TODO replacements."
-usefulness = 4
+insight = "When shortening or migrating Basix workflows, preserve every obligation, explicit decision predicate, target qualifier and unambiguous meaning. Preserve developer-instruction bytes except explicitly authorized edits."
+usefulness = 5
 
 [[entries]]
 date = "2026-10-10"

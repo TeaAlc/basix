@@ -10,3 +10,4 @@
 
 - [ADR 0012: Ticket data and retry model](ADR_0012_ticket-data-and-retry-model.md) — Durable ticket metadata and bounded recovery
 - [ADR 0013: Source memory](ADR_0013_source-memory-storage-and-ownership.md) — Project-owned source catalogs and write ownership
+- [ADR 0014: Dependency-driven parallel planning](ADR_0014_dependency-driven-parallel-planning.md) — Dependencies, isolated writers and integration
