@@ -179,12 +179,6 @@ insight = "Emit runtime status, health, logs, and Tor IP inside verify_mcp befor
 usefulness = 0
 
 [[entries]]
-date = "2026-08-21"
-category = "Tooling"
-insight = "urllib build_opener may omit an empty ProxyHandler from handlers; retain the handler reference when tests must prove environment proxies are explicitly disabled."
-usefulness = 0
-
-[[entries]]
 date = "2026-10-21"
 category = "Verification"
 insight = "Rootless Podman health timers may be inactive. Use container-local supervisors and live SOCKS/control or MCP probes; historical Tor bootstrap notices do not prove current readiness."
@@ -386,4 +380,10 @@ usefulness = 1
 date = "2026-10-24"
 category = "User Instruction"
 insight = "Choose coherent feature-sized plans, grouping small related features. Dependencies reference only fully accepted integrated plans, never another plan's internal phases. Balance useful parallelism against coordination and integration cost."
+usefulness = 1
+
+[[entries]]
+date = "2026-10-24"
+category = "User Instruction"
+insight = "Assume main is functional. At merges, rerun checks required by integration effects and conflict resolution; run whole-task functionality checks after all plans are implemented and integrated."
 usefulness = 1
