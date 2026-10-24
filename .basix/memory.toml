@@ -386,4 +386,4 @@ usefulness = 1
 date = "2026-10-24"
 category = "User Instruction"
 insight = "When proposing planning improvements, consider parallel independent planning and research, isolated feature branches for parallel writers, and explicit synchronization and merge phases before dependent serial work."
-usefulness = 0
+usefulness = 1
