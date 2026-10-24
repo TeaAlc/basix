@@ -284,7 +284,8 @@ import tomllib
 from pathlib import Path
 
 root = Path(sys.argv[1])
-# Reverse only authorized source research/ticket startup/cron additions and four activation lines.
+# Reverse only authorized source research/ticket startup/cron additions,
+# the reread clarification, and four activation lines.
 # Prove all other bytes remain unchanged.
 # The fixed digest matches the pre-source-memory HEAD baseline; installed tests need no Git.
 import hashlib
@@ -300,6 +301,10 @@ baseline_bytes = baseline_bytes.replace(source_research, b"", 1)
 cron_trigger_rule = '- Cron jobs that start an agent harness or trigger agents must identify the trigger to the agent by prepending a marker to the prompt, for example `(Triggered by CronJob)`. Use `(Triggered by <event> [Flags])` with the actual event name; optional flags are expressed as tags, for example `(Triggered by CronJob [nightly] [maintenance])`.\n'.encode()
 assert instruction_bytes.count(cron_trigger_rule) == 1
 baseline_bytes = baseline_bytes.replace(cron_trigger_rule, b"", 1)
+original_reread_rule = '- Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it. You must reread skills after a kontext compact, if you need them again.\n'.encode()
+clarified_reread_rule = '- Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it or the direct parent explicitly states during a continuation that the source has changed. After context compaction, reread required instructions before using them.\n'.encode()
+assert instruction_bytes.count(clarified_reread_rule) == 1
+baseline_bytes = baseline_bytes.replace(clarified_reread_rule, original_reread_rule, 1)
 assert (root / "skills/basix-ticket-management/SKILL.md").is_file()
 for heading, skill, suffix in (
     ("Planning", "basix-planning", ""),
@@ -315,7 +320,7 @@ for heading, skill, suffix in (
     original = f"- TODO: Add skillname{suffix}".encode()
     baseline_bytes = baseline_bytes.replace(section, section.replace(replacement, original), 1)
 assert b"TODO: Add skillname" not in instruction_bytes
-assert hashlib.sha256(baseline_bytes).hexdigest() == "6db1bb7097aa51fe35d90107686237a87972e8379b75f93ae7dd64120ebe83ff", "developer instructions changed outside authorized TODO spans, source research/ticket startup additions and cron trigger rule"
+assert hashlib.sha256(baseline_bytes).hexdigest() == "6db1bb7097aa51fe35d90107686237a87972e8379b75f93ae7dd64120ebe83ff", "developer instructions changed outside authorized TODO spans, source research/ticket startup additions, cron trigger rule and reread clarification"
 # Validate the documented ticket data examples, not just skill discovery.
 import json
 ticket_skill = (root / "skills/basix-ticket-management/SKILL.md").read_text()

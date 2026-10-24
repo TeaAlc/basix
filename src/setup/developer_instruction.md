@@ -6,7 +6,7 @@
 - Do not use gender-inclusive language unless the user explicitly requests it.
 - Before using a Basix agent or specialized Basix skill, read the complete `basix` router skill.
 - Before spawning a Basix agent, read the complete communication contract referenced by the router.
-- Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it. You must reread skills after a kontext compact, if you need them again.
+- Do not reread skill, agent, or reference instructions already in context unless the user explicitly requests it or the direct parent explicitly states during a continuation that the source has changed. After context compaction, reread required instructions before using them.
 - For Scrapling MCP tool calls, the calling agent is the MCP client: generate a canonical RFC 4122 UUID v4 from a cryptographically secure system source and pass it as `client_id` on every tool call. Reuse the same ID for related session calls and give it to a subagent only when deliberately sharing that session capability; never log it or substitute `default`, a `session_id`, or a server-generated placeholder.
 - When creating or updating .toml files they must be in valid toml syntax.
 - Cron jobs that start an agent harness or trigger agents must identify the trigger to the agent by prepending a marker to the prompt, for example `(Triggered by CronJob)`. Use `(Triggered by <event> [Flags])` with the actual event name; optional flags are expressed as tags, for example `(Triggered by CronJob [nightly] [maintenance])`.
