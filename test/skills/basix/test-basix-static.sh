@@ -284,7 +284,7 @@ import tomllib
 from pathlib import Path
 
 root = Path(sys.argv[1])
-# Reverse only authorized ticket startup/cron additions and four activation lines.
+# Reverse only authorized source research/ticket startup/cron additions and four activation lines.
 # Prove all other bytes remain unchanged.
 # The fixed digest matches the pre-source-memory HEAD baseline; installed tests need no Git.
 import hashlib
@@ -292,6 +292,11 @@ instruction_bytes = (root / "setup/developer_instruction.md").read_bytes()
 ticket_startup = "## Ticket management\n\n- At session start and after each context compaction, check if in .basix/tickets/open or .basix/tickets/failed are files, when the are present. If there are files, load the `basix-ticket-management` skill and silently inspect the files. Report relevant action needs; follow the skill's authorization and retry rules.\n\n".encode()
 assert instruction_bytes.count(ticket_startup) == 1
 baseline_bytes = instruction_bytes.replace(ticket_startup, b"", 1)
+source_research = '## Source research\n\n- Agents researching sources themselves must read and follow the complete `basix-source-memory` skill before research.\n- This requirement applies equally to subagents; the spawning parent must explicitly mandate it in every research assignment.\n- Read-only agents return observations and research coverage to their parent for persistence.\n\n'.encode()
+assert instruction_bytes.count(source_research) == 1
+assert len(source_research.decode().split()) <= 64
+assert len([line for line in source_research.decode().splitlines() if line.startswith("- ")]) == 3
+baseline_bytes = baseline_bytes.replace(source_research, b"", 1)
 cron_trigger_rule = '- Cron jobs that start an agent harness or trigger agents must identify the trigger to the agent by prepending a marker to the prompt, for example `(Triggered by CronJob)`. Use `(Triggered by <event> [Flags])` with the actual event name; optional flags are expressed as tags, for example `(Triggered by CronJob [nightly] [maintenance])`.\n'.encode()
 assert instruction_bytes.count(cron_trigger_rule) == 1
 baseline_bytes = baseline_bytes.replace(cron_trigger_rule, b"", 1)
@@ -310,7 +315,7 @@ for heading, skill, suffix in (
     original = f"- TODO: Add skillname{suffix}".encode()
     baseline_bytes = baseline_bytes.replace(section, section.replace(replacement, original), 1)
 assert b"TODO: Add skillname" not in instruction_bytes
-assert hashlib.sha256(baseline_bytes).hexdigest() == "6db1bb7097aa51fe35d90107686237a87972e8379b75f93ae7dd64120ebe83ff", "developer instructions changed outside authorized TODO spans, ticket startup addition and cron trigger rule"
+assert hashlib.sha256(baseline_bytes).hexdigest() == "6db1bb7097aa51fe35d90107686237a87972e8379b75f93ae7dd64120ebe83ff", "developer instructions changed outside authorized TODO spans, source research/ticket startup additions and cron trigger rule"
 # Validate the documented ticket data examples, not just skill discovery.
 import json
 ticket_skill = (root / "skills/basix-ticket-management/SKILL.md").read_text()
