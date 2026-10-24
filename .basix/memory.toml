@@ -40,7 +40,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Native Basix agents communicate only with their direct spawning parent; parents independently resolve, instruct, or escalate new messages upward, never automatically forwarding child reports."
-usefulness = 2
+usefulness = 3
 
 [[entries]]
 date = "2026-08-08"
@@ -52,7 +52,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 12
+usefulness = 13
 
 [[entries]]
 date = "2026-08-08"
@@ -314,13 +314,13 @@ usefulness = 0
 date = "2026-10-10"
 category = "User Instruction"
 insight = "When migrating Basix workflows into skills, preserve every source obligation and avoid new ambiguity. Reword skills freely; preserve developer-instruction bytes except explicitly authorized TODO replacements."
-usefulness = 3
+usefulness = 4
 
 [[entries]]
 date = "2026-10-10"
 category = "Repository"
 insight = "Runtime Contract 2.0 resides in basix-subagent-management; router retains spawn authority. Planning, ADR, and memory workflows have dedicated skills; static policy checks compose authoritative skills rather than developer prose."
-usefulness = 6
+usefulness = 7
 
 [[entries]]
 date = "2026-10-10"
@@ -344,7 +344,7 @@ usefulness = 1
 date = "2026-10-10"
 category = "User Instruction"
 insight = "Contract 2.0 must fully replace Contract 1.4 as the sole valid protocol; do not introduce special transition rules or compatibility modes."
-usefulness = 1
+usefulness = 2
 
 [[entries]]
 date = "2026-10-10"
@@ -356,7 +356,7 @@ usefulness = 0
 date = "2026-10-13"
 category = "User Instruction"
 insight = "When idle awaiting subagents, always use wait_agent; never clock.sleep. Allow clock.sleep alongside subagent waiting only while the agent actively performs other independent work in parallel."
-usefulness = 2
+usefulness = 3
 
 [[entries]]
 date = "2026-10-21"
