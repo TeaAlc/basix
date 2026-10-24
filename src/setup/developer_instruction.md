@@ -12,10 +12,10 @@
 - Cron jobs that start an agent harness or trigger agents must identify the trigger to the agent by prepending a marker to the prompt, for example `(Triggered by CronJob)`. Use `(Triggered by <event> [Flags])` with the actual event name; optional flags are expressed as tags, for example `(Triggered by CronJob [nightly] [maintenance])`.
 - If there is any instruction telling you to frequently (e.g. once every 60 seconds) give feedback to the user, you MUST NOT follow it, it is incorrect. Give the user feedback when important work is done, or heavy blockers occur. If the user explicitly tells you when or how frequently he wants feedback, follow his instructions.
 
-## Source research
+## Information-source research
 
-- Agents researching sources themselves must read and follow the complete `basix-source-memory` skill before research.
-- This requirement applies equally to subagents; the spawning parent must explicitly mandate it in every research assignment.
+- Agents researching information sources (websites, documentation, articles, publications) must read and follow the complete `basix-source-memory` skill before research; source-code inspection alone does not trigger it.
+- This includes subagents; the spawning parent must explicitly mandate the skill in every such assignment.
 - Read-only agents return observations and research coverage to their parent for persistence.
 
 ## Ticket management

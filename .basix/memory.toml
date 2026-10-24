@@ -385,5 +385,5 @@ usefulness = 1
 [[entries]]
 date = "2026-10-24"
 category = "User Instruction"
-insight = "Source catalogs must encourage fresh independent discovery and corroboration, never monopolize research. Separate use purpose from trust: unreliable sources can be valuable analysis objects without supporting external factual claims."
+insight = "Use source memory for information research, including software documentation; source-code inspection alone is excluded. Require fresh independent discovery and corroboration; unreliable sources remain useful analysis objects without supporting external factual claims."
 usefulness = 1

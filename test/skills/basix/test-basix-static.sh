@@ -292,7 +292,7 @@ instruction_bytes = (root / "setup/developer_instruction.md").read_bytes()
 ticket_startup = "## Ticket management\n\n- At session start and after each context compaction, check if in .basix/tickets/open or .basix/tickets/failed are files, when the are present. If there are files, load the `basix-ticket-management` skill and silently inspect the files. Report relevant action needs; follow the skill's authorization and retry rules.\n\n".encode()
 assert instruction_bytes.count(ticket_startup) == 1
 baseline_bytes = instruction_bytes.replace(ticket_startup, b"", 1)
-source_research = '## Source research\n\n- Agents researching sources themselves must read and follow the complete `basix-source-memory` skill before research.\n- This requirement applies equally to subagents; the spawning parent must explicitly mandate it in every research assignment.\n- Read-only agents return observations and research coverage to their parent for persistence.\n\n'.encode()
+source_research = '## Information-source research\n\n- Agents researching information sources (websites, documentation, articles, publications) must read and follow the complete `basix-source-memory` skill before research; source-code inspection alone does not trigger it.\n- This includes subagents; the spawning parent must explicitly mandate the skill in every such assignment.\n- Read-only agents return observations and research coverage to their parent for persistence.\n\n'.encode()
 assert instruction_bytes.count(source_research) == 1
 assert len(source_research.decode().split()) <= 64
 assert len([line for line in source_research.decode().splitlines() if line.startswith("- ")]) == 3

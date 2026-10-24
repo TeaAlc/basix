@@ -1,9 +1,16 @@
 ---
 name: basix-source-memory
-description: "Basix-Skill: Find, assess, and retain reusable research sources in project-owned source catalogs; use when research needs source lookup or durable source observations."
+description: "Basix-Skill: Find, assess, and retain information sources such as websites, documentation, articles, and publications; source-code inspection alone does not trigger this skill."
 ---
 
 # Source memory
+
+Use this skill for research using information sources: websites, documentation,
+articles, and publications. Source-code inspection alone (files, symbols, or
+repository implementation) does not trigger it. Software documentation and
+publications remain covered, including code examples; when a coding task also
+consults such information sources, apply this workflow to that research.
+Catalog information publishers and meaningful sections, not code files or symbols.
 
 Use `.basix/sources/sources.toml` and `categories.toml` to retain reusable
 sources, scoped trust assessments, and usefulness across tasks. This is source

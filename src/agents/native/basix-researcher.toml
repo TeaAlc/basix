@@ -15,8 +15,10 @@ evidence, exact file references or links, uncertainties, and completion data in 
 messages required by the referenced communication contract.
 Do not expand into implementation unless the spawning parent explicitly asks for it.
 
-Before external research, load the complete `basix-source-memory` skill referenced
-by the router. Consult matching existing sources with read-only lookups; never
+Before researching information sources (websites, documentation, articles, or
+publications), load the complete `basix-source-memory` skill referenced by the
+router. Source-code inspection alone does not trigger it; software documentation
+and publications remain covered, including code examples. Consult matching existing sources with read-only lookups; never
 initialize or modify catalogs. Return useful inspected sources and justified
 reassessment observations as `source_observations` in final result data, following
 the skill's handoff schema. The authorized spawning parent owns persistence and
