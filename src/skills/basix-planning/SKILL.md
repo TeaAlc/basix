@@ -29,7 +29,16 @@ as practical phases and stated dependencies. Define each phase briefly in order:
 Optimize input-token efficiency without compromising correctness, safety or
 mandatory dependencies. Delegate bounded work when its benefit outweighs added
 context, labeling tasks `(Subagent Task: <subagent_type>)`. For discovered bug/feature
-files, list every affected file with a work description of at most 32 characters.
+files, list every affected file with a work description of at most 32 characters,
+inline or through a complete canonical manifest. For a manifest, record its stable
+path and full content hash; verify it exists, is readable and matches that identity.
+Map exact scope IDs to primary task owners, with every path and its short work
+description in the manifest; IDs/ranges must resolve unambiguously with no missing
+or duplicate ownership. Revalidate affected scope and replan when it changes.
+Small inventories need no manifest.
+Keep shared invariants, dependencies and inventories authoritative in one place,
+with task-specific deltas rather than repeated copies. Dispatch assignments must
+still contain independently complete context under management's rules.
 Estimate total effort before work; above 10 million expected input tokens, ask
 whether to compact after every phase. If enabled, preserve all continuation
 findings, decisions, dependencies and discovery results compactly at phase closure.
@@ -52,6 +61,19 @@ checks, plan checkpoints and requested analysis. Read-only agents propose change
 
 ## Dependencies and parallel work
 
+Audit actual dependencies, including those introduced by baselines, phase gates,
+shared resources and acceptance aggregation. Distinguish source prerequisites,
+semantic readiness for implementation and readiness for integration/release;
+integration needs must not silently become implementation blockers. Retain genuine
+safety and contract gates; explain extra gates that constrain otherwise independent
+work. Phase labels and waves create no implicit global barrier.
+Before finalizing parallel plans with explicit machine-readable file dependencies,
+mechanically reconcile full-inventory ownership, direct task source inputs and
+start conditions; record the validation command, input identities and result.
+Read [dependency-validation.md](references/dependency-validation.md) for the
+normalized contract and validator. Do not substitute future implementation tests
+for this planning evidence.
+
 A task is ready when named predecessors and required inputs/contracts are accepted
 by their responsible parents, ownership/scope is clear, concurrent writes are
 disjoint, mutable resources/logs are isolated and management's slot capacity is
@@ -62,6 +84,13 @@ the goal, not a universal sequence.
 For parallel tasks or handoffs only, record needed dependencies/results,
 owner/scope, accepted inputs/contracts, resources/logs, acceptance checks and
 synthesis/integration owner. Ordinary serial work needs no parallel template.
+
+Schedule the earliest meaningful partial integration or feedback for the risks at
+hand. Stage harness/infrastructure work to support the next useful checks rather
+than automatically requiring a complete harness before all implementation. Partial
+checks supplement required final aggregate checks and frozen independent review;
+they do not replace them. Choose their scope and timing from actual dependencies
+and risks, not a universal sequence.
 
 Joins await named accepted results, not every agent or a phase boundary. Contract
 2.0 distinguishes terminal delivery, inactivity, passing checks and parent

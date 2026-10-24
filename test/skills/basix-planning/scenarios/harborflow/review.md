@@ -6,7 +6,7 @@ Date: 2026-10-24. This is an invented software-delivery scenario, not a product 
 
 The [scenario](scenario.md) supplies requirements, acceptance cases and injected changes; the [manifest](source-manifest.json) supplies the exact production-source inventory. A separate scenario author created these raw inputs. Root checked their structure before a fresh planner received the skill and raw inputs, without an ideal schedule or suspected defect. A separate read-only verifier then received the immutable artifacts and an explicit evaluation rubric. No implementation workers, product branches, databases or deployments were created.
 
-The resulting future plan is [harborflow-delivery-001.md](../../../../../.basix/plans/harborflow-delivery-001.md). Its implementation QS remains unexecuted and its phase Learnings must remain empty. The experiment's administrative plan is separate and is archived when this experiment finishes.
+The resulting future plan is [harborflow-delivery-001.md](../../../../../.basix/plans/archive/harborflow-delivery-001.md). Its implementation QS remains unexecuted and its phase Learnings must remain empty. The experiment's administrative plan is separate and is archived when this experiment finishes.
 
 ## Scenario complexity
 
@@ -73,3 +73,5 @@ The test supports the narrower conclusion that the current skill enabled one fre
 ## Limits
 
 This tests one complex invented scenario and one independent planning attempt. It cannot establish general reliability, actual concurrency speedup, token savings or software correctness. B0/B1, resource values and service checks describe future execution; no real HarborFlow repository or baseline commit exists. Tests/configuration/documentation are auxiliary scope and do not inflate the 100 production-source count. A planner error alone does not establish a missing skill instruction.
+
+This historical first-attempt report is preserved. The later [skill refinement and fresh independent rerun](refinement-review.md) distinguishes completeness from schedule quality and records the accepted successor.

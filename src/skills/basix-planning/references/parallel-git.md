@@ -6,11 +6,14 @@ Contract 2.0 governs delivery, inactivity and acceptance. Read-only agents need
 no feature branch or worktree. This workflow grants no additional write, commit,
 push or destructive-operation authority.
 
-## Establish an isolated wave
+## Establish isolated writers
 
-Root records the integration target, its expected tip and each wave's exact
-baseline. A dependent wave starts from the accepted integrated predecessor base,
-not a stale original baseline. Freeze disjoint write scopes and shared interface
+Root records the integration target, its expected tip and each writer's exact
+baseline. Use the earliest accepted base containing that writer's actual required
+predecessors; check inherited source requirements rather than assuming a baseline
+adds no dependencies. A dependent writer starts from the accepted integrated
+predecessor base, not a stale original baseline. Unrelated wave members need not
+finish first. Freeze disjoint write scopes and shared interface
 contracts before dispatch. Overlapping scopes or an unsettled interface require
 sequential acceptance or explicit replanning.
 
@@ -44,6 +47,9 @@ branch and worktree. Named joins require only their declared predecessors; an
 unrelated running task is not an integration barrier. Resolve conflicts only
 within authorized scope. Corrections invalidate affected acceptance and test
 evidence: rerun affected checks and obtain new acceptance before proceeding.
+Integrate accepted subsets when they enable meaningful risk-based feedback,
+using the checks and infrastructure needed for that subset; retain the final gates
+below for the complete integrated result.
 
 Run aggregate checks on the integrated result, then obtain a frozen independent
 review before updating the target. Record the tested tree and reviewed result;

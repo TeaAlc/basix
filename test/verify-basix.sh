@@ -10,6 +10,7 @@ suites=(
   test/skills/basix/test-basix.sh
   test/skills/basix/test-basix-static.sh
   test/skills/basix-agent-authoring/test-basix-agent-authoring.sh
+  test/skills/basix-planning/test-basix-planning.sh
   test/skills/basix-source-memory/test-basix-source-memory.sh
   test/skills/basix-experience/test-basix-experience.sh
   test/scripts/test-run-quality-gates.sh
