@@ -375,3 +375,9 @@ date = "2026-10-24"
 category = "User Instruction"
 insight = "Store research sources in .basix/sources/sources.toml and distinct broad categories in categories.toml; preserve category meanings, bounded descriptions, usefulness counts, and justified trustability reassessments."
 usefulness = 0
+
+[[entries]]
+date = "2026-10-24"
+category = "User Instruction"
+insight = "Source-memory categories must include software development documentation, programming languages, best practices, guides, and API descriptions from the initial seed."
+usefulness = 0
