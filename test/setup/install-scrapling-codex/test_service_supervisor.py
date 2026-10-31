@@ -67,6 +67,27 @@ while True: time.sleep(0.05)
         self.assertEqual(result.returncode, 1)
         self.assertIn("child exited status=0", result.stderr)
 
+    def test_irrecoverable_policy_signal_recovers_with_finite_restart_budget(self):
+        """Real policy poison/saturation replaces children despite healthy MCP probes."""
+        fixtures = str(Path(__file__).parent)
+        for reason in ("creation", "saturation"):
+            with self.subTest(reason=reason):
+                (self.root / "starts").unlink(missing_ok=True)
+                self.child.write_text("import sys,os,signal,time,pathlib\n"
+                    + "sys.path.insert(0," + repr(fixtures) + ")\n"
+                    + "import test_scrapling_policy as fixture\n"
+                    + "owner=fixture.policy.ClientPolicy(fixture.FakeServer())\n"
+                    + "owner.failure_notifier=lambda:os.kill(os.getppid(),signal.SIGUSR1)\n"
+                    + "with pathlib.Path(__file__).with_name('starts').open('a') as out: out.write(str(os.getpid())+'\\n')\n"
+                    + ("owner.session_creation_failed=True;owner.assess_health()\n" if reason == "creation" else
+                       "class Stuck:\n def done(self): return False\n def cancelling(self): return 1\nowner.pending_operations={Stuck() for _ in range(32)}\nowner.abandoned_operations=set(owner.pending_operations)\nowner.assess_health(0);owner.assess_health(60)\n")
+                    + "while True: time.sleep(.05)\n")
+                result = subprocess.run(self.command(), capture_output=True, text=True, timeout=8)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(len((self.root / "starts").read_text().splitlines()), 2)
+                self.assertIn("irreversible local policy degradation", result.stderr)
+                self.assertIn("restart budget exhausted", result.stderr)
+
     def test_hung_probe_recovers_then_exhausts_bounded_budget(self):
         """Assert self's hung probes restart a real child within a bounded budget."""
         self.probe.write_text("import time\ntime.sleep(10)\n")
@@ -129,7 +150,7 @@ raise SystemExit(1 if n % 2 == 0 else 0)
             b"250 OK\r\n", b"250-status/bootstrap-phase=NOTICE BOOTSTRAP PROGRESS=100\r\n",
             b"250-status/circuit-established=0\r\n", b"250 OK\r\n"]
         contexts = []
-        for connection in (socks, control):
+        for connection in (socks, socks, control):
             context = MagicMock()
             context.__enter__.return_value = connection
             contexts.append(context)

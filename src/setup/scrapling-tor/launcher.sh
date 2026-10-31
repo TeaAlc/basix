@@ -18,8 +18,6 @@ readonly ENDPOINT="http://127.0.0.1:$PORT/mcp"
 
 created_internal=false created_egress=false created_tor=false created_scrapling=false probe_created=false diagnostics_collected=false
 created_internal_id='' created_egress_id='' created_tor_ref='' created_scrapling_ref=''
-migration_old_removed=false migration_original_internal_id='' migration_new_internal_id='' migration_disconnected_ids=() migration_disconnected_names=()
-legacy_ids=() legacy_names=()
 rollback() {
   local status=$? failed_line=${1:-unknown}; trap - ERR
   printf 'Managed service preparation failed at launcher line %s (exit %s).\n' "$failed_line" "$status" >&2
@@ -27,38 +25,8 @@ rollback() {
   if $probe_created; then "$RUNTIME" rm -f "$PROBE_CONTAINER" >/dev/null 2>&1 || true; fi
   if $created_scrapling && [[ -n $created_scrapling_ref ]]; then "$RUNTIME" rm -f "$created_scrapling_ref" >/dev/null 2>&1 || true; fi
   if $created_tor && [[ -n $created_tor_ref ]]; then "$RUNTIME" rm -f "$created_tor_ref" >/dev/null 2>&1 || true; fi
-  if $created_internal && network_still_matches "$INTERNAL_NET" "$created_internal_id"; then "$RUNTIME" network rm "$INTERNAL_NET" >/dev/null 2>&1 || true; fi
-  if $created_egress && network_still_matches "$EGRESS_NET" "$created_egress_id"; then "$RUNTIME" network rm "$EGRESS_NET" >/dev/null 2>&1 || true; fi
-  if $migration_old_removed; then
-    local network_ready=false
-    if [[ -n $migration_new_internal_id ]] && network_still_matches "$INTERNAL_NET" "$migration_new_internal_id"; then
-      "$RUNTIME" network rm "$INTERNAL_NET" >/dev/null 2>&1 || true
-    fi
-    local inspect_status=0
-    if network_json "$INTERNAL_NET" >/dev/null 2>&1; then
-      network_ready=false
-    else
-      inspect_status=$?
-    fi
-    if ((inspect_status == 1)); then
-      if "$RUNTIME" network create --driver bridge --internal --disable-dns --label "$LABEL_KEY=$LABEL_VALUE" "$INTERNAL_NET" >/dev/null 2>&1; then
-        network_ready=true
-      fi
-    fi
-    local index id
-    if $network_ready; then
-      for index in "${!migration_disconnected_ids[@]}"; do
-        id=${migration_disconnected_ids[$index]}
-        "$RUNTIME" network connect "$INTERNAL_NET" "$id" >/dev/null 2>&1 || true
-      done
-    fi
-  elif [[ -n $migration_original_internal_id ]] && network_still_matches "$INTERNAL_NET" "$migration_original_internal_id"; then
-    local index id
-    for index in "${!migration_disconnected_ids[@]}"; do
-      id=${migration_disconnected_ids[$index]}
-      "$RUNTIME" network connect "$INTERNAL_NET" "$id" >/dev/null 2>&1 || true
-    done
-  fi
+  if $created_internal && network_still_matches "$INTERNAL_NET" "$created_internal_id"; then "$RUNTIME" network rm "$created_internal_id" >/dev/null 2>&1 || true; fi
+  if $created_egress && network_still_matches "$EGRESS_NET" "$created_egress_id"; then "$RUNTIME" network rm "$created_egress_id" >/dev/null 2>&1 || true; fi
   return "$status"
 }
 trap 'rollback "$LINENO"' ERR
@@ -80,24 +48,6 @@ network_still_matches() {
   [[ -n $expected ]] || return 1
   actual=$(network_id "$name" 2>/dev/null) || return 1
   [[ $actual == "$expected" ]]
-}
-container_has_network() {
-  local id=$1 network=$2
-  container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 -c '
-import json,sys
-n=json.load(sys.stdin)[0]
-networks=(n.get("NetworkSettings") or {}).get("Networks") or {}
-raise SystemExit(0 if sys.argv[1] in networks else 1)
-' "$network"
-}
-disconnect_if_connected() {
-  local network=$1 id=$2 status
-  if container_has_network "$id" "$network" >/dev/null 2>&1; then
-    "$RUNTIME" network disconnect --force "$network" "$id" >/dev/null 2>&1
-    return $?
-  fi
-  status=$?
-  ((status == 1)) || return 7
 }
 container_still_matches() {
   local name=$1 expected=$2 actual
@@ -162,87 +112,15 @@ for alias in value.get("Aliases",value.get("aliases",[])) or []:
   done <<<"$connected"
 }
 
-# Replace an owned DNS-disabled network; name is the validated internal network.
-migrate_internal_network() {
-  local name=$1 connected classification=0 id container result tor_id='' scrapling_id=''
-  migration_disconnected_ids=(); migration_disconnected_names=()
-  migration_original_internal_id=$(network_id "$name") || {
-    printf 'Could not pin the managed network identity before migration.\n' >&2
-    return 7
-  }
-  connected=$(network_json "$name" | PYTHONDONTWRITEBYTECODE=1 python3 -c '
-import json,sys
-n=json.load(sys.stdin)[0]
-for ident,value in (n.get("Containers") or n.get("containers") or {}).items():
-    if not isinstance(value,dict): raise SystemExit(2)
-    name=value.get("Name") or value.get("name") or ""
-    if not isinstance(name,str) or not name: raise SystemExit(2)
-    print(ident, name)
-')
-  while read -r id container; do
-    [[ -z $id || $container == "$TOR_CONTAINER" || $container == "$SCRAPLING_CONTAINER" ]] && continue
-    classification=0
-    result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || classification=$?
-    if [[ $classification == 0 && $result == managed-legacy ]]; then
-      migration_disconnected_ids+=("$id"); migration_disconnected_names+=("$container")
-      legacy_ids+=("$id"); legacy_names+=("$container")
-      disconnect_if_connected "$name" "$id" || return 7
-      printf 'Deferred removal of validated legacy Scrapling container %s until migration commit.\n' "$container" >&2
-      continue
-    fi
-    printf 'Refusing DNS migration while foreign container %s uses %s.\n' "$container" "$name" >&2
-    return 7
-  done <<<"$connected"
-  if container_json "$TOR_CONTAINER" >/dev/null 2>&1; then
-    tor_id=$(container_id "$TOR_CONTAINER" 2>/dev/null || true)
-    [[ -n $tor_id ]] || { printf 'Could not pin Tor container identity during network migration.\n' >&2; return 7; }
-    classify_container "$TOR_CONTAINER" tor "$TOR_IMAGE" "$TOR_IMAGE" || classification=$?
-    ((classification == 0 || classification == 10)) || { printf 'Refusing DNS migration with unsafe Tor container.\n' >&2; return 7; }
-  fi
-  classification=0
-  if container_json "$SCRAPLING_CONTAINER" >/dev/null 2>&1; then
-    scrapling_id=$(container_id "$SCRAPLING_CONTAINER" 2>/dev/null || true)
-    [[ -n $scrapling_id ]] || { printf 'Could not pin Scrapling container identity during network migration.\n' >&2; return 7; }
-    classify_container "$SCRAPLING_CONTAINER" scrapling "$SCRAPLING_IMAGE" "$SCRAPLING_ID" "$BASIX_TOR_HOST" "$HERE/policy_mcp.py" || classification=$?
-    if ((classification == 0 || classification == 10)); then
-      container_still_matches "$SCRAPLING_CONTAINER" "$scrapling_id" || { printf 'Scrapling container changed during network migration; refusing removal.\n' >&2; return 7; }
-      migration_disconnected_ids+=("$scrapling_id"); migration_disconnected_names+=("$SCRAPLING_CONTAINER")
-      disconnect_if_connected "$name" "$scrapling_id" || return 7
-    else
-      classification=0
-      result=$(container_json "$SCRAPLING_CONTAINER" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$scrapling_id" --policy "$HERE/policy_mcp.py") || classification=$?
-      [[ $classification == 0 && $result == managed-legacy ]] || { printf 'Refusing DNS migration with unsafe Scrapling container.\n' >&2; return 7; }
-      container_still_matches "$SCRAPLING_CONTAINER" "$scrapling_id" || { printf 'Scrapling container changed during legacy migration; refusing removal.\n' >&2; return 7; }
-      migration_disconnected_ids+=("$scrapling_id"); migration_disconnected_names+=("$SCRAPLING_CONTAINER")
-      legacy_ids+=("$scrapling_id"); legacy_names+=("$SCRAPLING_CONTAINER")
-      disconnect_if_connected "$name" "$scrapling_id" || return 7
-      printf 'Deferred removal of validated legacy Scrapling container until migration commit.\n' >&2
-    fi
-  fi
-  if [[ -n $tor_id ]]; then
-    container_still_matches "$TOR_CONTAINER" "$tor_id" || { printf 'Tor container changed during network migration; refusing network replacement.\n' >&2; return 7; }
-    migration_disconnected_ids+=("$tor_id"); migration_disconnected_names+=("$TOR_CONTAINER")
-    disconnect_if_connected "$name" "$tor_id" || return 7
-  fi
-  network_still_matches "$name" "$migration_original_internal_id" || {
-    printf 'Refusing DNS migration after the managed network identity changed.\n' >&2
-    return 7
-  }
-  "$RUNTIME" network rm "$name" >/dev/null
-  migration_old_removed=true
-  local create_args=(network create --driver bridge --internal --label "$LABEL_KEY=$LABEL_VALUE")
-  [[ -n $TRANSACTION_ID ]] && create_args+=(--label "$TRANSACTION_LABEL_KEY=$TRANSACTION_ID")
-  "$RUNTIME" "${create_args[@]}" "$name" >/dev/null
-  created_internal=true
-  migration_new_internal_id=$(network_id "$name") || return 7
-  if [[ -n $tor_id ]]; then
-    "$RUNTIME" network connect --alias "$BASIX_TOR_HOST" "$name" "$tor_id" >/dev/null
-  fi
-  if [[ -n $scrapling_id ]]; then
-    "$RUNTIME" network connect "$name" "$scrapling_id" >/dev/null
-  fi
-  validate_network "$name" true
-  created_internal=false
+# Retired owned networks are replaced empty; no retired resource is restored.
+replace_internal_network() {
+  local name=$1 pinned connected
+  pinned=$(network_id "$name") || return 7
+  connected=$(network_json "$name" | PYTHONDONTWRITEBYTECODE=1 python3 -c 'import json,sys; n=json.load(sys.stdin)[0]; print(len(n.get("Containers",n.get("containers",{})) or {}))') || return 7
+  [[ $connected == 0 ]] || { printf 'Refusing replacement of nonempty retired network %s.\n' "$name" >&2; return 7; }
+  network_still_matches "$name" "$pinned" || return 7
+  "$RUNTIME" network rm "$pinned" >/dev/null
+  ensure_network "$name" true
 }
 
 ensure_network() {
@@ -250,7 +128,7 @@ ensure_network() {
   if network_json "$name" >/dev/null 2>&1; then
     validate_network "$name" "$internal" || classification=$?
     if ((classification == 0)); then return; fi
-    if ((classification == 10)) && [[ $internal == true ]]; then migrate_internal_network "$name"; return; fi
+    if ((classification == 10)) && [[ $internal == true ]]; then replace_internal_network "$name"; return; fi
     return "$classification"
   fi
   local args=(network create --driver bridge --label "$LABEL_KEY=$LABEL_VALUE")
@@ -422,67 +300,77 @@ container_diagnostics() {
   printf 'Tor gateway IP on %s: %s\n' "$INTERNAL_NET" "${ip:-unavailable}" >&2
 }
 
-classify_running_scrapling() {
-  local id name extra result classification listing
-  legacy_ids=(); legacy_names=()
-  if ! listing=$("$RUNTIME" ps -a --no-trunc --format '{{.ID}} {{.Names}}'); then
-    printf 'Could not enumerate running containers; refusing Scrapling migration.\n' >&2
-    return 7
-  fi
+# Fully validate the removal inventory before deleting any owned container.
+retire_owned() {
+  local name id kind configured actual classification result listing extra network connected member
+  local remove_ids=() remove_names=() remove_kinds=() owned_ids=()
+  for name in "$TOR_CONTAINER" "$SCRAPLING_CONTAINER"; do
+    container_json "$name" >/dev/null 2>&1 || continue
+    id=$(container_id "$name") || return 7
+    [[ -n $id ]] || return 7
+    kind=tor configured=$TOR_IMAGE actual=$TOR_IMAGE
+    if [[ $name == "$SCRAPLING_CONTAINER" ]]; then kind=scrapling; configured=$SCRAPLING_IMAGE; actual=$SCRAPLING_ID; fi
+    classification=0
+    classify_container "$name" "$kind" "$configured" "$actual" "$BASIX_TOR_HOST" "$HERE/policy_mcp.py" || classification=$?
+    if ((classification != 0 && classification != 10)); then
+      result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || { printf 'Refusing foreign or unsafe %s container before replacement.\n' "$([[ $kind == tor ]] && printf Tor || printf Scrapling)" >&2; return 7; }
+      [[ $kind == scrapling && $result == managed-legacy ]] || return 7
+      classification=10
+    fi
+    owned_ids+=("$id")
+    if ((classification == 10)) || [[ ${BASIX_SETUP_REPLACE_SCRAPLING:-false} == true ]]; then
+      remove_ids+=("$id"); remove_names+=("$name"); remove_kinds+=("$kind")
+    fi
+  done
+  listing=$("$RUNTIME" ps -a --no-trunc --format '{{.ID}} {{.Names}}') || { printf 'Could not enumerate running containers; refusing replacement.\n' >&2; return 7; }
   while read -r id name extra; do
     [[ -z $id && -z $name && -z $extra ]] && continue
-    [[ -n $id && -n $name && -z $extra ]] || { printf 'Runtime returned malformed container listing; refusing Scrapling migration.\n' >&2; return 7; }
-    [[ $name != "$TOR_CONTAINER" && $name != "$SCRAPLING_CONTAINER" && $name != *.basix-rollback-* ]] || continue
-    classification=0
-    result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || classification=$?
-    case $classification:$result in
-      0:unrelated) ;;
-      0:managed-legacy)
-        if ! printf '%s\n' "${legacy_ids[@]}" | grep -Fxq "$id"; then
-          legacy_ids+=("$id"); legacy_names+=("$name")
-        fi
-        printf 'Validated managed legacy Scrapling container %s for deferred migration.\n' "$name" >&2 ;;
-      *)
-        printf 'Refusing foreign or unsafe running Scrapling container named %s.\n' "$name" >&2
-        return 7 ;;
+    [[ -n $id && -n $name && -z $extra ]] || { printf 'Runtime returned malformed container listing.\n' >&2; return 7; }
+    [[ $name != "$TOR_CONTAINER" && $name != "$SCRAPLING_CONTAINER" ]] || continue
+    result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || { printf 'Refusing foreign or unsafe running Scrapling container %s.\n' "$name" >&2; return 7; }
+    case $result in
+      unrelated) ;;
+      managed-legacy) remove_ids+=("$id"); remove_names+=("$name"); remove_kinds+=(stdio); owned_ids+=("$id") ;;
+      *) return 7 ;;
     esac
   done <<<"$listing"
-}
-
-remove_validated_legacy() {
-  local index id name result classification
-  for index in "${!legacy_ids[@]}"; do
-    id=${legacy_ids[$index]}; name=${legacy_names[$index]}; classification=0
-    result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || classification=$?
-    [[ $classification == 0 && $result == managed-legacy ]] || {
-      printf 'Validated legacy Scrapling container %s disappeared or changed; refusing removal.\n' "$name" >&2
-      return 7
-    }
+  for network in "$INTERNAL_NET" "$EGRESS_NET"; do
+    network_json "$network" >/dev/null 2>&1 || continue
+    classification=0
+    [[ $network == "$INTERNAL_NET" ]] && kind=true || kind=false
+    validate_network "$network" "$kind" || classification=$?
+    ((classification == 0 || classification == 10)) || return 7
+    # A strict network is retained; unrelated attachments are never mutated.
+    # A retired network must be replaced empty, so prove every attachment owned.
+    ((classification == 10)) || continue
+    connected=$(network_json "$network" | PYTHONDONTWRITEBYTECODE=1 python3 -c 'import json,sys; n=json.load(sys.stdin)[0]; print("\n".join((n.get("Containers",n.get("containers",{})) or {}).keys()))') || return 7
+    while read -r member; do
+      [[ -z $member ]] && continue
+      printf '%s\n' "${owned_ids[@]}" | grep -Fxq "$member" || { printf 'Refusing network replacement with foreign attached container.\n' >&2; return 7; }
+    done <<<"$connected"
+  done
+  local index
+  for index in "${!remove_ids[@]}"; do
+    id=${remove_ids[$index]}; name=${remove_names[$index]}; kind=${remove_kinds[$index]}
+    container_still_matches "$name" "$id" || return 7
+    if [[ $kind == stdio ]]; then
+      result=$(container_json "$id" | PYTHONDONTWRITEBYTECODE=1 python3 "$CONTAINER_POLICY" candidate --id "$id" --policy "$HERE/policy_mcp.py") || return 7
+      [[ $result == managed-legacy ]] || return 7
+    else
+      configured=$TOR_IMAGE actual=$TOR_IMAGE
+      if [[ $kind == scrapling ]]; then configured=$SCRAPLING_IMAGE; actual=$SCRAPLING_ID; fi
+      classification=0
+      classify_container "$name" "$kind" "$configured" "$actual" "$BASIX_TOR_HOST" "$HERE/policy_mcp.py" || classification=$?
+      ((classification == 0 || classification == 10)) || return 7
+    fi
     "$RUNTIME" rm -f "$id" >/dev/null || return 7
-    printf 'Removed validated legacy Scrapling container %s after HTTP verification.\n' "$name" >&2
+    printf 'Removed positively identified owned retired container %s; no retired restoration.\n' "$name" >&2
   done
 }
 
-classify_named_scrapling() {
-  local classification=0
-  if ! container_json "$SCRAPLING_CONTAINER" >/dev/null 2>&1; then
-    return 0
-  fi
-  classify_container "$SCRAPLING_CONTAINER" scrapling "$SCRAPLING_IMAGE" "$SCRAPLING_ID" "$BASIX_TOR_HOST" "$HERE/policy_mcp.py" || classification=$?
-  case $classification in
-    0|10) return 0 ;;
-    *)
-      printf 'Refusing foreign or unsafe Scrapling container named %s before Tor reconciliation.\n' "$SCRAPLING_CONTAINER" >&2
-      return 7
-      ;;
-  esac
-}
-
 ensure_scrapling() {
-  classify_running_scrapling
-  classify_named_scrapling
+  retire_owned
   ensure_tor
-  classify_running_scrapling
   local create=true classification=0 scrapling_id='' replace_requested=${BASIX_SETUP_REPLACE_SCRAPLING:-false}
   if container_json "$SCRAPLING_CONTAINER" >/dev/null 2>&1; then
     scrapling_id=$(container_id "$SCRAPLING_CONTAINER" 2>/dev/null || true)
@@ -504,6 +392,10 @@ ensure_scrapling() {
     esac
   fi
   if $create; then
+    local acquisition_root="$HERE/../scrapling-artifacts"
+    [[ ! -L $acquisition_root ]] || { printf "Unsafe acquisition root.\n" >&2; return 7; }
+    mkdir -m 700 -p "$acquisition_root"
+    [[ $(stat -c %u "$acquisition_root") == $(id -u) && $(stat -c %a "$acquisition_root") == 700 ]] || { printf "Unsafe acquisition root ownership/mode.\n" >&2; return 7; }
     port_available || { printf 'Loopback port %s is already in use; no resource was replaced.\n' "$PORT" >&2; return 7; }
     created_scrapling=true
     run_created_container created_scrapling_ref -d --name "$SCRAPLING_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
@@ -515,6 +407,9 @@ ensure_scrapling() {
       --health-interval 15s --health-timeout 8s --health-start-period 120s --health-retries 3 \
       -v "$HERE/policy_mcp.py:/opt/basix/policy_mcp.py:ro" \
       -v "$HERE/service_supervisor.py:/opt/basix/service_supervisor.py:ro" \
+      -v "$HERE/health_check.py:/opt/basix/health_check.py:ro" \
+      -v "$HERE/binary_acquisition.py:/opt/basix/binary_acquisition.py:ro" \
+      -v "$acquisition_root:/var/lib/basix-acquisition:rw" \
       --entrypoint /app/.venv/bin/python "$SCRAPLING_IMAGE" /opt/basix/service_supervisor.py mcp >/dev/null
     classify_container "$SCRAPLING_CONTAINER" scrapling "$SCRAPLING_IMAGE" "$SCRAPLING_ID" "$BASIX_TOR_HOST" "$HERE/policy_mcp.py"
   fi
@@ -546,8 +441,7 @@ verify_mcp() {
 }
 
 prepare() { ensure_scrapling; verify_mcp; }
-migrate_legacy() { ensure_scrapling; verify_mcp; remove_validated_legacy; }
-start() { ensure_scrapling; verify_mcp; remove_validated_legacy; }
+start() { ensure_scrapling; verify_mcp; }
 stop() { "$RUNTIME" stop "$SCRAPLING_CONTAINER" "$TOR_CONTAINER" >/dev/null; }
 status() {
   local tor_health tor_bootstrap scrapling_state alias_resolution tor_reachability scrapling_readiness registration
@@ -563,6 +457,6 @@ status() {
 }
 
 case "${1:-status}" in
-  prepare) prepare ;; migrate-legacy) migrate_legacy ;; start) start ;; stop) stop ;; status) status ;; tor-ip) ensure_tor; tor_ip ;;
-  *) printf 'Usage: %s [prepare|migrate-legacy|start|stop|status|tor-ip]\n' "$0" >&2; exit 2 ;;
+  prepare) prepare ;; start) start ;; stop) stop ;; status) status ;; tor-ip) retire_owned; ensure_tor; tor_ip ;;
+  *) printf 'Usage: %s [prepare|start|stop|status|tor-ip]\n' "$0" >&2; exit 2 ;;
 esac

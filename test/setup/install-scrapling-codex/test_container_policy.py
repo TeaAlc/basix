@@ -28,6 +28,8 @@ class CandidateTests(unittest.TestCase):
 
     def test_real_legacy_fixture_is_managed(self):
         self.assertTrue(policy.legacy(self.legacy, "/home/codex/.codex/basix/scrapling-tor/policy_mcp.py"))
+        self.legacy["HostConfig"]["RestartPolicy"] = {"Name": "no"}
+        self.assertTrue(policy.legacy(self.legacy, "/home/codex/.codex/basix/scrapling-tor/policy_mcp.py"))
 
     def test_unrelated_and_unsafe_are_distinct(self):
         benign = fixture("podman-benign-container.json")
@@ -143,12 +145,30 @@ class SupervisorPolicyTests(unittest.TestCase):
         current["Config"]["Cmd"] = [policy.SUPERVISOR, "mcp"]
         current["Config"]["Healthcheck"] = {"Test": ["CMD-SHELL", f"{policy.PYTHON} {policy.SUPERVISOR} --probe mcp"]}
         current["Mounts"].append({"Source": "/tmp/codex/basix/scrapling-tor/service_supervisor.py", "Destination": policy.SUPERVISOR, "RW": False})
+        for name in ("binary_acquisition.py", "health_check.py"):
+            current["Mounts"].append({"Source": "/tmp/codex/basix/scrapling-tor/" + name, "Destination": "/opt/basix/" + name, "RW": False})
+        current["Mounts"].append({"Source": "/tmp/codex/basix/scrapling-artifacts", "Destination": "/var/lib/basix-acquisition", "RW": True})
         return current
 
     def test_existing_managed_alias_service_is_replaceable(self):
         """Assert self's prior unsupervised canonical runtime is safe migration drift."""
         self.assertEqual(policy.managed(self.current, self.args), 10)
         self.assertEqual(policy.managed(self.supervised(), self.args), 0)
+        # Current Podman serializes the disabled default as "no"; it is still
+        # replaceable drift, never a canonical managed restart configuration.
+        disabled = self.supervised()
+        disabled["HostConfig"]["RestartPolicy"]["Name"] = "no"
+        self.assertEqual(policy.managed(disabled, self.args), 10)
+        disabled["HostConfig"]["RestartPolicy"]["Name"] = "always"
+        self.assertEqual(policy.managed(disabled, self.args), 1)
+
+    def test_published_autoremove_http_is_owned_retired(self):
+        """Identify retired resources without permitting reuse or altering inspect data."""
+        current = self.supervised()
+        current["HostConfig"]["AutoRemove"] = True
+        before = copy.deepcopy(current)
+        self.assertEqual(policy.managed(current, self.args), 10)
+        self.assertEqual(current, before)
 
     def test_supervisor_mount_command_health_and_foreign_resources_fail_closed(self):
         """Reject each mutation of self's otherwise canonical supervisor resources."""

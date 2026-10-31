@@ -42,6 +42,18 @@ def registration() -> dict[str, object]:
 class CodexScanTests(unittest.TestCase):
     """Exercise the fail-closed registration allowlist."""
 
+    def test_fingerprint_ignores_only_safe_live_auth_status(self) -> None:
+        entry = registration()
+        original = codex_scan.fingerprint([(entry, {})])
+        for status in (None, "unknown", "unsupported"):
+            entry["auth_status"] = status
+            self.assertEqual(original, codex_scan.fingerprint([(entry, {})]))
+        entry["auth_status"] = "logged_in"
+        self.assertNotEqual(original, codex_scan.fingerprint([(entry, {})]))
+        entry = registration()
+        entry["transport"]["url"] = ENDPOINT + "/changed"
+        self.assertNotEqual(original, codex_scan.fingerprint([(entry, {})]))
+
     def test_current_safe_shape_is_expected(self) -> None:
         self.assertTrue(codex_scan.expected(registration(), ENDPOINT))
 

@@ -4,7 +4,7 @@ version = 1
 date = "2026-10-21"
 category = "User Instruction"
 insight = "The user explicitly accepts Scrapling's system DNS exception under ADR 0007 after explanation; preserve Tor routing for application HTTP/browser traffic without claiming all DNS uses Tor."
-usefulness = 0
+usefulness = 1
 
 [[entries]]
 date = "2026-08-29"
@@ -16,7 +16,7 @@ usefulness = 1
 date = "2026-08-29"
 category = "Verification"
 insight = "Tor container restarts can change its internal IP while Scrapling retains a literal SOCKS address; test restart drift and safely reconcile managed containers."
-usefulness = 1
+usefulness = 2
 
 [[entries]]
 date = "2026-08-29"
@@ -46,7 +46,7 @@ usefulness = 0
 date = "2026-08-08"
 category = "User Instruction"
 insight = "Exclude repo-local .codex and .agents from agent, test, and verifier evidence or direct mutation; only Basix installers may write them during explicitly requested installations."
-usefulness = 14
+usefulness = 15
 
 [[entries]]
 date = "2026-08-08"
@@ -72,7 +72,7 @@ usefulness = 0
 date = "2026-08-10"
 category = "Workflow"
 insight = "Run focused negative tests before freezing verifier targets. After corrections, rerun focused checks first, then run the full verification once."
-usefulness = 1
+usefulness = 2
 
 [[entries]]
 date = "2026-08-10"
@@ -116,7 +116,7 @@ usefulness = 0
 date = "2026-08-10"
 category = "Repository"
 insight = "All tests are component-owned under test/. verify-basix.sh aggregates deterministic agents, skills, and shared suites; test-setup.sh aggregates setup; live tests remain explicit."
-usefulness = 10
+usefulness = 11
 
 [[entries]]
 date = "2026-08-11"
@@ -161,9 +161,9 @@ insight = "Podman inspect serializes multiargument entrypoints as strings. Accep
 usefulness = 1
 
 [[entries]]
-date = "2026-08-21"
+date = "2026-10-31"
 category = "Verification"
-insight = "Isolated rootless Podman can complete large registry pulls yet fail Tor bootstrap when its network namespace cannot mount or egress; record this separately from installer test evidence."
+insight = "Tor SafeSocks numeric pinning requires a virtual MAPADDRESS key; keep controller credentials inside Tor, reference-count shared mappings, unmap on final closure, and test actual deployed behavior."
 usefulness = 0
 
 [[entries]]
@@ -263,9 +263,9 @@ insight = "Disabling all managed capabilities must still validate shared default
 usefulness = 0
 
 [[entries]]
-date = "2026-08-29"
-category = "Verification"
-insight = "The Scrapling installer must preflight running-container ownership, snapshot managed Tor/Scrapling IDs before replacement, and restore them on later Codex or HTTP failure."
+date = "2026-10-31"
+category = "User Instruction"
+insight = "Scrapling/Tor supports only the new secure runtime: remove positively identified owned retired containers, preserve foreign resources, and avoid legacy migration, running snapshots or automatic retired-container restoration."
 usefulness = 0
 
 [[entries]]
@@ -290,13 +290,13 @@ usefulness = 0
 date = "2026-10-10"
 category = "User Instruction"
 insight = "When shortening or migrating Basix workflows, preserve every obligation, explicit decision predicate, target qualifier and unambiguous meaning. Preserve developer-instruction bytes except explicitly authorized edits."
-usefulness = 5
+usefulness = 6
 
 [[entries]]
 date = "2026-10-10"
 category = "Repository"
 insight = "Runtime Contract 2.0 resides in basix-subagent-management; router retains spawn authority. Planning, ADR, and memory workflows have dedicated skills; static policy checks compose authoritative skills rather than developer prose."
-usefulness = 8
+usefulness = 9
 
 [[entries]]
 date = "2026-10-10"
@@ -308,7 +308,7 @@ usefulness = 4
 date = "2026-10-10"
 category = "User Instruction"
 insight = "Use explicit user model/effort first, then applicable specialist or skill settings; otherwise use gpt-6.1-sol/low. Delegate without context forks and with complete assignments; apply current executor/helper and runtime capacity limits."
-usefulness = 3
+usefulness = 4
 
 [[entries]]
 date = "2026-10-10"
@@ -362,13 +362,13 @@ usefulness = 1
 date = "2026-10-24"
 category = "User Instruction"
 insight = "Use source memory for information research, including software documentation; source-code inspection alone is excluded. Require fresh independent discovery and corroboration; unreliable sources remain useful analysis objects without supporting external factual claims."
-usefulness = 1
+usefulness = 2
 
 [[entries]]
 date = "2026-10-24"
 category = "User Instruction"
 insight = "Root plans; each multiphase plan has one executor and feature branch. Design for three concurrent executors, each with two read-only exploration/research children; executors never delegate implementation."
-usefulness = 1
+usefulness = 2
 
 [[entries]]
 date = "2026-10-24"
@@ -386,4 +386,4 @@ usefulness = 1
 date = "2026-10-24"
 category = "User Instruction"
 insight = "Assume main is functional. At merges, rerun checks required by integration effects and conflict resolution; run whole-task functionality checks after all plans are implemented and integrated."
-usefulness = 1
+usefulness = 2

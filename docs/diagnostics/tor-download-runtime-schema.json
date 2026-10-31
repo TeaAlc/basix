@@ -1,0 +1,1944 @@
+{
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nOpen a reusable stealthy browser session. Pass per-request options to `browser_fetch`.\n\n:param session_id: Reviewed upstream input; see schema for allowed values.\n\n:param headless: Reviewed upstream input; see schema for allowed values.\n\n:param timezone_id: Reviewed upstream input; see schema for allowed values.\n\n:param locale: Reviewed upstream input; see schema for allowed values.\n\n:param useragent: Reviewed upstream input; see schema for allowed values.\n\n:param cookies: Reviewed upstream input; see schema for allowed values.\n\n:param hide_canvas: Reviewed upstream input; see schema for allowed values.\n\n:param allow_webgl: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "$defs": {
+          "SetCookieParam": {
+            "properties": {
+              "domain": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Domain"
+              },
+              "expires": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Expires"
+              },
+              "httpOnly": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Httponly"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "partitionKey": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Partitionkey"
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Path"
+              },
+              "sameSite": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "Lax",
+                      "None",
+                      "Strict"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Samesite"
+              },
+              "secure": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Secure"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Url"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "title": "SetCookieParam",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "allow_webgl": {
+            "default": true,
+            "description": "Enable WebGL; disabling it can trigger bot detection.",
+            "title": "Allow Webgl",
+            "type": "boolean"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "cookies": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/SetCookieParam"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Initial cookies as Playwright cookie dictionaries.",
+            "title": "Cookies"
+          },
+          "headless": {
+            "default": true,
+            "description": "Hide the browser window.",
+            "title": "Headless",
+            "type": "boolean"
+          },
+          "hide_canvas": {
+            "default": false,
+            "description": "Add noise to canvas operations.",
+            "title": "Hide Canvas",
+            "type": "boolean"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Browser language, Accept-Language, and formatting locale; system default if omitted.",
+            "title": "Locale"
+          },
+          "timezone_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Browser timezone; uses the system timezone if omitted.",
+            "title": "Timezone Id"
+          },
+          "useragent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User-Agent override; otherwise generated in headless mode, native in headful mode.",
+            "title": "Useragent"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "browser_openArguments",
+        "type": "object"
+      },
+      "name": "browser_open",
+      "outputSchema": {
+        "description": "Response returned when a new session is created.",
+        "properties": {
+          "session_id": {
+            "description": "The unique identifier of the session.",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_type": {
+            "description": "The type of the session: 'stealthy' or 'static'.",
+            "enum": [
+              "stealthy",
+              "static"
+            ],
+            "title": "Session Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "session_type"
+        ],
+        "title": "SessionCreatedModel",
+        "type": "object"
+      },
+      "title": "Open browser"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nOpen a reusable HTTP session for `session_make_request`, keeping cookies, connections, and request settings.\n\n:param session_id: Reviewed upstream input; see schema for allowed values.\n\n:param impersonate: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "$defs": {
+          "_BrowserProfile": {
+            "enum": [
+              "edge99",
+              "edge101",
+              "chrome99",
+              "chrome100",
+              "chrome101",
+              "chrome104",
+              "chrome107",
+              "chrome110",
+              "chrome116",
+              "chrome119",
+              "chrome120",
+              "chrome123",
+              "chrome124",
+              "chrome131",
+              "chrome133a",
+              "chrome136",
+              "chrome142",
+              "chrome145",
+              "chrome146",
+              "chrome150",
+              "chrome99_android",
+              "chrome131_android",
+              "safari153",
+              "safari155",
+              "safari170",
+              "safari172_ios",
+              "safari180",
+              "safari180_ios",
+              "safari184",
+              "safari184_ios",
+              "safari260",
+              "safari2601",
+              "safari260_ios",
+              "firefox133",
+              "firefox135",
+              "firefox144",
+              "firefox147",
+              "tor145",
+              "chrome",
+              "edge",
+              "safari",
+              "safari_ios",
+              "safari_beta",
+              "safari_ios_beta",
+              "chrome_android",
+              "firefox",
+              "safari15_3",
+              "safari15_5",
+              "safari17_0",
+              "safari17_2_ios",
+              "safari18_0",
+              "safari18_0_ios",
+              "safari18_4",
+              "safari18_4_ios"
+            ],
+            "type": "string"
+          }
+        },
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "impersonate": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/_BrowserProfile"
+              },
+              {
+                "items": {
+                  "$ref": "#/$defs/_BrowserProfile"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "chrome",
+            "description": "Browser/version to impersonate; \"chrome\" uses the latest supported Chrome profile. Lists pick randomly per attempt; None disables impersonation.",
+            "title": "Impersonate"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "open_request_sessionArguments",
+        "type": "object"
+      },
+      "name": "open_request_session",
+      "outputSchema": {
+        "description": "Response returned when a new session is created.",
+        "properties": {
+          "session_id": {
+            "description": "The unique identifier of the session.",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_type": {
+            "description": "The type of the session: 'stealthy' or 'static'.",
+            "enum": [
+              "stealthy",
+              "static"
+            ],
+            "title": "Session Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "session_type"
+        ],
+        "title": "SessionCreatedModel",
+        "type": "object"
+      },
+      "title": "Open HTTP session"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nClose a session and free its resources.\n\n:param session_id: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "session_id": {
+            "description": "Session ID to close.",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "client_id"
+        ],
+        "title": "close_sessionArguments",
+        "type": "object"
+      },
+      "name": "close_session",
+      "outputSchema": {
+        "description": "Response returned when a session is closed.",
+        "properties": {
+          "message": {
+            "description": "A confirmation message.",
+            "title": "Message",
+            "type": "string"
+          },
+          "session_id": {
+            "description": "The unique identifier of the closed session.",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "message"
+        ],
+        "title": "SessionClosedModel",
+        "type": "object"
+      },
+      "title": "Close session"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nList registered sessions, their status, and effective settings.",
+      "inputSchema": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "list_sessionsArguments",
+        "type": "object"
+      },
+      "name": "list_sessions",
+      "outputSchema": {
+        "$defs": {
+          "SessionInfo": {
+            "description": "Information about an open browser session.",
+            "properties": {
+              "created_at": {
+                "description": "ISO timestamp of when the session was created.",
+                "title": "Created At",
+                "type": "string"
+              },
+              "is_alive": {
+                "description": "Whether the session is still alive and usable.",
+                "title": "Is Alive",
+                "type": "boolean"
+              },
+              "session_id": {
+                "description": "The unique identifier of the session.",
+                "title": "Session Id",
+                "type": "string"
+              },
+              "session_type": {
+                "description": "The type of the session: 'stealthy' or 'static'.",
+                "enum": [
+                  "stealthy",
+                  "static"
+                ],
+                "title": "Session Type",
+                "type": "string"
+              },
+              "settings": {
+                "additionalProperties": true,
+                "description": "The effective settings this session was created with.",
+                "title": "Settings",
+                "type": "object"
+              }
+            },
+            "required": [
+              "session_id",
+              "session_type",
+              "created_at",
+              "is_alive"
+            ],
+            "title": "SessionInfo",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "result": {
+            "items": {
+              "$ref": "#/$defs/SessionInfo"
+            },
+            "title": "Result",
+            "type": "array"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "title": "list_sessionsOutput",
+        "type": "object"
+      },
+      "title": "List sessions"
+    },
+    {
+      "annotations": {
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nMake an HTTP request without JavaScript. Suitable for low-to-mid protection.\n\n:param url: Reviewed upstream input; see schema for allowed values.\n\n:param method: Reviewed upstream input; see schema for allowed values.\n\n:param impersonate: Reviewed upstream input; see schema for allowed values.\n\n:param extraction_type: Reviewed upstream input; see schema for allowed values.\n\n:param css_selector: Reviewed upstream input; see schema for allowed values.\n\n:param main_content_only: Reviewed upstream input; see schema for allowed values.\n\n:param params: Reviewed upstream input; see schema for allowed values.\n\n:param data: Reviewed upstream input; see schema for allowed values.\n\n:param json: Reviewed upstream input; see schema for allowed values.\n\n:param headers: Reviewed upstream input; see schema for allowed values.\n\n:param cookies: Reviewed upstream input; see schema for allowed values.\n\n:param timeout: Reviewed upstream input; see schema for allowed values.\n\n:param retry_delay: Reviewed upstream input; see schema for allowed values.\n\n:param stealthy_headers: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "$defs": {
+          "_BrowserProfile": {
+            "enum": [
+              "edge99",
+              "edge101",
+              "chrome99",
+              "chrome100",
+              "chrome101",
+              "chrome104",
+              "chrome107",
+              "chrome110",
+              "chrome116",
+              "chrome119",
+              "chrome120",
+              "chrome123",
+              "chrome124",
+              "chrome131",
+              "chrome133a",
+              "chrome136",
+              "chrome142",
+              "chrome145",
+              "chrome146",
+              "chrome150",
+              "chrome99_android",
+              "chrome131_android",
+              "safari153",
+              "safari155",
+              "safari170",
+              "safari172_ios",
+              "safari180",
+              "safari180_ios",
+              "safari184",
+              "safari184_ios",
+              "safari260",
+              "safari2601",
+              "safari260_ios",
+              "firefox133",
+              "firefox135",
+              "firefox144",
+              "firefox147",
+              "tor145",
+              "chrome",
+              "edge",
+              "safari",
+              "safari_ios",
+              "safari_beta",
+              "safari_ios_beta",
+              "chrome_android",
+              "firefox",
+              "safari15_3",
+              "safari15_5",
+              "safari17_0",
+              "safari17_2_ios",
+              "safari18_0",
+              "safari18_0_ios",
+              "safari18_4",
+              "safari18_4_ios"
+            ],
+            "type": "string"
+          }
+        },
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "cookies": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Request cookies.",
+            "title": "Cookies"
+          },
+          "css_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Select matching elements after `main_content_only` filtering.",
+            "title": "Css Selector"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Form or raw body; ignored for GET.",
+            "title": "Data"
+          },
+          "extraction_type": {
+            "default": "markdown",
+            "description": "Content output format.",
+            "enum": [
+              "text",
+              "html",
+              "markdown"
+            ],
+            "title": "Extraction Type",
+            "type": "string"
+          },
+          "headers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Request headers.",
+            "title": "Headers"
+          },
+          "impersonate": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/_BrowserProfile"
+              },
+              {
+                "items": {
+                  "$ref": "#/$defs/_BrowserProfile"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "chrome",
+            "description": "Browser/version to impersonate; \"chrome\" uses the latest supported Chrome profile. Lists pick randomly per attempt; None disables impersonation.",
+            "title": "Impersonate"
+          },
+          "json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "JSON body; ignored for GET.",
+            "title": "Json"
+          },
+          "main_content_only": {
+            "default": true,
+            "description": "Sanitize <body> content before selection; False uses the full document.",
+            "title": "Main Content Only",
+            "type": "boolean"
+          },
+          "method": {
+            "default": "GET",
+            "description": "HTTP method.",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "DELETE"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Query parameters.",
+            "title": "Params"
+          },
+          "retry_delay": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Seconds between retries.",
+            "title": "Retry Delay"
+          },
+          "stealthy_headers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": true,
+            "description": "Fill missing browser headers and use a Google referer if none was supplied.",
+            "title": "Stealthy Headers"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 30,
+            "description": "Timeout in seconds.",
+            "title": "Timeout"
+          },
+          "url": {
+            "description": "URL to fetch.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "client_id"
+        ],
+        "title": "make_requestArguments",
+        "type": "object"
+      },
+      "name": "make_request",
+      "outputSchema": {
+        "description": "Request's response information structure.",
+        "properties": {
+          "content": {
+            "description": "The page content as Markdown, HTML, text, or an AI ARIA snapshot.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Content",
+            "type": "array"
+          },
+          "status": {
+            "description": "The status code returned by the website.",
+            "title": "Status",
+            "type": "integer"
+          },
+          "url": {
+            "description": "The URL given by the user that resulted in this response.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "content",
+          "url"
+        ],
+        "title": "ResponseModel",
+        "type": "object"
+      },
+      "title": "Send HTTP request"
+    },
+    {
+      "annotations": {
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nFetch a page with a stealth browser and JavaScript rendering.\n\n:param url: Reviewed upstream input; see schema for allowed values.\n\n:param extraction_type: Reviewed upstream input; see schema for allowed values.\n\n:param css_selector: Reviewed upstream input; see schema for allowed values.\n\n:param main_content_only: Reviewed upstream input; see schema for allowed values.\n\n:param headless: Reviewed upstream input; see schema for allowed values.\n\n:param google_search: Reviewed upstream input; see schema for allowed values.\n\n:param wait: Reviewed upstream input; see schema for allowed values.\n\n:param timezone_id: Reviewed upstream input; see schema for allowed values.\n\n:param locale: Reviewed upstream input; see schema for allowed values.\n\n:param extra_headers: Reviewed upstream input; see schema for allowed values.\n\n:param useragent: Reviewed upstream input; see schema for allowed values.\n\n:param hide_canvas: Reviewed upstream input; see schema for allowed values.\n\n:param timeout: Reviewed upstream input; see schema for allowed values.\n\n:param disable_resources: Reviewed upstream input; see schema for allowed values.\n\n:param wait_selector: Reviewed upstream input; see schema for allowed values.\n\n:param cookies: Reviewed upstream input; see schema for allowed values.\n\n:param network_idle: Reviewed upstream input; see schema for allowed values.\n\n:param wait_selector_state: Reviewed upstream input; see schema for allowed values.\n\n:param allow_webgl: Reviewed upstream input; see schema for allowed values.\n\n:param solve_cloudflare: Reviewed upstream input; see schema for allowed values.\n\n:param pierce_shadow: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "$defs": {
+          "SetCookieParam": {
+            "properties": {
+              "domain": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Domain"
+              },
+              "expires": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Expires"
+              },
+              "httpOnly": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Httponly"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "partitionKey": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Partitionkey"
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Path"
+              },
+              "sameSite": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "Lax",
+                      "None",
+                      "Strict"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Samesite"
+              },
+              "secure": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Secure"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Url"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string"
+              }
+            },
+            "title": "SetCookieParam",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "allow_webgl": {
+            "default": true,
+            "description": "Enable WebGL; disabling it can trigger bot detection.",
+            "title": "Allow Webgl",
+            "type": "boolean"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "cookies": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/SetCookieParam"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Initial cookies as Playwright cookie dictionaries.",
+            "title": "Cookies"
+          },
+          "css_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Select matching elements after `main_content_only` filtering.",
+            "title": "Css Selector"
+          },
+          "disable_resources": {
+            "default": false,
+            "description": "Block font, image, media, beacon, object, imageset, texttrack, websocket, csp_report, and stylesheet requests.",
+            "title": "Disable Resources",
+            "type": "boolean"
+          },
+          "extra_headers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Additional request headers.",
+            "title": "Extra Headers"
+          },
+          "extraction_type": {
+            "default": "markdown",
+            "description": "Content output format.",
+            "enum": [
+              "text",
+              "html",
+              "markdown"
+            ],
+            "title": "Extraction Type",
+            "type": "string"
+          },
+          "google_search": {
+            "default": true,
+            "description": "Set a Google referer, overriding any supplied referer.",
+            "title": "Google Search",
+            "type": "boolean"
+          },
+          "headless": {
+            "default": true,
+            "description": "Hide the browser window.",
+            "title": "Headless",
+            "type": "boolean"
+          },
+          "hide_canvas": {
+            "default": false,
+            "description": "Add noise to canvas operations.",
+            "title": "Hide Canvas",
+            "type": "boolean"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Browser language, Accept-Language, and formatting locale; system default if omitted.",
+            "title": "Locale"
+          },
+          "main_content_only": {
+            "default": true,
+            "description": "Sanitize <body> content before selection; False uses the full document.",
+            "title": "Main Content Only",
+            "type": "boolean"
+          },
+          "network_idle": {
+            "default": false,
+            "description": "Try to wait for 500 ms without network activity; continue if the wait fails.",
+            "title": "Network Idle",
+            "type": "boolean"
+          },
+          "pierce_shadow": {
+            "default": false,
+            "description": "Include open Shadow DOM content.",
+            "title": "Pierce Shadow",
+            "type": "boolean"
+          },
+          "solve_cloudflare": {
+            "default": false,
+            "description": "Attempt to solve Cloudflare Turnstile/interstitial challenges before returning.",
+            "title": "Solve Cloudflare",
+            "type": "boolean"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "default": 30000,
+            "description": "Navigation and page-operation timeout in milliseconds.",
+            "title": "Timeout"
+          },
+          "timezone_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Browser timezone; uses the system timezone if omitted.",
+            "title": "Timezone Id"
+          },
+          "url": {
+            "description": "URL to fetch.",
+            "title": "Url",
+            "type": "string"
+          },
+          "useragent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User-Agent override; otherwise generated in headless mode, native in headful mode.",
+            "title": "Useragent"
+          },
+          "wait": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "default": 0,
+            "description": "Extra milliseconds after the page is ready, before returning.",
+            "title": "Wait"
+          },
+          "wait_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Wait for the first CSS match; continue if the wait fails.",
+            "title": "Wait Selector"
+          },
+          "wait_selector_state": {
+            "default": "attached",
+            "description": "Target state of `wait_selector`.",
+            "enum": [
+              "attached",
+              "detached",
+              "hidden",
+              "visible"
+            ],
+            "title": "Wait Selector State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "client_id"
+        ],
+        "title": "browser_fetch_onceArguments",
+        "type": "object"
+      },
+      "name": "browser_fetch_once",
+      "outputSchema": {
+        "description": "Request's response information structure.",
+        "properties": {
+          "content": {
+            "description": "The page content as Markdown, HTML, text, or an AI ARIA snapshot.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Content",
+            "type": "array"
+          },
+          "status": {
+            "description": "The status code returned by the website.",
+            "title": "Status",
+            "type": "integer"
+          },
+          "url": {
+            "description": "The URL given by the user that resulted in this response.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "content",
+          "url"
+        ],
+        "title": "ResponseModel",
+        "type": "object"
+      },
+      "title": "Fetch page in browser"
+    },
+    {
+      "annotations": {
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nFetch a URL in an open stealthy browser session. Options apply only to this request.\n\n:param url: Reviewed upstream input; see schema for allowed values.\n\n:param session_id: Reviewed upstream input; see schema for allowed values.\n\n:param extraction_type: Reviewed upstream input; see schema for allowed values.\n\n:param css_selector: Reviewed upstream input; see schema for allowed values.\n\n:param main_content_only: Reviewed upstream input; see schema for allowed values.\n\n:param wait: Reviewed upstream input; see schema for allowed values.\n\n:param timeout: Reviewed upstream input; see schema for allowed values.\n\n:param google_search: Reviewed upstream input; see schema for allowed values.\n\n:param network_idle: Reviewed upstream input; see schema for allowed values.\n\n:param load_dom: Reviewed upstream input; see schema for allowed values.\n\n:param disable_resources: Reviewed upstream input; see schema for allowed values.\n\n:param wait_selector: Reviewed upstream input; see schema for allowed values.\n\n:param wait_selector_state: Reviewed upstream input; see schema for allowed values.\n\n:param extra_headers: Reviewed upstream input; see schema for allowed values.\n\n:param blocked_domains: Reviewed upstream input; see schema for allowed values.\n\n:param solve_cloudflare: Reviewed upstream input; see schema for allowed values.\n\n:param pierce_shadow: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "properties": {
+          "blocked_domains": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Block requests to these domains and their subdomains.",
+            "title": "Blocked Domains"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "css_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Select after `main_content_only` filtering; snapshots require exactly one match.",
+            "title": "Css Selector"
+          },
+          "disable_resources": {
+            "default": false,
+            "description": "Block font, image, media, beacon, object, imageset, texttrack, websocket, csp_report, and stylesheet requests.",
+            "title": "Disable Resources",
+            "type": "boolean"
+          },
+          "extra_headers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Additional request headers.",
+            "title": "Extra Headers"
+          },
+          "extraction_type": {
+            "default": "markdown",
+            "description": "Content output format; snapshots include element bounding boxes.",
+            "enum": [
+              "text",
+              "html",
+              "markdown",
+              "snapshot"
+            ],
+            "title": "Extraction Type",
+            "type": "string"
+          },
+          "google_search": {
+            "default": true,
+            "description": "Set a Google referer, overriding any supplied referer.",
+            "title": "Google Search",
+            "type": "boolean"
+          },
+          "load_dom": {
+            "default": true,
+            "description": "Wait for DOMContentLoaded.",
+            "title": "Load Dom",
+            "type": "boolean"
+          },
+          "main_content_only": {
+            "default": true,
+            "description": "Sanitize <body> before selection; False uses the full document. Ignored for snapshots.",
+            "title": "Main Content Only",
+            "type": "boolean"
+          },
+          "network_idle": {
+            "default": false,
+            "description": "Try to wait for 500 ms without network activity; continue if the wait fails.",
+            "title": "Network Idle",
+            "type": "boolean"
+          },
+          "pierce_shadow": {
+            "default": false,
+            "description": "Include open Shadow DOM content; ignored for snapshots.",
+            "title": "Pierce Shadow",
+            "type": "boolean"
+          },
+          "session_id": {
+            "description": "ID from `browser_open`.",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "solve_cloudflare": {
+            "default": false,
+            "description": "Attempt to solve Cloudflare Turnstile/interstitial challenges.",
+            "title": "Solve Cloudflare",
+            "type": "boolean"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "default": 30000,
+            "description": "Navigation and page-operation timeout in milliseconds.",
+            "title": "Timeout"
+          },
+          "url": {
+            "description": "URL to fetch.",
+            "title": "Url",
+            "type": "string"
+          },
+          "wait": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "default": 0,
+            "description": "Extra milliseconds after the page is ready, before returning.",
+            "title": "Wait"
+          },
+          "wait_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Wait for the first CSS match; continue if the wait fails.",
+            "title": "Wait Selector"
+          },
+          "wait_selector_state": {
+            "default": "attached",
+            "description": "Target state of `wait_selector`.",
+            "enum": [
+              "attached",
+              "detached",
+              "hidden",
+              "visible"
+            ],
+            "title": "Wait Selector State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "session_id",
+          "client_id"
+        ],
+        "title": "browser_fetchArguments",
+        "type": "object"
+      },
+      "name": "browser_fetch",
+      "outputSchema": {
+        "description": "Request's response information structure.",
+        "properties": {
+          "content": {
+            "description": "The page content as Markdown, HTML, text, or an AI ARIA snapshot.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Content",
+            "type": "array"
+          },
+          "status": {
+            "description": "The status code returned by the website.",
+            "title": "Status",
+            "type": "integer"
+          },
+          "url": {
+            "description": "The URL given by the user that resulted in this response.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "content",
+          "url"
+        ],
+        "title": "ResponseModel",
+        "type": "object"
+      },
+      "title": "Fetch in browser session"
+    },
+    {
+      "annotations": {
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nMake an HTTP request using the session's cookies, connections, impersonation, and proxy. Options apply to this request.\n\n:param url: Reviewed upstream input; see schema for allowed values.\n\n:param session_id: Reviewed upstream input; see schema for allowed values.\n\n:param method: Reviewed upstream input; see schema for allowed values.\n\n:param extraction_type: Reviewed upstream input; see schema for allowed values.\n\n:param css_selector: Reviewed upstream input; see schema for allowed values.\n\n:param main_content_only: Reviewed upstream input; see schema for allowed values.\n\n:param params: Reviewed upstream input; see schema for allowed values.\n\n:param data: Reviewed upstream input; see schema for allowed values.\n\n:param json: Reviewed upstream input; see schema for allowed values.\n\n:param headers: Reviewed upstream input; see schema for allowed values.\n\n:param cookies: Reviewed upstream input; see schema for allowed values.\n\n:param timeout: Reviewed upstream input; see schema for allowed values.\n\n:param retry_delay: Reviewed upstream input; see schema for allowed values.\n\n:param stealthy_headers: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "cookies": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Request cookies.",
+            "title": "Cookies"
+          },
+          "css_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Select matching elements after `main_content_only` filtering.",
+            "title": "Css Selector"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Form or raw body; ignored for GET.",
+            "title": "Data"
+          },
+          "extraction_type": {
+            "default": "markdown",
+            "description": "Content output format.",
+            "enum": [
+              "text",
+              "html",
+              "markdown"
+            ],
+            "title": "Extraction Type",
+            "type": "string"
+          },
+          "headers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Request headers.",
+            "title": "Headers"
+          },
+          "json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "JSON body; ignored for GET.",
+            "title": "Json"
+          },
+          "main_content_only": {
+            "default": true,
+            "description": "Sanitize <body> content before selection; False uses the full document.",
+            "title": "Main Content Only",
+            "type": "boolean"
+          },
+          "method": {
+            "default": "GET",
+            "description": "HTTP method.",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "DELETE"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Query parameters.",
+            "title": "Params"
+          },
+          "retry_delay": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Seconds between retries.",
+            "title": "Retry Delay"
+          },
+          "session_id": {
+            "description": "HTTP session ID from `open_request_session`.",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stealthy_headers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": true,
+            "description": "Fill missing browser headers and use a Google referer if none was supplied.",
+            "title": "Stealthy Headers"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 30,
+            "description": "Timeout in seconds.",
+            "title": "Timeout"
+          },
+          "url": {
+            "description": "URL to fetch.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "session_id",
+          "client_id"
+        ],
+        "title": "session_make_requestArguments",
+        "type": "object"
+      },
+      "name": "session_make_request",
+      "outputSchema": {
+        "description": "Request's response information structure.",
+        "properties": {
+          "content": {
+            "description": "The page content as Markdown, HTML, text, or an AI ARIA snapshot.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Content",
+            "type": "array"
+          },
+          "status": {
+            "description": "The status code returned by the website.",
+            "title": "Status",
+            "type": "integer"
+          },
+          "url": {
+            "description": "The URL given by the user that resulted in this response.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "content",
+          "url"
+        ],
+        "title": "ResponseModel",
+        "type": "object"
+      },
+      "title": "Send HTTP request in HTTP session"
+    },
+    {
+      "annotations": {
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nRead the current page or one element as snapshot, HTML, Markdown, or text without navigating.\nReturn plain text; snapshot search keeps refs, ancestor paths and three lines of nearby context.\n\n:param session_id: Reviewed upstream input; see schema for allowed values.\n\n:param extraction_type: Reviewed upstream input; see schema for allowed values.\n\n:param target: Reviewed upstream input; see schema for allowed values.\n\n:param depth: Reviewed upstream input; see schema for allowed values.\n\n:param boxes: Reviewed upstream input; see schema for allowed values.\n\n:param search: Reviewed upstream input; see schema for allowed values.\n\n:param main_content_only: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "properties": {
+          "boxes": {
+            "default": true,
+            "description": "Include viewport bounding boxes in snapshots; ignored for other formats.",
+            "title": "Boxes",
+            "type": "boolean"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Snapshot depth before search; unlimited if omitted. Ignored for other formats.",
+            "title": "Depth"
+          },
+          "extraction_type": {
+            "default": "snapshot",
+            "description": "Output format; defaults to an AI ARIA snapshot.",
+            "enum": [
+              "text",
+              "html",
+              "markdown",
+              "snapshot"
+            ],
+            "title": "Extraction Type",
+            "type": "string"
+          },
+          "main_content_only": {
+            "default": true,
+            "description": "Clean body/target content for AI; ignored for snapshots.",
+            "title": "Main Content Only",
+            "type": "boolean"
+          },
+          "search": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Snapshot-only Python regex; case-sensitive unless (?i). No matches returns empty text.",
+            "title": "Search"
+          },
+          "session_id": {
+            "description": "ID from `browser_open`; call `browser_fetch` first.",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Playwright selector or aria-ref=<ref> matching one element; omitted reads the page.",
+            "title": "Target"
+          }
+        },
+        "required": [
+          "session_id",
+          "client_id"
+        ],
+        "title": "browser_extractArguments",
+        "type": "object"
+      },
+      "name": "browser_extract",
+      "title": "Extract page content"
+    },
+    {
+      "annotations": {
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\n\nCapture the current page or one element without navigating; return the image and current URL.\nElement capture waits and scrolls into view. Use browser_actions for other waits before capture.\n\n:param session_id: Reviewed upstream input; see schema for allowed values.\n\n:param image_type: Reviewed upstream input; see schema for allowed values.\n\n:param full_page: Reviewed upstream input; see schema for allowed values.\n\n:param quality: Reviewed upstream input; see schema for allowed values.\n\n:param timeout: Reviewed upstream input; see schema for allowed values.\n\n:param selector: Reviewed upstream input; see schema for allowed values.\n\n:param ref: Reviewed upstream input; see schema for allowed values.",
+      "inputSchema": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "full_page": {
+            "default": false,
+            "description": "Capture the full scrollable page; incompatible with selector/ref.",
+            "title": "Full Page",
+            "type": "boolean"
+          },
+          "image_type": {
+            "default": "png",
+            "description": "Image format.",
+            "enum": [
+              "png",
+              "jpeg"
+            ],
+            "title": "Image Type",
+            "type": "string"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "JPEG quality, 0-100; invalid for PNG.",
+            "title": "Quality"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Current snapshot element reference; omit both targets for page capture.",
+            "title": "Ref"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Playwright selector matching one element; omit when using ref.",
+            "title": "Selector"
+          },
+          "session_id": {
+            "description": "ID from `browser_open`; call `browser_fetch` first.",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "timeout": {
+            "default": 30000,
+            "description": "Capture limit in milliseconds; 0 disables it.",
+            "minimum": 0,
+            "title": "Timeout",
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "client_id"
+        ],
+        "title": "browser_screenshotArguments",
+        "type": "object"
+      },
+      "name": "browser_screenshot",
+      "title": "Take browser session screenshot"
+    },
+    {
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\nExport inside fixed state/export directory. :param client_id: Capability. :param artifact_id: Opaque ID.",
+      "inputSchema": {
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "artifact_id"
+        ],
+        "title": "artifact_exportArguments",
+        "type": "object"
+      },
+      "name": "artifact_export"
+    },
+    {
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\nInspect completed artifact. :param client_id: Capability. :param artifact_id: Opaque ID.",
+      "inputSchema": {
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "artifact_id"
+        ],
+        "title": "artifact_infoArguments",
+        "type": "object"
+      },
+      "name": "artifact_info"
+    },
+    {
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\nRequest bounded cancellation. :param client_id: Capability. :param job_id: Opaque ID.",
+      "inputSchema": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "job_id"
+        ],
+        "title": "download_cancelArguments",
+        "type": "object"
+      },
+      "name": "download_cancel"
+    },
+    {
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\nEnqueue exact acquisition. :param client_id: Capability. :param url: HTTP(S) URL. :param expected_sha256: Known digest. :param maximum_bytes: Requested cap. :param time_budget: Seconds. :param idempotency_key: Client retry key.",
+      "inputSchema": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "expected_sha256": {
+            "default": null,
+            "title": "Expected Sha256",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "default": null,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "maximum_bytes": {
+            "default": 33554432,
+            "title": "Maximum Bytes",
+            "type": "integer"
+          },
+          "time_budget": {
+            "default": 120,
+            "title": "Time Budget",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "url"
+        ],
+        "title": "download_startArguments",
+        "type": "object"
+      },
+      "name": "download_start"
+    },
+    {
+      "description": "The calling agent is the MCP client. Before calling this tool, generate a canonical RFC 4122 UUID version 4 with a cryptographically secure system source and pass it as `client_id`. Reuse that same ID for related calls and session lifecycle operations; do not use `default`, a `session_id`, or a server-generated placeholder. The server controls all network settings.\n:param client_id: Required. The calling agent supplies the canonical UUID v4 used to isolate its sessions and must reuse it for related calls.\nInspect job without restarting it. :param client_id: Capability. :param job_id: Opaque ID.",
+      "inputSchema": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "job_id"
+        ],
+        "title": "download_statusArguments",
+        "type": "object"
+      },
+      "name": "download_status"
+    }
+  ]
+}

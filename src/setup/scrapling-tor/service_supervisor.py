@@ -37,6 +37,10 @@ def tor_probe() -> int:
         sock.sendall(b"\x05\x01\x00")
         if receive(sock, 2) != b"\x05\x00":
             raise RuntimeError("SOCKS5 negotiation failed")
+    with socket.create_connection(("127.0.0.1", 9052), 2) as gateway:
+        gateway.sendall(b"\x05\x01\x00")
+        if receive(gateway, 2) != b"\x05\x00":
+            raise RuntimeError("pinning gateway negotiation failed")
     cookie = Path("/var/lib/tor/control_auth_cookie").read_bytes().hex()
     with socket.create_connection(("127.0.0.1", 9051), 2) as sock:
         stream = sock.makefile("rb")
@@ -146,21 +150,30 @@ def stop(child: subprocess.Popen, grace: float, signum: int = signal.SIGTERM) ->
 def supervise(args: argparse.Namespace) -> int:
     """Supervise the child and readiness probe configured by args."""
     shutdown = 0
+    policy_failed = False
 
     def interrupted(signum: int, frame: object) -> None:
         """Remember signum for forwarding; frame is the ignored Python signal frame."""
         nonlocal shutdown
         shutdown = signum
 
+    def policy_failure(signum: int, frame: object) -> None:
+        """Record irreversible policy health. :param signum: SIGUSR1. :param frame: Ignored signal frame."""
+        nonlocal policy_failed
+        if args.kind == "mcp":
+            policy_failed = True
+
+    signal.signal(signal.SIGUSR1, policy_failure)
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signum, interrupted)
-    command = args.command or (["tor", "-f", "/etc/tor/torrc"] if args.kind == "tor" else [sys.executable, "/opt/basix/policy_mcp.py"])
+    command = args.command or ([sys.executable, "/opt/basix/pinning_gateway.py"] if args.kind == "tor" else [sys.executable, "/opt/basix/policy_mcp.py"])
     probe_command = args.probe_command or [sys.executable, str(Path(__file__).resolve()), "--probe", args.kind]
     restarts = []
     child = None
     try:
         while not shutdown:
-            child = subprocess.Popen(command, start_new_session=True)
+            policy_failed = False
+            child = subprocess.Popen(command, start_new_session=True, env={**os.environ, "BASIX_POLICY_SUPERVISOR_PID": str(os.getpid())})
             log(f"started {args.kind} child pid={child.pid}")
             started = time.monotonic()
             next_probe = started
@@ -171,6 +184,9 @@ def supervise(args: argparse.Namespace) -> int:
                     log(f"{args.kind} child exited status={child.returncode}; exiting for container restart policy")
                     return 1
                 now = time.monotonic()
+                if policy_failed:
+                    log("mcp irreversible local policy degradation; supervised replacement required")
+                    break
                 if now >= next_probe:
                     try:
                         result = subprocess.run(probe_command, timeout=args.probe_timeout, check=False)

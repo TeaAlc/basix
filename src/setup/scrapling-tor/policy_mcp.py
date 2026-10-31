@@ -8,6 +8,9 @@ import os
 import re
 import random
 import socket
+import sys
+import contextlib
+import signal
 import time
 import urllib.error
 import uuid
@@ -20,10 +23,13 @@ EXPECTED_TOOLS = {
     "list_sessions", "make_request", "open_request_session", "open_session",
     "screenshot", "session_fetch", "session_make_request", "stealthy_fetch",
 }
+CURRENT_SIGNATURES = {'browser_open': ['session_id', 'headless', 'real_chrome', 'timezone_id', 'locale', 'useragent', 'proxy', 'cdp_url', 'executable_path', 'cookies', 'hide_canvas', 'block_webrtc', 'allow_webgl', 'additional_args'], 'browser_save_state': ['session_id', 'path'], 'browser_load_state': ['session_id', 'path'], 'open_request_session': ['session_id', 'impersonate', 'proxy'], 'close_session': ['session_id'], 'list_sessions': [], 'browser_network_requests': ['session_id', 'url_pattern', 'include_static', 'after_id', 'limit'], 'browser_network_request': ['session_id', 'request_id', 'part'], 'browser_extract': ['session_id', 'extraction_type', 'target', 'depth', 'boxes', 'search', 'main_content_only'], 'browser_actions': ['session_id', 'actions', 'slowly'], 'browser_evaluate': ['session_id', 'expression', 'arg', 'isolated_context'], 'browser_screenshot': ['session_id', 'image_type', 'full_page', 'quality', 'timeout', 'selector', 'ref'], 'make_request': ['url', 'method', 'impersonate', 'extraction_type', 'css_selector', 'main_content_only', 'params', 'data', 'json', 'headers', 'cookies', 'timeout', 'follow_redirects', 'max_redirects', 'retries', 'retry_delay', 'proxy', 'proxy_auth', 'auth', 'verify', 'http3', 'stealthy_headers'], 'browser_fetch_once': ['url', 'extraction_type', 'css_selector', 'main_content_only', 'headless', 'google_search', 'real_chrome', 'wait', 'proxy', 'timezone_id', 'locale', 'extra_headers', 'useragent', 'hide_canvas', 'cdp_url', 'executable_path', 'timeout', 'disable_resources', 'wait_selector', 'cookies', 'network_idle', 'wait_selector_state', 'block_webrtc', 'allow_webgl', 'solve_cloudflare', 'additional_args', 'pierce_shadow'], 'browser_fetch': ['url', 'session_id', 'extraction_type', 'css_selector', 'main_content_only', 'wait', 'timeout', 'google_search', 'network_idle', 'load_dom', 'disable_resources', 'wait_selector', 'wait_selector_state', 'extra_headers', 'blocked_domains', 'solve_cloudflare', 'pierce_shadow'], 'session_make_request': ['url', 'session_id', 'method', 'extraction_type', 'css_selector', 'main_content_only', 'params', 'data', 'json', 'headers', 'cookies', 'timeout', 'follow_redirects', 'max_redirects', 'retries', 'retry_delay', 'auth', 'verify', 'http3', 'stealthy_headers']}
+DISABLED_CURRENT_TOOLS = {"browser_save_state", "browser_load_state", "browser_actions", "browser_evaluate", "browser_network_requests", "browser_network_request"}
+CURRENT_PUBLIC_TOOLS = set(CURRENT_SIGNATURES) - DISABLED_CURRENT_TOOLS
 NETWORK_OVERRIDES = {
     "proxy", "proxy_auth", "cdp_url", "real_chrome", "executable_path",
     "additional_args", "block_webrtc", "dns_over_https", "http3", "extra_flags",
-    "auth",
+    "auth", "verify", "follow_redirects", "max_redirects", "retries",
 }
 SESSION_TOOLS = {
     "close_session", "session_fetch", "session_make_request", "screenshot",
@@ -88,20 +94,20 @@ def validate_configuration():
 
 
 def canonical_client_id(value):
-    """Return a canonical UUID v4 or reject the tool call."""
+    """Validate capability. :param value: Canonical UUID v4 string."""
     if not isinstance(value, str):
         raise ValueError("client_id must be a canonical UUID v4")
     try:
         parsed = uuid.UUID(value)
     except (ValueError, AttributeError):
         raise ValueError("client_id must be a canonical UUID v4") from None
-    if parsed.version != 4 or str(parsed) != value:
+    if parsed.version != 4 or parsed.variant != uuid.RFC_4122 or str(parsed) != value:
         raise ValueError("client_id must be a canonical UUID v4")
     return value
 
 
 def _session_id(result):
-    """Extract the upstream-generated identifier without constraining its payload."""
+    """Extract generated identifier. :param result: Upstream session result."""
     candidate = result
     if isinstance(candidate, str):
         try:
@@ -120,6 +126,7 @@ def _session_id(result):
 
 
 def _listed_session_id(item):
+    """Read listed identifier. :param item: Upstream session entry."""
     try:
         return _session_id(item)
     except RuntimeError:
@@ -177,7 +184,7 @@ class TorMonitor:
         :param owner: Optional callable proving that a resolved address belongs to Tor.
         """
         self.host = host
-        self.resolver = resolver or socket.gethostbyname
+        self.resolver = resolver or self._resolve
         self.probe = probe or self._probe
         self.sleeper = sleeper or asyncio.sleep
         self.clock = clock or time.monotonic
@@ -191,17 +198,31 @@ class TorMonitor:
         self._recovery_lock = asyncio.Lock()
 
     @staticmethod
-    def _probe(address, port=9050, timeout=1.0):
-        """Probe Tor TCP readiness.
+    async def _resolve(host):
+        """Resolve with a killed/reaped subprocess deadline. :param host: Managed alias."""
+        child = await asyncio.create_subprocess_exec(sys.executable, "-c", "import socket,sys; print(socket.gethostbyname(sys.argv[1]))", host, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        try:
+            stdout, _ = await asyncio.wait_for(child.communicate(), 1)
+            if child.returncode != 0 or len(stdout) > 64:
+                raise OSError("alias_resolution_failed")
+            return stdout.decode("ascii").strip()
+        finally:
+            if child.returncode is None:
+                with contextlib.suppress(ProcessLookupError):
+                    child.kill()
+            await child.wait()
 
-        :param address: Resolved Tor IPv4 address.
-        :param port: Tor SOCKS TCP port.
-        :param timeout: Connection timeout in seconds.
+    @staticmethod
+    async def _probe(address, port=9050, timeout=1.0):
+        """Probe numeric Tor address without blocking serving loop.
+
+        :param address: Resolved IPv4. :param port: SOCKS port. :param timeout: Seconds.
         """
-        with socket.create_connection((address, port), timeout=timeout):
-            return True
+        _, writer = await asyncio.wait_for(asyncio.open_connection(address, port), timeout)
+        writer.close()
+        await asyncio.wait_for(writer.wait_closed(), timeout)
 
-    def check(self, *, force=False):
+    async def check(self, *, force=False):
         """Resolve and probe the alias when its five-second sample is due.
 
         :param force: Ignore the sampling interval when true.
@@ -212,13 +233,17 @@ class TorMonitor:
         self.checked_at = now
         try:
             address = self.resolver(self.host)
+            if inspect.isawaitable(address):
+                address = await asyncio.wait_for(address, 1.5)
             parsed = ipaddress.ip_address(address)
             if parsed.version != 4 or not parsed.is_private:
                 raise OSError("Tor alias resolved outside the private internal network")
             if self.owner is not None and not self.owner(self.host, address):
                 raise OSError("Tor alias ownership could not be verified")
-            self.probe(address, 9050, 1.0)
-        except (OSError, ValueError, socket.timeout):
+            result = self.probe(address, 9050, 1.0)
+            if inspect.isawaitable(result):
+                await result
+        except (OSError, ValueError, socket.timeout, asyncio.TimeoutError):
             self.invalidate()
             return False
         if address != self.address or not self.valid:
@@ -242,7 +267,7 @@ class TorMonitor:
 
     async def retry_failure(self):
         """Classify a failed retry using current local and fresh external evidence."""
-        if self.check(force=True) and await self.confirm_external():
+        if await self.check(force=True) and await self.confirm_external():
             return RuntimeError(TOR_REQUEST_FAILED["error"])
         self.invalidate()
         return RuntimeError(TOR_UNAVAILABLE["error"])
@@ -250,12 +275,12 @@ class TorMonitor:
     async def recover(self):
         """Run or share bounded local recovery and external confirmation."""
         async with self._recovery_lock:
-            if self.valid and self.check():
+            if self.valid and await self.check():
                 return True
             for delay in RECOVERY_DELAYS:
                 if delay:
                     await self.sleeper(self.jitter(delay))
-                if self.check(force=True):
+                if await self.check(force=True):
                     confirmed = self.confirmer is None or await self.confirm_external()
                     if confirmed:
                         return True
@@ -285,6 +310,11 @@ class TorMonitor:
                 raise
 
 
+SESSION_OPERATION_TIMEOUT = 60
+SESSION_LOCK_TIMEOUT = 2
+SESSION_CLOSE_TIMEOUT = 10
+
+
 class ClientPolicy:
     """Own in-memory session capabilities and serialize lifecycle changes."""
 
@@ -300,8 +330,134 @@ class ClientPolicy:
         self.session_locks = {}
         self.session_state = {}
         self.lifecycle_lock = asyncio.Lock()
+        self.pending_operations = set()
+        self.abandoned_operations = set()
+        self.session_creation_failed = False
+        self.failure_notifier = None
+        self.health_failed = False
+        self.saturated_since = None
+        self.upstream_close = server.close_session
+        self.maintenance = None
+        self.health_maintenance = None
+
+    def ensure_maintenance(self):
+        """Start bounded session expiry and acquisition retention on the serving loop."""
+        if self.maintenance is None or self.maintenance.done():
+            self.maintenance = asyncio.create_task(self.maintain())
+        if self.health_maintenance is None or self.health_maintenance.done():
+            self.health_maintenance = asyncio.create_task(self.watch_health())
+        manager = getattr(self.monitor, "acquisition_manager", None)
+        if manager is not None:
+            manager.ensure_maintenance()
+
+    def assess_health(self, now=None):
+        """Signal irreversible local degradation once. :param now: Optional monotonic test time."""
+        now = time.monotonic() if now is None else now
+        cancelled = self.abandoned_operations & self.pending_operations
+        blocked_sessions = len(self.session_state) >= 16 and all(
+            state.get("poisoned") and state.get("work") in cancelled for state in self.session_state.values())
+        if len(cancelled) >= 32 or blocked_sessions:
+            if self.saturated_since is None:
+                self.saturated_since = now
+        else:
+            self.saturated_since = None
+        failed = self.session_creation_failed or (self.saturated_since is not None and now - self.saturated_since >= 60)
+        if failed and not self.health_failed:
+            self.health_failed = True
+            if self.failure_notifier is not None:
+                self.failure_notifier()
+
+    async def watch_health(self):
+        """Sample irreversible health each second independently of idle closure."""
+        while True:
+            await asyncio.sleep(1)
+            self.assess_health()
+
+    async def maintain(self):
+        """Close idle sessions each minute without delaying health sampling."""
+        while True:
+            await asyncio.sleep(60)
+            await self.expire_sessions()
+
+    async def bounded(self, operation, timeout, state=None):
+        """Bound upstream work without awaiting cancellation-suppressing code.
+
+        :param operation: Upstream coroutine. :param timeout: Administrator seconds.
+        :param state: Optional owned session state to poison on unknown completion.
+        """
+        if len(self.pending_operations) >= 32:
+            operation.close()
+            raise RuntimeError("Upstream operation capacity reached; restart unhealthy service")
+        task = asyncio.create_task(operation)
+        self.pending_operations.add(task)
+        self.assess_health()
+        if state is not None:
+            state["work"] = task
+        def finished(completed):
+            """Reap completed operation. :param completed: Finished upstream task."""
+            self.pending_operations.discard(completed)
+            self.abandoned_operations.discard(completed)
+            if state is not None and state.get("work") is completed:
+                state.pop("work", None)
+            if not completed.cancelled():
+                completed.exception()
+        task.add_done_callback(finished)
+        try:
+            done, _ = await asyncio.wait({task}, timeout=timeout)
+            if not done:
+                raise asyncio.TimeoutError()
+            return task.result()
+        finally:
+            if not task.done():
+                self.abandoned_operations.add(task)
+                if state is not None:
+                    state["poisoned"] = True
+                task.cancel()
+
+    @contextlib.asynccontextmanager
+    async def session_guard(self, session_id):
+        """Bound per-session lock wait. :param session_id: Owned public identifier."""
+        lock = self.session_locks.get(session_id)
+        if lock is None:
+            raise RuntimeError("Session unavailable")
+        await asyncio.wait_for(lock.acquire(), SESSION_LOCK_TIMEOUT)
+        try:
+            yield
+        finally:
+            lock.release()
+
+    def deadline(self, method):
+        """Apply the administrator tool deadline. :param method: Managed async wrapper."""
+        @functools.wraps(method)
+        async def guarded(*args, **kwargs):
+            """Bound tool execution. :param args: Positional inputs. :param kwargs: Named inputs."""
+            try:
+                async with asyncio.timeout(SESSION_OPERATION_TIMEOUT):
+                    return await method(*args, **kwargs)
+            except asyncio.TimeoutError:
+                raise RuntimeError("Administrator operation deadline reached; close or restart unhealthy session") from None
+        return guarded
+
+    async def expire_sessions(self):
+        """Bound idle closure without holding the cross-client lifecycle lock."""
+        for key, state in list(self.session_state.items()):
+            lock = self.session_locks.get(key)
+            if lock is None or lock.locked() or state.get("work") is not None or time.monotonic() - state.get("last_used", time.monotonic()) < 1800:
+                continue
+            try:
+                async with self.session_guard(key):
+                    if self.session_state.get(key) is not state or state.get("work") is not None:
+                        continue
+                    await self.bounded(self.upstream_close(state["upstream_id"]), SESSION_CLOSE_TIMEOUT, state)
+                    self.owners.pop(key, None)
+                    self.session_locks.pop(key, None)
+                    self.session_state.pop(key, None)
+            except Exception:
+                # A racing operation or failed close retains the bounded slot.
+                continue
 
     def _signature(self, method, *, hide_session=False):
+        """Build public signature. :param method: Reviewed method. :param hide_session: Hide caller-selected session IDs."""
         signature = inspect.signature(method)
         hidden = set(NETWORK_OVERRIDES)
         if hide_session:
@@ -314,14 +470,17 @@ class ClientPolicy:
 
     @staticmethod
     def _description(method, *, alias_guidance=None):
+        """Build public documentation. :param method: Reviewed method. :param alias_guidance: Optional alias instructions."""
         original = inspect.getdoc(method) or ""
         parts = [CLIENT_ID_GUIDANCE, CLIENT_ID_PARAMETER]
         if alias_guidance:
             parts.append(alias_guidance)
         parts.append(original)
+        parts.extend(":param " + name + ": Reviewed upstream input; see schema for allowed values." for name in inspect.signature(method).parameters if name not in NETWORK_OVERRIDES)
         return "\n\n".join(parts).strip()
 
     def network_tool(self, method, *, browser=False, session_aware=False, forced=None):
+        """Wrap retrieval. :param method: Reviewed method. :param browser: Browser transport. :param session_aware: Enforce ownership. :param forced: Administrator settings."""
         forced = forced or {}
         signature = inspect.signature(method)
         hidden = NETWORK_OVERRIDES.intersection(signature.parameters)
@@ -329,8 +488,11 @@ class ClientPolicy:
         @functools.wraps(method)
         async def guarded(*args, client_id, **kwargs):
             canonical_client_id(client_id)
-            self.monitor.check()
+            self.ensure_maintenance()
             bound = signature.bind_partial(*args, **kwargs)
+            if NETWORK_OVERRIDES.intersection(bound.arguments):
+                raise ValueError("Caller network overrides are prohibited")
+            await self.monitor.check()
             session_id = bound.arguments.get("session_id") if session_aware else None
             lock = None
             if session_id:
@@ -342,11 +504,15 @@ class ClientPolicy:
             bound.arguments.update(forced)
             if not session_id:
                 bound.arguments["proxy"] = BROWSER_PROXY if browser else HTTP_PROXY
+            state = None
             async def invoke():
-                return await method(*bound.args, **bound.kwargs)
+                return await self.bounded(method(*bound.args, **bound.kwargs), SESSION_OPERATION_TIMEOUT, state)
             if lock:
-                async with lock:
-                    state = self.session_state[session_id]
+                async with self.session_guard(session_id):
+                    state = self.session_state.get(session_id)
+                    if state is None or state.get("poisoned") or self.owners.get(session_id) != client_id:
+                        return SESSION_UNAVAILABLE.copy()
+                    state["last_used"] = time.monotonic()
                     bound.arguments["session_id"] = state["upstream_id"]
                     try:
                         return await invoke()
@@ -357,7 +523,7 @@ class ClientPolicy:
                         if not await self.monitor.recover():
                             raise RuntimeError(TOR_UNAVAILABLE["error"]) from None
                         try:
-                            await self._recreate_session(session_id)
+                            await self.bounded(self._recreate_session(session_id), SESSION_OPERATION_TIMEOUT, state)
                         except Exception as recreate_exc:
                             if _proxy_failure(recreate_exc):
                                 self.monitor.invalidate()
@@ -377,15 +543,16 @@ class ClientPolicy:
             "bulk_fetch", "bulk_stealthy_fetch"
         } else None
         guarded.__doc__ = self._description(method, alias_guidance=alias_guidance)
-        return guarded
+        return self.deadline(guarded)
 
     def singular_network_tool(self, method, bulk_method):
-        """Adapt Scrapling's singular aliases to the policy-wrapped bulk tool."""
+        """Adapt alias. :param method: Singular method. :param bulk_method: Policy-wrapped bulk method."""
         bulk_guarded = bulk_method
 
         @functools.wraps(method)
         async def guarded(*args, client_id, **kwargs):
             canonical_client_id(client_id)
+            self.ensure_maintenance()
             bound = inspect.signature(method).bind(*args, **kwargs)
             url = bound.arguments.pop("url")
             result = await bulk_guarded(urls=[url], client_id=client_id, **bound.arguments)
@@ -396,13 +563,17 @@ class ClientPolicy:
         return guarded
 
     def open_session(self, method, *, kind, forced=None):
+        """Wrap session creation. :param method: Reviewed opener. :param kind: Browser or request. :param forced: Administrator settings."""
         forced = forced or {}
         signature = inspect.signature(method)
 
         @functools.wraps(method)
         async def guarded(*args, client_id, **kwargs):
             canonical_client_id(client_id)
+            self.ensure_maintenance()
             bound = signature.bind_partial(*args, **kwargs)
+            if NETWORK_OVERRIDES.intersection(bound.arguments):
+                raise ValueError("Caller network overrides are prohibited")
             # The upstream accepts an optional caller-selected session_id, but
             # the policy owns session identity and must discard it whether the
             # caller supplied it positionally or by keyword.
@@ -411,8 +582,18 @@ class ClientPolicy:
                 bound.arguments.pop(name, None)
             bound.arguments.update(forced)
             bound.arguments["proxy"] = BROWSER_PROXY if kind == "browser" else HTTP_PROXY
-            async with self.lifecycle_lock:
-                result = await method(*bound.args, **bound.kwargs)
+            await asyncio.wait_for(self.lifecycle_lock.acquire(), SESSION_LOCK_TIMEOUT)
+            try:
+                if self.session_creation_failed or len(self.session_state) >= 16:
+                    raise RuntimeError("Session capacity reached; close unused sessions or restart unhealthy service")
+                try:
+                    result = await self.bounded(method(*bound.args, **bound.kwargs), SESSION_OPERATION_TIMEOUT)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    # Cancellation cannot prove upstream resource creation rolled back.
+                    # Refuse further opens until process restart, avoiding leaked sessions.
+                    self.session_creation_failed = True
+                    self.assess_health()
+                    raise RuntimeError("Session creation timed out; restart unhealthy service") from None
                 session_id = _session_id(result)
                 if session_id in self.owners:
                     raise RuntimeError("Scrapling returned a duplicate session identifier")
@@ -420,6 +601,7 @@ class ClientPolicy:
                 self.session_locks[session_id] = asyncio.Lock()
                 self.session_state[session_id] = {
                     "upstream_id": session_id,
+                    "last_used": time.monotonic(),
                     "public_result": result,
                     "generation": self.monitor.generation,
                     "method": method,
@@ -428,49 +610,53 @@ class ClientPolicy:
                     "kwargs": dict(bound.kwargs),
                 }
                 return result
+            finally:
+                self.lifecycle_lock.release()
 
         guarded.__signature__ = self._signature(method, hide_session=True)
         guarded.__doc__ = self._description(method)
         return guarded
 
     def list_sessions(self, method):
+        """Wrap session listing. :param method: Upstream listing."""
         @functools.wraps(method)
-        async def guarded(*args, client_id, **kwargs):
+        async def guarded(*, client_id: str):
             canonical_client_id(client_id)
-            async with self.lifecycle_lock:
-                result = await method(*args, **kwargs)
-                if not isinstance(result, list):
-                    raise RuntimeError("Scrapling returned an unsupported session list")
-                upstream_ids = {_listed_session_id(item) for item in result}
-                return [
-                    state["public_result"] for public_id, state in self.session_state.items()
-                    if self.owners.get(public_id) == client_id
-                    and state["upstream_id"] in upstream_ids
-                ]
+            self.ensure_maintenance()
+            result = await self.bounded(method(), 5)
+            if not isinstance(result, list):
+                raise RuntimeError("Scrapling returned an unsupported session list")
+            upstream_ids = {_listed_session_id(item) for item in result}
+            return [state["public_result"] for public_id, state in self.session_state.items()
+                    if self.owners.get(public_id) == client_id and not state.get("poisoned")
+                    and state["upstream_id"] in upstream_ids]
 
-        guarded.__signature__ = self._signature(method)
+        guarded.__signature__ = inspect.Signature([inspect.Parameter("client_id", inspect.Parameter.KEYWORD_ONLY, annotation=str)], return_annotation=inspect.signature(method).return_annotation)
         guarded.__doc__ = self._description(method)
         return guarded
 
     def close_session(self, method):
+        """Wrap owned closure. :param method: Upstream closer."""
         @functools.wraps(method)
         async def guarded(*args, client_id, **kwargs):
             canonical_client_id(client_id)
+            self.ensure_maintenance()
             session_id = kwargs.get("session_id")
             if session_id is None and args:
                 session_id = args[0]
-            async with self.lifecycle_lock:
-                if self.owners.get(session_id) != client_id:
+            if self.owners.get(session_id) != client_id:
+                return SESSION_UNAVAILABLE.copy()
+            async with self.session_guard(session_id):
+                state = self.session_state.get(session_id)
+                if state is None or self.owners.get(session_id) != client_id or state.get("work") is not None:
                     return SESSION_UNAVAILABLE.copy()
-                lock = self.session_locks[session_id]
-                async with lock:
-                    upstream_id = self.session_state[session_id]["upstream_id"]
-                    if "session_id" in kwargs:
-                        kwargs["session_id"] = upstream_id
-                        call_args = args
-                    else:
-                        call_args = (upstream_id, *args[1:])
-                    result = await method(*call_args, **kwargs)
+                upstream_id = state["upstream_id"]
+                if "session_id" in kwargs:
+                    kwargs["session_id"] = upstream_id
+                    call_args = args
+                else:
+                    call_args = (upstream_id, *args[1:])
+                result = await self.bounded(method(*call_args, **kwargs), SESSION_CLOSE_TIMEOUT, state)
                 self.owners.pop(session_id, None)
                 self.session_locks.pop(session_id, None)
                 self.session_state.pop(session_id, None)
@@ -493,7 +679,16 @@ class ClientPolicy:
 
 
 def assert_upstream_tools(server):
+    """Reject upstream drift. :param server: Unmodified upstream server."""
     actual = {tool.name for tool in asyncio.run(server._build_server("127.0.0.1", PORT).list_tools())}
+    if actual == set(CURRENT_SIGNATURES):
+        for name, parameters in CURRENT_SIGNATURES.items():
+            signature = inspect.signature(getattr(server, name))
+            if list(signature.parameters) != parameters or any(p.kind not in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY) for p in signature.parameters.values()):
+                raise RuntimeError("Unreviewed Scrapling 0.5 signature: " + name)
+        if not callable(getattr(server._build_server("127.0.0.1", PORT), "remove_tool", None)):
+            raise RuntimeError("MCP tool removal API unavailable")
+        return
     if actual != EXPECTED_TOOLS:
         raise RuntimeError(f"Unsupported Scrapling MCP tool set: {sorted(actual)}")
     for name in EXPECTED_TOOLS:
@@ -544,6 +739,26 @@ def configure_server(server, monitor=None):
             return _contains_istor(result)
         monitor = TorMonitor(confirmer=confirm_tor)
     policy = ClientPolicy(server, monitor)
+    if hasattr(server, "browser_open"):
+        strict = {"http3": False, "verify": True, "follow_redirects": "safe", "max_redirects": 5, "retries": 1}
+        server.make_request = policy.network_tool(server.make_request, forced=strict)
+        server.session_make_request = policy.network_tool(server.session_make_request, session_aware=True, forced=strict)
+        server.browser_open = policy.open_session(server.browser_open, kind="browser", forced={"block_webrtc": True})
+        server.open_request_session = policy.open_session(server.open_request_session, kind="request")
+        server.list_sessions = policy.list_sessions(server.list_sessions)
+        server.close_session = policy.close_session(server.close_session)
+        server.browser_fetch_once = policy.network_tool(server.browser_fetch_once, browser=True, forced={"block_webrtc": True})
+        for name in ("browser_fetch", "browser_extract", "browser_screenshot"):
+            setattr(server, name, policy.network_tool(getattr(server, name), browser=True, session_aware=True))
+        original_build = server._build_server
+        def reviewed_build(host, port):
+            """Remove unreviewed upstream capabilities. :param host: Listener host. :param port: Listener port."""
+            mcp = original_build(host, port)
+            for name in DISABLED_CURRENT_TOOLS:
+                mcp.remove_tool(name)
+            return mcp
+        server._build_server = reviewed_build
+        return policy
     server.make_request = policy.network_tool(server.make_request, forced={"http3": False})
     server.bulk_get = policy.network_tool(server.bulk_get, forced={"http3": False})
     server.open_session = policy.open_session(
@@ -580,13 +795,67 @@ def configure_server(server, monitor=None):
     return policy
 
 
+def configure_acquisition(server, monitor):
+    """Register binary handlers and validate emitted schemas.
+
+    :param server: Reviewed upstream server instance.
+    :param monitor: Shared Tor readiness monitor.
+    """
+    from binary_acquisition import AcquisitionManager, AcquisitionError, TOOLS
+    from health_check import validate_tool_inventory
+    async def ready():
+        """Require current local readiness and external Tor evidence."""
+        return await monitor.check(force=True) and await monitor.confirm_external()
+    manager = AcquisitionManager("/var/lib/basix-acquisition", ready=ready)
+    monitor.acquisition_manager = manager
+    build = server._build_server
+    def build_with_acquisition(host, port):
+        """Build reviewed server plus managed tools.
+
+        :param host: Listener host.
+        :param port: Listener port.
+        """
+        mcp = build(host, port)
+        for name in sorted(TOOLS):
+            method = getattr(manager, name)
+            async def handler(*args, _method=method, **kwargs):
+                """Convert internal failures to safe MCP errors.
+
+                :param args: Bound positional tool arguments.
+                :param _method: Trusted bound implementation.
+                :param kwargs: Schema-validated tool arguments.
+                """
+                try:
+                    return await _method(*args, **kwargs)
+                except AcquisitionError as exc:
+                    return {"state": "rejected", "error": str(exc), "retryable": str(exc).startswith("tor_") and str(exc) != "tor_pinning_unsupported"}
+                except Exception:
+                    # Framework error serialization must never include sensitive inputs.
+                    raise ValueError("Acquisition operation rejected; inspect owned job status") from None
+            handler.__name__ = name
+            handler.__signature__ = inspect.signature(method)
+            handler.__doc__ = CLIENT_ID_GUIDANCE + "\n" + CLIENT_ID_PARAMETER + "\n" + inspect.getdoc(method)
+            mcp.add_tool(handler, name=name)
+        return mcp
+    server._build_server = build_with_acquisition
+    tools = asyncio.run(server._build_server("127.0.0.1", PORT).list_tools())
+    validate_tool_inventory("startup", {"result": {"tools": [tool.model_dump(by_alias=True) for tool in tools]}})
+    return manager
+
+
 def main():
     validate_configuration()
     browser_base.DEFAULT_ARGS = tuple(dict.fromkeys((*browser_base.DEFAULT_ARGS, *CHROMIUM_FLAGS)))
     browser_base.STEALTH_ARGS = tuple(dict.fromkeys((*browser_base.STEALTH_ARGS, *CHROMIUM_FLAGS)))
     server = ScraplingMCPServer()
     assert_upstream_tools(server)
-    configure_server(server)
+    policy = configure_server(server)
+    # Only the supervised production child can notify its trusted local parent.
+    parent = os.environ.get("BASIX_POLICY_SUPERVISOR_PID")
+    if parent != str(os.getppid()):
+        raise RuntimeError("Policy requires its managed local supervisor")
+    policy.failure_notifier = lambda: os.kill(int(parent), signal.SIGUSR1)
+    configure_acquisition(server, policy.monitor)
     server.serve(
         http=True,
         host="0.0.0.0",

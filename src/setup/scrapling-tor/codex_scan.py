@@ -80,7 +80,15 @@ def matches(data):
 
 
 def fingerprint(found):
-    raw = json.dumps([entry for entry, _ in found], sort_keys=True, separators=(",", ":"))
+    """Hash configuration, excluding safe live probe status. :param found: Matched registration pairs."""
+    entries = []
+    for entry, _ in found:
+        item = dict(entry)
+        # This status changes when the managed endpoint starts; it is not config.
+        if item.get("auth_status") in (None, "unknown", "unsupported"):
+            item.pop("auth_status", None)
+        entries.append(item)
+    raw = json.dumps(entries, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode()).hexdigest()
 
 

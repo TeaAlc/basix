@@ -13,7 +13,9 @@ EXPECTED_TOOLS = {
     "bulk_fetch", "bulk_get", "bulk_stealthy_fetch", "close_session", "fetch",
     "list_sessions", "make_request", "open_request_session", "open_session",
     "screenshot", "session_fetch", "session_make_request", "stealthy_fetch",
+    "download_start", "download_status", "download_cancel", "artifact_info", "artifact_export",
 }
+CURRENT_TOOLS = {"browser_open", "open_request_session", "close_session", "list_sessions", "make_request", "browser_fetch_once", "browser_fetch", "session_make_request", "browser_extract", "browser_screenshot", "download_start", "download_status", "download_cancel", "artifact_info", "artifact_export"}
 CLIENT_DESCRIPTION_MARKERS = (
     "calling agent is the MCP client",
     "canonical RFC 4122 UUID version 4",
@@ -23,6 +25,7 @@ CLIENT_DESCRIPTION_MARKERS = (
 HIDDEN_ARGUMENTS = {
     "proxy", "proxy_auth", "auth", "cdp_url", "real_chrome", "executable_path",
     "additional_args", "block_webrtc", "dns_over_https", "http3", "extra_flags",
+    "verify", "follow_redirects", "max_redirects", "retries",
 }
 TOR_HOST = os.environ.get("BASIX_TOR_HOST", os.environ.get("BASIX_TOR_IP", "tor"))
 
@@ -100,7 +103,7 @@ def validate_tool_inventory(endpoint, listing):
                 f"MCP phase tools/list failed at {endpoint}: tool name at index {index} was not a string"
             )
         names.append(name)
-    if len(names) != len(EXPECTED_TOOLS) or set(names) != EXPECTED_TOOLS:
+    if len(names) != len(set(names)) or set(names) not in (EXPECTED_TOOLS, CURRENT_TOOLS):
         raise RuntimeError(f"MCP phase tools/list failed at {endpoint}: Scrapling tool inventory is not canonical")
     for tool in tools:
         description = tool.get("description")
@@ -141,7 +144,7 @@ def validate_tool_inventory(endpoint, listing):
                 f"MCP phase tools/list failed at {endpoint}: network controls exposed by "
                 f"{tool.get('name')}: {sorted(exposed)}"
             )
-        if tool.get("name") == "open_session" and "session_id" in properties:
+        if tool.get("name") in ("open_session", "browser_open", "open_request_session") and "session_id" in properties:
             raise RuntimeError(
                 f"MCP phase tools/list failed at {endpoint}: open_session exposes caller-selected session_id"
             )

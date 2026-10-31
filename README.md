@@ -207,10 +207,12 @@ This container boundary does not reproduce Tor Browser's fingerprinting
 protections. The loopback service has no TLS or global authentication; remote
 access is outside its trust model.
 
-An existing single Scrapling registration requires interactive replacement
+Replacing a noncanonical single Scrapling registration requires interactive
 approval or `--force`. Multiple registrations, foreign running services, and
-unsafe runtime resources cause an abort even with `--force`. Restart Codex after
-installation or migration.
+unsafe runtime resources cause an abort even with `--force`. Positively identified
+Basix-owned retired containers are removed; only the strict current configuration
+is supported. Retired services are never preserved or restored. Failed new
+resources are removed for reviewed reinstallation. Restart Codex after installation.
 
 Each container supervises its child locally, independent of host health timers or
 rootless systemd. Tor probes negotiate SOCKS5 and authenticate to its loopback-only
@@ -237,6 +239,17 @@ the calling agent from a cryptographically secure system source. Reuse it for
 related session calls; share it with a subagent only deliberately. It controls
 session ownership, not server authentication, and must never be replaced with
 `default`, a `session_id`, or a server-generated placeholder.
+
+Dedicated binary preparation tools are `download_start`, `download_status`,
+`download_cancel`, `artifact_info` and `artifact_export`, all with required
+`client_id`. Poll jobs to completion, verify SHA-256, then consume the generated
+local export offline. Downloads use remote Tor resolution and validated pinned
+public addresses with original HTTPS certificate verification. Limits, supported
+upstream contract, deployment/rollback and the incomplete strict acceptance matrix
+are documented in [binary acquisition](docs/diagnostics/tor-download-implementation.md).
+Resume, browser-assisted binary download and caller-selected export paths are
+unsupported. The managed DNS exception remains; this does not establish every
+browser destination is safe against SSRF.
 
 Runtime details are defined in the [installer](src/setup/install-scrapling-codex.sh)
 and [controller](src/setup/scrapling-tor/launcher.sh). The controller supports

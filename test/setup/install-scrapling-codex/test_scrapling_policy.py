@@ -116,6 +116,157 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
         self.client = str(uuid.uuid4())
         self.other = str(uuid.uuid4())
 
+    def test_irrecoverable_health_only_signals_poison_or_persistent_cancel_saturation(self):
+        """Transient requests and active work never request service replacement."""
+        notify = Mock()
+        self.owner.failure_notifier = notify
+        active = [Mock(done=Mock(return_value=False), cancelling=Mock(return_value=0)) for _ in range(32)]
+        self.owner.pending_operations = set(active)
+        self.owner.assess_health(0)
+        self.owner.assess_health(1000)
+        notify.assert_not_called()
+        self.owner.abandoned_operations = set(active)
+        self.owner.assess_health(1001)
+        self.owner.assess_health(1060)
+        notify.assert_not_called()
+        self.owner.assess_health(1061)
+        self.owner.assess_health(1062)
+        notify.assert_called_once_with()
+        self.owner.pending_operations.clear()
+
+    def test_persistent_poison_of_all_session_slots_requests_recovery(self):
+        """Sixteen stuck owned sessions cannot leave the session API degraded forever."""
+        self.owner.failure_notifier = Mock()
+        tasks = [Mock(done=Mock(return_value=False), cancelling=Mock(return_value=1)) for _ in range(16)]
+        self.owner.pending_operations = set(tasks)
+        self.owner.abandoned_operations = set(tasks)
+        self.owner.session_state = {str(index): {"poisoned": True, "work": task} for index, task in enumerate(tasks)}
+        self.owner.assess_health(0)
+        self.owner.assess_health(59)
+        self.owner.failure_notifier.assert_not_called()
+        self.owner.assess_health(60)
+        self.owner.failure_notifier.assert_called_once_with()
+        self.owner.pending_operations.clear()
+        self.owner.session_state.clear()
+
+    async def test_stuck_alias_resolution_is_nonblocking_killed_and_reaped(self):
+        """A stuck libc helper cannot block unrelated loop work or cancellation."""
+        original = asyncio.create_subprocess_exec
+        children = []
+        async def spawn(*args, **kwargs):
+            """Start stuck helper. :param args: Requested command. :param kwargs: Process options."""
+            child = await original(sys.executable, "-c", "import time; time.sleep(30)", **kwargs)
+            children.append(child)
+            return child
+        monitor = policy.TorMonitor()
+        with patch.object(policy.asyncio, "create_subprocess_exec", new=spawn):
+            check = asyncio.create_task(monitor.check(force=True))
+            for _ in range(3):
+                await asyncio.sleep(.01)
+            self.assertFalse(check.done())
+            check.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(check, .5)
+            self.assertIsNotNone(children[-1].returncode)
+            self.assertFalse(await asyncio.wait_for(monitor.check(force=True), 2))
+            self.assertIsNotNone(children[-1].returncode)
+
+    async def test_stuck_session_work_does_not_deadlock_other_clients(self):
+        """Null/huge caller timeout cannot hold lifecycle locks or leak new work slots."""
+        self.owner.monitor.check = AsyncMock(return_value=True)
+        self.owner.failure_notifier = Mock()
+        for timeout in (None, 10**20):
+            session = await self.server.open_request_session(client_id=self.client)
+            identifier = session["session_id"]
+            release, started = asyncio.Event(), asyncio.Event()
+            self.addCleanup(release.set)
+            async def stuck(url, session_id, timeout=None):
+                """Ignore cancellation until released. :param url: URL. :param session_id: Upstream ID. :param timeout: Untrusted caller timeout."""
+                started.set()
+                while not release.is_set():
+                    try:
+                        await release.wait()
+                    except asyncio.CancelledError:
+                        asyncio.current_task().uncancel()
+                        continue
+            operation = self.owner.network_tool(stuck, session_aware=True)
+            with patch.object(policy, "SESSION_OPERATION_TIMEOUT", .05), patch.object(policy, "SESSION_LOCK_TIMEOUT", .01), patch.object(policy, "SESSION_CLOSE_TIMEOUT", .02):
+                task = asyncio.create_task(operation(url="https://example.com", session_id=identifier, timeout=timeout, client_id=self.client))
+                await started.wait()
+                with self.assertRaises(asyncio.TimeoutError):
+                    await self.server.close_session(session_id=identifier, client_id=self.client)
+                independent = await self.server.open_request_session(client_id=self.other)
+                self.assertTrue(await self.server.list_sessions(client_id=self.other))
+                await self.server.close_session(session_id=independent["session_id"], client_id=self.other)
+                with self.assertRaisesRegex(RuntimeError, "deadline"):
+                    await asyncio.wait_for(task, .2)
+                self.assertTrue(self.owner.session_state[identifier]["poisoned"])
+                self.assertEqual(len(self.owner.abandoned_operations), 1)
+                self.assertEqual(await self.server.close_session(session_id=identifier, client_id=self.client), policy.SESSION_UNAVAILABLE)
+                release.set()
+                await asyncio.sleep(0)
+                await asyncio.sleep(0)
+                await self.server.close_session(session_id=identifier, client_id=self.client)
+            self.assertFalse(self.owner.session_state)
+            self.assertFalse(self.owner.pending_operations)
+            self.assertFalse(self.owner.abandoned_operations)
+            self.owner.assess_health()
+            self.owner.failure_notifier.assert_not_called()
+
+    async def test_stuck_close_releases_lifecycle_for_independent_clients(self):
+        """Unknown close work retains only its own bounded session slot."""
+        session = await self.server.open_request_session(client_id=self.client)
+        release = asyncio.Event()
+        self.addCleanup(release.set)
+        async def stuck_close(session_id):
+            """Wait despite cancellation. :param session_id: Owned upstream identifier."""
+            while not release.is_set():
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    continue
+            return {"closed": True}
+        closing = self.owner.close_session(stuck_close)
+        with patch.object(policy, "SESSION_CLOSE_TIMEOUT", .02):
+            with self.assertRaises(asyncio.TimeoutError):
+                await closing(session_id=session["session_id"], client_id=self.client)
+            independent = await self.server.open_request_session(client_id=self.other)
+            self.assertTrue(await self.server.list_sessions(client_id=self.other))
+            await self.server.close_session(session_id=independent["session_id"], client_id=self.other)
+            self.assertTrue(self.owner.session_state[session["session_id"]]["poisoned"])
+        release.set()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        await self.server.close_session(session_id=session["session_id"], client_id=self.client)
+        self.assertFalse(self.owner.pending_operations)
+
+    async def test_timed_out_creation_blocks_further_unknown_allocations(self):
+        """Unknown cancellation state cannot accumulate upstream sessions."""
+        async def opener(session_id=None, proxy=None):
+            """Simulate upstream timeout. :param session_id: Ignored ID. :param proxy: Managed proxy."""
+            raise asyncio.TimeoutError()
+        guarded = self.owner.open_session(opener, kind="request")
+        with self.assertRaisesRegex(RuntimeError, "timed out"):
+            await guarded(client_id=self.client)
+        with self.assertRaisesRegex(RuntimeError, "capacity"):
+            await self.server.open_request_session(client_id=self.client)
+        self.assertEqual(self.server.sessions, [])
+
+    async def test_session_capacity_idle_expiry_and_repeated_cycles(self):
+        """Idle closure reclaims bounded upstream and policy session state."""
+        for _ in range(3):
+            for _ in range(16):
+                await self.server.open_request_session(client_id=self.client)
+            with self.assertRaisesRegex(RuntimeError, "capacity"):
+                await self.server.open_request_session(client_id=self.client)
+            for state in self.owner.session_state.values():
+                state["last_used"] = -3600
+            await self.owner.expire_sessions()
+            self.assertEqual(self.owner.session_state, {})
+            self.assertEqual(self.owner.session_locks, {})
+            self.assertEqual(self.owner.owners, {})
+            self.assertEqual(self.server.sessions, [])
+
     def test_every_tool_requires_client_id_and_hides_controls(self):
         for name in policy.EXPECTED_TOOLS:
             signature = inspect.signature(getattr(self.server, name))
@@ -157,16 +308,18 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             policy.TOR_HOST = original
 
     async def test_network_policy_remains_forced(self):
-        result = await self.server.make_request(
-            "https://example", proxy="http://evil", auth=("bad", "secret"),
-            http3=True, client_id=self.client
-        )
+        with self.assertRaisesRegex(ValueError, "network overrides"):
+            await self.server.make_request(
+                "https://example", proxy="http://evil", auth=("bad", "secret"),
+                http3=True, client_id=self.client
+            )
+        result = await self.server.make_request("https://example", client_id=self.client)
         self.assertEqual(result, ("socks5h://10.77.0.2:9050", None, None, False))
 
     async def test_singular_browser_aliases_forward_client_id_through_bulk_policy(self):
-        result = await self.server.fetch(
-            "https://example", proxy="http://evil", block_webrtc=False, client_id=self.client
-        )
+        with self.assertRaisesRegex(ValueError, "network overrides"):
+            await self.server.fetch("https://example", proxy="http://evil", client_id=self.client)
+        result = await self.server.fetch("https://example", client_id=self.client)
         self.assertEqual(result, ("socks5://10.77.0.2:9050", None))
         self.assertEqual(self.server.singular_calls, [])
         stealthy = await self.server.stealthy_fetch("https://example", client_id=self.client)
@@ -208,8 +361,7 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.server.opened_session_ids, [None])
         self.assertEqual(
             await self.server.session_make_request(
-                "https://example", public_id, auth=("bad", "secret"),
-                http3=True, client_id=self.client,
+                "https://example", public_id, client_id=self.client,
             ),
             ("https://example", public_id, None, False),
         )
@@ -248,14 +400,14 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             probe=lambda address, port, timeout: probes.append((address, port, timeout)),
             clock=lambda: now[0],
         )
-        self.assertTrue(monitor.check())
+        self.assertTrue(await monitor.check())
         self.assertEqual((monitor.generation, resolutions), (1, ["tor.alias"]))
         now[0] = 4.99
-        self.assertTrue(monitor.check())
+        self.assertTrue(await monitor.check())
         self.assertEqual(len(resolutions), 1)
         addresses[0] = "10.77.0.3"
         now[0] = 5.0
-        self.assertTrue(monitor.check())
+        self.assertTrue(await monitor.check())
         self.assertEqual(monitor.generation, 2)
         self.assertEqual(probes[-1], ("10.77.0.3", 9050, 1.0))
 
@@ -264,10 +416,10 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             resolver=lambda _host: "10.77.0.2",
             probe=lambda *_: True,
         )
-        self.assertTrue(monitor.check())
+        self.assertTrue(await monitor.check())
         first_generation = monitor.generation
         monitor.invalidate()
-        self.assertTrue(monitor.check(force=True))
+        self.assertTrue(await monitor.check(force=True))
         self.assertEqual(monitor.generation, first_generation + 1)
 
     async def test_shared_bounded_recovery_uses_jitter_and_one_confirmation(self):
@@ -604,6 +756,88 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             await server.session_fetch(
                 "https://example", session_id=opened["session_id"], client_id=self.client
             )
+
+
+class CurrentContractTests(unittest.TestCase):
+    """Review exact 0.5 inventory, removed tools and forced network controls."""
+    def make_server(self):
+        """Build a source-signature fixture without importing external dependencies."""
+        class CurrentMCP:
+            """Expose supported SDK registration interfaces."""
+            def __init__(self):
+                """Initialize tool names."""
+                self.names = set(policy.CURRENT_SIGNATURES)
+            async def list_tools(self):
+                """Return registered names."""
+                return [types.SimpleNamespace(name=name) for name in self.names]
+            def remove_tool(self, name):
+                """Remove one tool. :param name: Reviewed disabled name."""
+                self.names.remove(name)
+        class CurrentServer:
+            """Capture calls for policy assertions."""
+            def __init__(self):
+                """Initialize call capture."""
+                self.calls = []
+            def _build_server(self, host, port):
+                """Build fixture. :param host: Host. :param port: Port."""
+                return CurrentMCP()
+        for name, parameters in policy.CURRENT_SIGNATURES.items():
+            documentation = " ".join(":param " + name + ": Fixture input." for name in parameters)
+            namespace = {}
+            body = "async def " + name + "(self" + "".join(", " + parameter + "=None" for parameter in parameters) + "):\n"
+            body += "    \"\"\"" + documentation + "\"\"\"\n    values=locals().copy()\n    values.pop('self')\n    self.calls.append(('" + name + "', values))\n"
+            if name in ("browser_open", "open_request_session"):
+                body += "    return {'session_id':'owned-session'}\n"
+            elif name == "list_sessions":
+                body += "    return [{'session_id':'owned-session'}]\n"
+            else:
+                body += "    return values\n"
+            exec(body, namespace)
+            setattr(CurrentServer, name, namespace[name])
+        return CurrentServer()
+
+    def test_current_inventory_and_signature_drift(self):
+        """All 16 reviewed upstream tools are required before reduction."""
+        server = self.make_server()
+        policy.assert_upstream_tools(server)
+        server.browser_evaluate = AsyncMock()
+        with self.assertRaisesRegex(RuntimeError, "signature"):
+            policy.assert_upstream_tools(server)
+
+    def test_current_reduction_and_forced_network_policy(self):
+        """Only reviewed retrieval methods remain, with ownership and no overrides."""
+        server = self.make_server()
+        server.list_sessions.__func__.__annotations__["return"] = list[dict]
+        monitor = Mock(check=AsyncMock(return_value=True))
+        async def execute(operation, **kwargs):
+            """Invoke fixture operation. :param operation: Async call. :param kwargs: Retry options."""
+            return await operation()
+        monitor.execute = execute
+        policy.configure_server(server, monitor=monitor)
+        self.assertEqual(inspect.signature(server.list_sessions).return_annotation, list[dict])
+        names = {tool.name for tool in asyncio.run(server._build_server("localhost", 8002).list_tools())}
+        self.assertEqual(names, policy.CURRENT_PUBLIC_TOOLS)
+        client = str(uuid.uuid4())
+        async def exercise():
+            """Assert HTTP/browser/session policy behavior."""
+            request = await server.make_request(url="https://example.com", client_id=client)
+            self.assertEqual(request['proxy'], policy.HTTP_PROXY)
+            self.assertEqual([request[key] for key in ('http3','verify','follow_redirects','max_redirects','retries')], [False, True, 'safe', 5, 1])
+            for key in ('verify','follow_redirects','max_redirects','proxy','http3'):
+                with self.assertRaises(ValueError):
+                    await server.make_request(url="https://example.com", client_id=client, **{key: False})
+            opened = await server.browser_open(client_id=client)
+            self.assertEqual(server.calls[-1][1]['proxy'], policy.BROWSER_PROXY)
+            self.assertTrue(server.calls[-1][1]['block_webrtc'])
+            foreign = await server.browser_fetch(url="https://example.com", session_id=opened['session_id'], client_id=str(uuid.uuid4()))
+            self.assertEqual(foreign, policy.SESSION_UNAVAILABLE)
+            own = await server.browser_fetch(url="https://example.com", session_id=opened['session_id'], client_id=client)
+            self.assertEqual(own['session_id'], opened['session_id'])
+        asyncio.run(exercise())
+        for name in names:
+            signature = inspect.signature(getattr(server, name))
+            self.assertEqual(signature.parameters['client_id'].default, inspect.Parameter.empty)
+            self.assertFalse(policy.NETWORK_OVERRIDES.intersection(signature.parameters))
 
 
 if __name__ == "__main__":

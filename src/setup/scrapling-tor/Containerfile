@@ -7,11 +7,12 @@ RUN apt-get update \
     && chown debian-tor:debian-tor /var/log/tor
 
 COPY torrc /etc/tor/torrc
-COPY service_supervisor.py /opt/basix/service_supervisor.py
+COPY service_supervisor.py pinning_gateway.py binary_acquisition.py /opt/basix/
 ENV PYTHONDONTWRITEBYTECODE=1
 USER debian-tor
 # Fail the build if the supervisor's runtime imports or permissions are incomplete.
-RUN python3 /opt/basix/service_supervisor.py --help >/dev/null
+RUN python3 /opt/basix/service_supervisor.py --help >/dev/null \
+    && python3 /opt/basix/pinning_gateway.py --help >/dev/null
 HEALTHCHECK --interval=15s --timeout=8s --start-period=120s --retries=3 \
   CMD ["python3", "/opt/basix/service_supervisor.py", "--probe", "tor"]
 ENTRYPOINT ["python3", "/opt/basix/service_supervisor.py", "tor"]

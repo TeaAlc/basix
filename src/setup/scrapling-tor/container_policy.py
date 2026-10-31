@@ -141,13 +141,18 @@ def policy_mount_valid(container: dict[str, Any], source: str, supervised: bool 
     expected = {POLICY: os.path.realpath(source)}
     if supervised:
         expected[SUPERVISOR] = os.path.realpath(os.path.join(os.path.dirname(source), "service_supervisor.py"))
+    acquisition = any(isinstance(m, dict) and m.get("Destination") == "/var/lib/basix-acquisition" for m in mounts) if isinstance(mounts, list) else False
+    if acquisition and supervised:
+        for name in ("binary_acquisition.py", "health_check.py"):
+            expected["/opt/basix/" + name] = os.path.realpath(os.path.join(os.path.dirname(source), name))
+        expected["/var/lib/basix-acquisition"] = os.path.realpath(os.path.join(os.path.dirname(source), "../scrapling-artifacts"))
     if not isinstance(mounts, list) or len(mounts) != len(expected):
         return False
     for mount in mounts:
         if not isinstance(mount, dict):
             return False
         destination = mount.get("Destination")
-        if not isinstance(destination, str) or destination not in expected or mount.get("RW") is not False:
+        if not isinstance(destination, str) or destination not in expected or mount.get("RW") is not (destination == "/var/lib/basix-acquisition"):
             return False
         if os.path.realpath(str(mount.get("Source") or "")) != expected.pop(destination):
             return False
@@ -193,7 +198,7 @@ def legacy(container: dict[str, Any], source: str) -> bool:
         and sequence(config.get("Entrypoint")) == [PYTHON]
         and sequence(config.get("Cmd")) == [POLICY]
         and autoremove
-        and restart in (None, "")
+        and restart in (None, "", "no")
         and bool(re.fullmatch(r"docker\.io/pyd4vinci/scrapling@sha256:[0-9a-fA-F]{64}", str(config.get("Image") or "")))
         and (image_name is None or str(image_name).lower() == str(config.get("Image") or "").lower())
     )
@@ -212,8 +217,10 @@ def managed(container: dict[str, Any], args: argparse.Namespace) -> int:
     config, host = base(container)
     networks = set(((container.get("NetworkSettings") or {}).get("Networks") or {}))
     restart = (host.get("RestartPolicy") or {}).get("Name")
-    if not secure_base(container) or restart not in (None, "", "unless-stopped"):
-        print(f"Managed {args.kind} policy rejected: security={secure_base(container)} restart_allowed={restart in (None, '', 'unless-stopped')}", file=sys.stderr)
+    annotations = config.get("Annotations") or {}
+    autoremove = host.get("AutoRemove") is True or ("AutoRemove" not in host and str(annotations.get("io.podman.annotations.autoremove", "")).upper() == "TRUE")
+    if not secure_base(container) or restart not in (None, "", "no", "unless-stopped"):
+        print(f"Managed {args.kind} policy rejected: security={secure_base(container)} restart_allowed={restart in (None, '', 'no', 'unless-stopped')}", file=sys.stderr)
         return 1
     if args.kind == "tor":
         health = config.get("Healthcheck") or {}
@@ -256,9 +263,9 @@ def managed(container: dict[str, Any], args: argparse.Namespace) -> int:
     if not valid:
         print(f"Managed {args.kind} policy rejected: networks={networks_valid} mounts={mounts_valid} ports={ports_valid} supervised_command={supervised_command} supervised_health={supervised_health} legacy_command={old_command} legacy_health={old_probe}" + (f" proxy={proxy_kind is not None}" if args.kind == "scrapling" else ""), file=sys.stderr)
         return 1
-    exact = supervised and restart == "unless-stopped" and normalized_image(container.get("Image")) == normalized_image(args.actual) and normalized_image(config.get("Image")) == normalized_image(args.configured)
+    exact = supervised and not autoremove and restart == "unless-stopped" and normalized_image(container.get("Image")) == normalized_image(args.actual) and normalized_image(config.get("Image")) == normalized_image(args.configured)
     if args.kind == "scrapling":
-        exact = exact and proxy_kind == "canonical" and bound_port == args.port
+        exact = exact and proxy_kind == "canonical" and bound_port == args.port and any(m.get("Destination") == "/var/lib/basix-acquisition" for m in container.get("Mounts", []))
     elif args.kind == "tor":
         exact = exact and TOR_HOST in aliases
     if not exact:

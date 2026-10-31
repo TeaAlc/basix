@@ -59,6 +59,16 @@ class HealthCheckTests(unittest.TestCase):
             }
         }
 
+    def test_current_public_subset_has_same_capability_boundary(self):
+        """Current inventory accepts only the reviewed reduced set, with all caps required."""
+        listing = self.canonical_listing()
+        template = listing["result"]["tools"][0]
+        listing["result"]["tools"] = [dict(template, name=name) for name in health_check.CURRENT_TOOLS]
+        health_check.validate_tool_inventory(self.endpoint, listing)
+        listing["result"]["tools"].append(dict(template, name="browser_evaluate"))
+        with self.assertRaisesRegex(RuntimeError, "inventory"):
+            health_check.validate_tool_inventory(self.endpoint, listing)
+
     def test_loopback_client_uses_an_empty_proxy_handler(self):
         client = health_check.MCPClient(self.endpoint)
         self.assertIsInstance(client.proxy_handler, urllib.request.ProxyHandler)
