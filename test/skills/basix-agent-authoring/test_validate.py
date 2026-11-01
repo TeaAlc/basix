@@ -31,7 +31,7 @@ from MCP resources or resource templates. Scrapling access is explicitly authori
 If unavailable, treat the assignment as blocked and unsuccessful under the communication
 contract. Tell the spawning parent to install Scrapling with the Basix installer
 `install-scrapling-codex.sh`. Also explain that Basix
-Scrapling requires Podman and routes all web requests through the Tor network.
+Scrapling requires Podman or Docker and routes all web requests through the Tor network.
 """
 
 

@@ -291,7 +291,7 @@ def validate_agent(path: Path) -> None:
             "Scrapling access is explicitly authorized for read-only research",
             "treat the assignment as blocked and unsuccessful under the communication\ncontract",
             "Tell the spawning parent to install Scrapling with the Basix installer",
-            "Basix\nScrapling requires Podman and routes all web requests through the Tor network",
+            "Basix\nScrapling requires Podman or Docker and routes all web requests through the Tor network",
         )
         for clause in researcher_clauses:
             need(clause in instructions, f"{path}: missing required Scrapling researcher policy")

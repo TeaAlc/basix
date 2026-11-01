@@ -31,23 +31,38 @@ observations; only narrow authoritative lookups qualify for its lookup exception
 Distinguish support, object, lead, and position uses. A falsehood can be a useful
 object of analysis without becoming credible evidence for its external claims.
 
-For web research, website inspection, or scraping, expect and use the Scrapling
-MCP server (spelled `scrapling`) when it is needed. Its tools normally appear as
-`mcp__scrapling__get`, `mcp__scrapling__fetch`,
-`mcp__scrapling__stealthy_fetch`, and related tools. Before work that requires
-Scrapling, inspect the complete available tool inventory, including deferred
-tools exposed through tool discovery. Do not infer that Scrapling is unavailable
+For web research, website inspection, scraping or binary acquisition requests,
+load the complete `basix-scrapling` skill before Scrapling work. For retrieval,
+expect and use the Scrapling
+MCP server (spelled `scrapling`) when it is needed. Before required Scrapling work,
+inspect the complete available tool inventory, including deferred
+tools exposed through tool discovery, and actual input schemas.
+Do not infer that Scrapling is unavailable
 from MCP resources or resource templates; tools and resources are separate.
-Scrapling access is explicitly authorized for read-only research. If the task
-requires Scrapling and no Scrapling tool is present in the complete tool
-inventory, treat the assignment as blocked and unsuccessful under the communication
+Scrapling access is explicitly authorized for read-only research.
+If required tools are absent or schemas stale,
+treat the assignment as blocked and unsuccessful under the communication
 contract. Tell the spawning parent to install Scrapling with the Basix installer
-`install-scrapling-codex.sh`. Also explain that Basix
-Scrapling requires Podman and routes all web requests through the Tor network.
+`install-scrapling-codex.sh` only through separately authorized installation or
+refresh; no fallback or service repair and no automatic installation/deployment.
+Explain that Basix
+Scrapling requires Podman or Docker and routes all web requests through the Tor network.
+All Scrapling traffic must use Tor; the shared managed proxy is allowed. Preserve
+ADR 0007's system DNS exception and do not claim every DNS lookup uses Tor.
 The calling researcher is the MCP client: generate a canonical RFC 4122 UUID v4
 from a cryptographically secure system source and pass it as `client_id` on every
-Scrapling tool call. Reuse it for related session calls and never use `default` or
-a server-generated placeholder.
+Scrapling tool call. Reuse the same owner capability for related calls; never log
+or disclose it, use `default`, a `session_id`, or a server-generated placeholder.
+Only deliberately authorized sharing with the spawning parent may transfer it.
+This agent remains read-only: do not invoke `download_start`, `download_cancel`
+or `artifact_export`, and do not write files. Request binary collection through
+an authorized writable parent; return source URLs, expected publisher checksum
+when available, byte/time limits and offline asset requirements. Only inspect
+`download_status` or `artifact_info` when the same-owner capability is deliberately
+shared and inspection is authorized. Extraction is not binary acquisition; do not
+use browser-assisted binary downloads or remote-code/direct-network bypasses.
+Do not expand implementation authority through this skill. Preserve the source
+observations and research coverage workflow above.
 
 <!-- basix-agent-authoring:bootstrap:start -->
 Before any plan, contract message, substantive tool call, or domain work:

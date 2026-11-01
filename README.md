@@ -123,6 +123,7 @@ The installed skills provide these entry points:
 | `basix-planning` | Saved phase plans, numbering, revision, and archival |
 | `basix-adr` | Binding decision checks and ADR lifecycle |
 | `basix-agent-memory` | Evidence-based memory curation and retention |
+| `basix-scrapling` | Tor retrieval, bounded binary acquisition, and verified offline artifact handoff |
 | `basix-source-memory` | Source discovery, independent corroboration, scoped trust, and helpful-use roles |
 | `basix-ticket-management` | Service-independent ticket processing, metadata, and bounded creation recovery |
 | `basix-subagent-efficiency` | Task-level analysis of delegation attempts, retries, and recovery |
