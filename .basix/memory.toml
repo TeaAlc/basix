@@ -385,5 +385,5 @@ usefulness = 1
 [[entries]]
 date = "2026-10-24"
 category = "User Instruction"
-insight = "Assume main is functional. At merges, rerun checks required by integration effects and conflict resolution; run whole-task functionality checks after all plans are implemented and integrated."
+insight = "Always merge your tested and verified feature branches into main before completion. Assume main functional; run integration/conflict checks and final whole-task checks after integration."
 usefulness = 2
