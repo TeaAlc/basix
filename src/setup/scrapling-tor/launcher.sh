@@ -236,9 +236,9 @@ ensure_tor() {
   fi
   if $create; then
     created_tor=true
-    run_created_container created_tor_ref -d --name "$TOR_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
+    run_created_container created_tor_ref -d --name "$TOR_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped --log-driver=none \
       --network "$EGRESS_NET" --cap-drop ALL --security-opt no-new-privileges \
-      --health-cmd 'python3 /opt/basix/service_supervisor.py --probe tor' \
+      --health-cmd 'python3 /opt/basix/service_supervisor.py --probe tor >/dev/null 2>&1' \
       --health-interval 15s --health-timeout 8s --health-start-period 120s --health-retries 3 "$TOR_IMAGE" >/dev/null
     "$RUNTIME" network connect --alias "$BASIX_TOR_HOST" "$INTERNAL_NET" "$TOR_CONTAINER" >/dev/null
     classify_container "$TOR_CONTAINER" tor "$TOR_IMAGE" "$TOR_IMAGE"
@@ -287,13 +287,11 @@ container_diagnostics() {
     bootstrap='n/a'
     [[ $name != "$TOR_CONTAINER" ]] || { tor_bootstrap_verified && bootstrap=verified || bootstrap=failed; }
     printf 'Container %s: state=%s health=%s bootstrap=%s\n' "$name" "$state" "$health" "$bootstrap" >&2
-    printf 'Logs for %s (last 200 lines):\n' "$name" >&2
-    if ! "$RUNTIME" logs --tail 200 "$name" >&2; then
-      printf 'Could not collect logs for %s.\n' "$name" >&2
-    fi
+    printf 'Container log retention: disabled; explicit current probe follows.\n' >&2
     if [[ $name == "$TOR_CONTAINER" ]]; then
-      printf 'Current Tor notices (last 100 lines):\n' >&2
-      "$RUNTIME" exec "$name" tail -n 100 /var/log/tor/notices.log >&2 || true
+      "$RUNTIME" exec "$name" python3 /opt/basix/service_supervisor.py --probe tor >&2 || true
+    else
+      "$RUNTIME" exec "$name" /app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp >&2 || true
     fi
   done
   ip=$(tor_ip 2>/dev/null || true)
@@ -398,12 +396,12 @@ ensure_scrapling() {
     [[ $(stat -c %u "$acquisition_root") == $(id -u) && $(stat -c %a "$acquisition_root") == 700 ]] || { printf "Unsafe acquisition root ownership/mode.\n" >&2; return 7; }
     port_available || { printf 'Loopback port %s is already in use; no resource was replaced.\n' "$PORT" >&2; return 7; }
     created_scrapling=true
-    run_created_container created_scrapling_ref -d --name "$SCRAPLING_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped \
+    run_created_container created_scrapling_ref -d --name "$SCRAPLING_CONTAINER" --label "$LABEL_KEY=$LABEL_VALUE" --restart unless-stopped --log-driver=none \
       --network "$INTERNAL_NET" --cap-drop ALL --security-opt no-new-privileges -p "127.0.0.1:$PORT:$PORT" \
       -e "BASIX_TOR_HOST=$BASIX_TOR_HOST" -e "BASIX_PORT=$PORT" -e "HTTP_PROXY=socks5h://$BASIX_TOR_HOST:9050" -e "HTTPS_PROXY=socks5h://$BASIX_TOR_HOST:9050" -e "ALL_PROXY=socks5h://$BASIX_TOR_HOST:9050" \
       -e "http_proxy=socks5h://$BASIX_TOR_HOST:9050" -e "https_proxy=socks5h://$BASIX_TOR_HOST:9050" -e "all_proxy=socks5h://$BASIX_TOR_HOST:9050" -e 'NO_PROXY=' -e 'no_proxy=' \
       -e 'PYTHONDONTWRITEBYTECODE=1' \
-      --health-cmd '/app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp' \
+      --health-cmd '/app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp >/dev/null 2>&1' \
       --health-interval 15s --health-timeout 8s --health-start-period 120s --health-retries 3 \
       -v "$HERE/policy_mcp.py:/opt/basix/policy_mcp.py:ro" \
       -v "$HERE/service_supervisor.py:/opt/basix/service_supervisor.py:ro" \

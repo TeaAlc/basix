@@ -283,7 +283,7 @@ BASIX_SETUP_REPLACE_SCRAPLING=true run "$launcher" prepare || {
   launcher_status=$?
   ((launcher_status == EXIT_CONFLICT)) && fail "$EXIT_CONFLICT" 'Managed runtime resource conflict; Codex was restored'
   ((launcher_status == EXIT_RUNTIME)) && fail "$EXIT_RUNTIME" 'Host runtime/network namespace unavailable; Codex was restored'
-  fail "$EXIT_VERIFY" 'Status 9: Managed Tor failed validation or bootstrap, or the MCP HTTP/Tor verification failed. Check the container logs and Tor gateway diagnostics above; status 4 is reserved for an unavailable rootless runtime/network namespace. Codex was restored'
+  fail "$EXIT_VERIFY" 'Status 9: Managed Tor failed validation or bootstrap, or the MCP HTTP/Tor verification failed. Check the explicit readiness probes and Tor gateway diagnostics above; status 4 is reserved for an unavailable rootless runtime/network namespace. Codex was restored'
 }
 new_tor_id=$(runtime_container_id basix-scrapling-tor 2>/dev/null || true)
 new_scrapling_id=$(runtime_container_id basix-scrapling-mcp 2>/dev/null || true)

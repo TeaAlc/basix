@@ -1,5 +1,7 @@
 # Active ADRs
 
+- [ADR 0019: Container log retention](ADR_0019_container-log-retention.md) — No retained container log content
+
 - [ADR 0018: Replace retired Tor containers](ADR_0018_replace-retired-tor-containers.md) — Remove owned old containers; current state only
 
 - [ADR 0017: Tor pinning gateway](ADR_0017_tor-pinning-gateway.md) — Preserve SafeSocks with trusted pinned connections

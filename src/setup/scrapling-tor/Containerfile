@@ -2,9 +2,7 @@ FROM docker.io/library/debian:bookworm-slim
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tor ca-certificates python3 \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /var/log/tor \
-    && chown debian-tor:debian-tor /var/log/tor
+    && rm -rf /var/lib/apt/lists/*
 
 COPY torrc /etc/tor/torrc
 COPY service_supervisor.py pinning_gateway.py binary_acquisition.py /opt/basix/
@@ -14,5 +12,5 @@ USER debian-tor
 RUN python3 /opt/basix/service_supervisor.py --help >/dev/null \
     && python3 /opt/basix/pinning_gateway.py --help >/dev/null
 HEALTHCHECK --interval=15s --timeout=8s --start-period=120s --retries=3 \
-  CMD ["python3", "/opt/basix/service_supervisor.py", "--probe", "tor"]
+  CMD python3 /opt/basix/service_supervisor.py --probe tor >/dev/null 2>&1
 ENTRYPOINT ["python3", "/opt/basix/service_supervisor.py", "tor"]

@@ -178,6 +178,23 @@ def bound_loopback_port(host: dict[str, Any]) -> str | None:
     return port
 
 
+def log_kind(host: dict[str, Any]) -> str | None:
+    """Validate runtime logging. :param host: Container HostConfig inspect object."""
+    logging = host.get("LogConfig")
+    if not isinstance(logging, dict) or logging.get("Type") not in ("none", "k8s-file", "json-file", "journald"):
+        return None
+    if set(logging) - {"Type", "Config", "Path", "Tag", "Size"}:
+        return None
+    if any(key in logging and not isinstance(logging[key], str) for key in ("Path", "Tag")):
+        return None
+    options = logging.get("Config")
+    if options is not None and (not isinstance(options, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in options.items())):
+        return None
+    if "Size" in logging and (type(logging["Size"]) not in (str, int) or (type(logging["Size"]) is int and logging["Size"] < 0)):
+        return None
+    return logging["Type"]
+
+
 def legacy(container: dict[str, Any], source: str) -> bool:
     """Check container is a replaceable numeric-proxy legacy using source."""
     config, host = base(container)
@@ -190,6 +207,7 @@ def legacy(container: dict[str, Any], source: str) -> bool:
         autoremove = str(annotations.get("io.podman.annotations.autoremove", "")).upper() == "TRUE"
     return (
         secure_base(container)
+        and log_kind(host) is not None
         and networks == {INTERNAL}
         and not (host.get("PortBindings") or {})
         and not bool(host.get("PublishAllPorts"))
@@ -213,12 +231,15 @@ def scrapling_related(container: dict[str, Any]) -> bool:
 
 
 def managed(container: dict[str, Any], args: argparse.Namespace) -> int:
-    """Classify managed container using parsed args; return policy exit code."""
+    """Classify ownership. :param container: Inspect object. :param args: Expected runtime identity."""
     config, host = base(container)
     networks = set(((container.get("NetworkSettings") or {}).get("Networks") or {}))
     restart = (host.get("RestartPolicy") or {}).get("Name")
     annotations = config.get("Annotations") or {}
     autoremove = host.get("AutoRemove") is True or ("AutoRemove" not in host and str(annotations.get("io.podman.annotations.autoremove", "")).upper() == "TRUE")
+    logging = log_kind(host)
+    if logging is None:
+        return 1
     if not secure_base(container) or restart not in (None, "", "no", "unless-stopped"):
         print(f"Managed {args.kind} policy rejected: security={secure_base(container)} restart_allowed={restart in (None, '', 'no', 'unless-stopped')}", file=sys.stderr)
         return 1
@@ -232,7 +253,8 @@ def managed(container: dict[str, Any], args: argparse.Namespace) -> int:
             (entrypoint == supervised_argv and not command)
             or scalar_entrypoint_matches(container, supervised_argv)
         )
-        supervised_health = health.get("Test") == new_health
+        quiet_health = ["CMD-SHELL", new_health[1] + " >/dev/null 2>&1"]
+        supervised_health = health.get("Test") in (new_health, quiet_health)
         supervised = supervised_command and supervised_health
         old_command = (
             (entrypoint == ["tor", "-f", "/etc/tor/torrc"] and not command)
@@ -253,7 +275,9 @@ def managed(container: dict[str, Any], args: argparse.Namespace) -> int:
         command = sequence(config.get("Cmd"))
         entrypoint_valid = sequence(config.get("Entrypoint")) == [PYTHON]
         supervised_command = entrypoint_valid and command == [SUPERVISOR, "mcp"]
-        supervised_health = health.get("Test") == ["CMD-SHELL", f"{PYTHON} {SUPERVISOR} --probe mcp"]
+        previous_health = ["CMD-SHELL", f"{PYTHON} {SUPERVISOR} --probe mcp"]
+        quiet_health = ["CMD-SHELL", previous_health[1] + " >/dev/null 2>&1"]
+        supervised_health = health.get("Test") in (previous_health, quiet_health)
         supervised = supervised_command and supervised_health
         old_command, old_probe = entrypoint_valid and command == [POLICY], not health
         old = old_command and old_probe
@@ -263,7 +287,7 @@ def managed(container: dict[str, Any], args: argparse.Namespace) -> int:
     if not valid:
         print(f"Managed {args.kind} policy rejected: networks={networks_valid} mounts={mounts_valid} ports={ports_valid} supervised_command={supervised_command} supervised_health={supervised_health} legacy_command={old_command} legacy_health={old_probe}" + (f" proxy={proxy_kind is not None}" if args.kind == "scrapling" else ""), file=sys.stderr)
         return 1
-    exact = supervised and not autoremove and restart == "unless-stopped" and normalized_image(container.get("Image")) == normalized_image(args.actual) and normalized_image(config.get("Image")) == normalized_image(args.configured)
+    exact = supervised and health.get("Test") == quiet_health and logging == "none" and not autoremove and restart == "unless-stopped" and normalized_image(container.get("Image")) == normalized_image(args.actual) and normalized_image(config.get("Image")) == normalized_image(args.configured)
     if args.kind == "scrapling":
         exact = exact and proxy_kind == "canonical" and bound_port == args.port and any(m.get("Destination") == "/var/lib/basix-acquisition" for m in container.get("Mounts", []))
     elif args.kind == "tor":

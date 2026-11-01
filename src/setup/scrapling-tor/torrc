@@ -6,5 +6,5 @@ DataDirectory /var/lib/tor
 SafeSocks 1
 VirtualAddrNetworkIPv4 127.192.0.0/10
 TestSocks 1
-Log notice file /var/log/tor/notices.log
+Log notice stdout
 RunAsDaemon 0

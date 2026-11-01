@@ -27,6 +27,55 @@ class AcquisitionError(Exception):
     """Safe machine-readable error, never containing remote input."""
 
 
+class Cancellation(threading.Event):
+    """Interrupt registered sockets without releasing worker-owned storage early."""
+
+    def __init__(self):
+        """Initialize the event and synchronized socket ownership."""
+        super().__init__()
+        self.sockets = set()
+        self.socket_lock = threading.Lock()
+
+    def track(self, sock):
+        """Register transport. :param sock: Worker-owned socket."""
+        with self.socket_lock:
+            self.sockets.add(sock)
+            if self.is_set():
+                with contextlib.suppress(OSError):
+                    socket.socket.shutdown(sock, socket.SHUT_RDWR)
+        return sock
+
+    def close(self, sock):
+        """Close without racing cancellation shutdown. :param sock: Owned socket."""
+        with self.socket_lock:
+            self.sockets.discard(sock)
+            sock.close()
+
+    def tls(self, sock, context, host):
+        """Transfer ownership before TLS I/O. :param sock: Plain socket. :param context: Verified TLS context. :param host: Original SNI hostname."""
+        with self.socket_lock:
+            secured = context.wrap_socket(sock, server_hostname=host, do_handshake_on_connect=False)
+            self.sockets.discard(sock)
+            self.sockets.add(secured)
+            if self.is_set():
+                with contextlib.suppress(OSError):
+                    socket.socket.shutdown(secured, socket.SHUT_RDWR)
+        try:
+            secured.do_handshake()
+            return secured
+        except BaseException:
+            self.close(secured)
+            raise
+
+    def set(self):
+        """Request cancellation and wake blocked socket operations promptly."""
+        super().set()
+        with self.socket_lock:
+            for sock in self.sockets:
+                with contextlib.suppress(OSError):
+                    socket.socket.shutdown(sock, socket.SHUT_RDWR)
+
+
 def client_key(client_id):
     """Validate and hash a bearer capability. :param client_id: Canonical UUID v4."""
     try:
@@ -172,17 +221,42 @@ class TorTransport:
         if proxy_host != "basix-tor-proxy":
             raise AcquisitionError("proxy_configuration_rejected")
         self.proxy_host, self.timeout = proxy_host, timeout
+        self.local = threading.local()
+
+    def close(self, sock):
+        """Close registered I/O safely. :param sock: Worker-owned socket."""
+        cancelled = getattr(self.local, "cancelled", None)
+        if isinstance(cancelled, Cancellation):
+            cancelled.close(sock)
+        else:
+            sock.close()
 
     def command(self, command, address, port, deadline):
         """Exchange SOCKS request. :param command: RESOLVE/CONNECT. :param address: Target bytes. :param port: Target port. :param deadline: Total deadline."""
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise AcquisitionError("time_limit")
-        sock = proxy_connect((self.proxy_host, 9050 if command == 0xF0 else 9052), min(self.timeout, remaining))
         try:
+            sock = proxy_connect((self.proxy_host, 9050 if command == 0xF0 else 9052), min(self.timeout, remaining))
+        except AcquisitionError as exc:
+            if str(exc) == "time_limit" and time.monotonic() < deadline:
+                raise AcquisitionError("tor_transport_failed") from None
+            raise
+        cancelled = getattr(self.local, "cancelled", None)
+        if isinstance(cancelled, Cancellation):
+            cancelled.track(sock)
+        try:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AcquisitionError("time_limit")
+            sock.settimeout(min(self.timeout, remaining))
             sock.sendall(b"\x05\x01\x00")
             if receive(sock, 2, deadline) != b"\x05\x00":
                 raise AcquisitionError("tor_unavailable")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AcquisitionError("time_limit")
+            sock.settimeout(min(self.timeout, remaining))
             sock.sendall(b"\x05" + bytes([command]) + b"\x00" + address + port.to_bytes(2, "big"))
             version, status, reserved, kind = receive(sock, 4, deadline)
             if version == 5 and status == 2 and command == 1:
@@ -193,7 +267,7 @@ class TorTransport:
             receive(sock, 2, deadline)
             return sock, str(ipaddress.ip_address(packed))
         except BaseException:
-            sock.close()
+            self.close(sock)
             raise
 
     def response(self, url, deadline):
@@ -206,7 +280,7 @@ class TorTransport:
             except ValueError:
                 encoded = host.encode("ascii")
                 resolve, resolved = self.command(0xF0, b"\x03" + bytes([len(encoded)]) + encoded, 0, deadline)
-                resolve.close()
+                self.close(resolve)
                 address = public_address(resolved)
             sock, _ = self.command(1, bytes([1 if address.version == 4 else 4]) + address.packed, port, deadline)
             try:
@@ -215,7 +289,9 @@ class TorTransport:
                     raise AcquisitionError("time_limit")
                 sock.settimeout(min(self.timeout, remaining))
                 if parsed.scheme == "https":
-                    sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
+                    context = ssl.create_default_context()
+                    cancelled = getattr(self.local, "cancelled", None)
+                    sock = cancelled.tls(sock, context, host) if isinstance(cancelled, Cancellation) else context.wrap_socket(sock, server_hostname=host)
                 path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
                 authority = f"[{host}]" if ":" in host else host
                 if port != (443 if parsed.scheme == "https" else 80):
@@ -229,14 +305,22 @@ class TorTransport:
                 response.begin()
                 return response, sock
             except BaseException:
-                sock.close()
+                self.close(sock)
                 raise
         except AcquisitionError:
             raise
         except (OSError, ssl.SSLError, http.client.HTTPException):
-            raise AcquisitionError("tor_transport_failed") from None
+            raise AcquisitionError("time_limit" if time.monotonic() >= deadline else "tor_transport_failed") from None
 
     def download(self, url, output, maximum, deadline, cancelled):
+        """Bind per-worker cancellation. :param url: Sensitive URL. :param output: Private sink. :param maximum: Byte cap. :param deadline: Absolute deadline. :param cancelled: Cancellation event."""
+        self.local.cancelled = cancelled
+        try:
+            return self.transfer(url, output, maximum, deadline, cancelled)
+        finally:
+            del self.local.cancelled
+
+    def transfer(self, url, output, maximum, deadline, cancelled):
         """Stream exact body bytes. :param url: Sensitive URL. :param output: Private binary sink. :param maximum: Byte cap. :param deadline: Monotonic deadline. :param cancelled: Cancellation event."""
         chain, seen = [], set()
         for hop in range(6):
@@ -293,10 +377,10 @@ class TorTransport:
             except AcquisitionError:
                 raise
             except (OSError, http.client.HTTPException):
-                raise AcquisitionError("tor_transport_failed") from None
+                raise AcquisitionError("time_limit" if time.monotonic() >= deadline else "tor_transport_failed") from None
             finally:
                 response.close()
-                sock.close()
+                self.close(sock)
         raise AcquisitionError("redirect_limit")
 
 
@@ -314,6 +398,7 @@ class AcquisitionManager:
         self.transport, self.ready = transport or TorTransport(), ready
         self.max_bytes, self.max_jobs, self.ttl = max_bytes, max_jobs, ttl
         self.jobs, self.events, self.tasks = {}, {}, {}
+        self.reservations = {}
         self.maintenance = None
         self.orphan_exports = set()
         self.lock = asyncio.Lock()
@@ -332,7 +417,11 @@ class AcquisitionManager:
                     job.update(state="failed", error="interrupted")
                 if job["job_id"] != name[:-5] or not re.fullmatch(r"[0-9a-f]{64}", job["owner"]):
                     raise AcquisitionError("state_manifest_unsafe")
+                if job.get("export_name") is not None and not re.fullmatch(r"[0-9a-f]{32}\.bin", str(job["export_name"])):
+                    raise AcquisitionError("state_manifest_unsafe")
                 if job["state"] == "completed":
+                    if type(job.get("length")) is not int or not 0 <= job["length"] <= self.max_bytes:
+                        raise AcquisitionError("state_manifest_unsafe")
                     try:
                         info = os.stat(job["job_id"] + ".bin", dir_fd=self.fd, follow_symlinks=False)
                         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size != job["length"]:
@@ -423,6 +512,35 @@ class AcquisitionManager:
             finally:
                 os.close(export_fd)
 
+    def storage_bytes(self):
+        """Count actual retained data plus bounded active reservations, once per inode."""
+        total = sum(self.reservations.values())
+        seen = set()
+        def count(directory, active=False):
+            """Count data files. :param directory: Open directory. :param active: Exclude reserved job files."""
+            size = 0
+            for name in os.listdir(directory):
+                if not re.fullmatch(r"[0-9a-f]{32}\.(?:bin|part)", name):
+                    continue
+                if active and name.split(".")[0] in self.reservations:
+                    continue
+                info = os.stat(name, dir_fd=directory, follow_symlinks=False)
+                if not stat.S_ISREG(info.st_mode):
+                    raise AcquisitionError("state_manifest_unsafe")
+                identity = (info.st_dev, info.st_ino)
+                if identity not in seen:
+                    seen.add(identity)
+                    size += info.st_size
+            return size
+        total += count(self.fd, True)
+        if "export" in os.listdir(self.fd):
+            descriptor = os.open("export", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=self.fd)
+            try:
+                total += count(descriptor)
+            finally:
+                os.close(descriptor)
+        return total
+
     def owned(self, client_id, resource_id):
         """Find an owned resource. :param client_id: Capability. :param resource_id: Opaque job/artifact ID."""
         owner = client_key(client_id)
@@ -457,7 +575,8 @@ class AcquisitionManager:
                     if job["request_key"] != request:
                         raise AcquisitionError("idempotency_conflict")
                     return self.view(job)
-            if len(self.jobs) >= self.max_jobs or sum(j["state"] == "running" for j in self.jobs.values()) >= 2 or 2 * (sum(j.get("length", 0) for j in self.jobs.values()) + (1 + sum(j["state"] == "running" for j in self.jobs.values())) * self.max_bytes) > 134217728:
+            maximum = min(maximum_bytes, self.max_bytes)
+            if len(self.jobs) >= self.max_jobs or len(self.reservations) >= 2 or self.storage_bytes() + maximum > 134217728:
                 raise AcquisitionError("capacity_limit")
             if self.ready is None or not await self.ready():
                 raise AcquisitionError("tor_unavailable_retryable")
@@ -465,9 +584,29 @@ class AcquisitionManager:
             job = dict(job_id=key, state="running", owner=owner, request_key=request, idempotency=idem, created=time.time(), policy=POLICY_VERSION)
             self.persist(job)
             self.jobs[key] = job
-            self.events[key] = threading.Event()
+            self.reservations[key] = maximum
+            self.events[key] = Cancellation()
             self.tasks[key] = asyncio.create_task(self.run(job, url, expected_sha256, min(maximum_bytes, self.max_bytes), time_budget))
+            self.tasks[key].add_done_callback(lambda task: self.cancel_before_entry(job, task))
             return self.view(job)
+
+    def cancel_before_entry(self, job, task):
+        """Finalize an unentered task. :param job: Owned manifest. :param task: Completed manager task."""
+        key = job["job_id"]
+        # Every entered run catches cancellation while joining its worker and
+        # removes its task in finally. Only cancellation before entry can leave
+        # this exact cancelled task registered; no executor or partial exists.
+        if not task.cancelled() or self.tasks.get(key) is not task:
+            return
+        job.update(state="cancelled", error="cancelled", retryable=False)
+        try:
+            self.persist(job)
+        except OSError:
+            job.update(state="failed", error="storage_or_transport_failed", retryable=False)
+        finally:
+            self.events.pop(key, None)
+            self.tasks.pop(key, None)
+            self.reservations.pop(key, None)
 
     async def run(self, job, url, expected, maximum, budget):
         """Publish only verified bytes. :param job: Owned state. :param url: Ephemeral URL. :param expected: Expected digest. :param maximum: Byte cap. :param budget: Seconds."""
@@ -488,7 +627,16 @@ class AcquisitionManager:
                 os.fsync(output.fileno())
                 return result
         try:
-            length, digest, chain = await asyncio.to_thread(worker)
+            pending = asyncio.get_running_loop().run_in_executor(None, worker)
+            while True:
+                try:
+                    await asyncio.wait({pending})
+                    break
+                except asyncio.CancelledError:
+                    # Task cancellation must not release files/reservations while
+                    # its executor thread can still write. Interrupt then join it.
+                    self.events[key].set()
+            length, digest, chain = pending.result()
             if self.events[key].is_set():
                 raise AcquisitionError("cancelled")
             if expected and expected != digest:
@@ -496,7 +644,7 @@ class AcquisitionManager:
             os.link(key + ".part", key + ".bin", src_dir_fd=self.fd, dst_dir_fd=self.fd, follow_symlinks=False)
             job.update(state="completed", artifact_id=key, length=length, sha256=digest, origins=chain, tls_verified=all(x.startswith("https:") for x in chain), completed=time.time())
         except Exception as exc:
-            code = str(exc) if isinstance(exc, AcquisitionError) else "storage_or_transport_failed"
+            code = "cancelled" if self.events[key].is_set() else str(exc) if isinstance(exc, AcquisitionError) else "storage_or_transport_failed"
             job.update(state="cancelled" if code == "cancelled" else "failed", error=code, retryable=code.startswith("tor_") and code != "tor_pinning_unsupported")
         finally:
             try:
@@ -516,6 +664,7 @@ class AcquisitionManager:
             finally:
                 self.events.pop(key, None)
                 self.tasks.pop(key, None)
+                self.reservations.pop(key, None)
 
     async def download_status(self, client_id: str, job_id: str):
         """Inspect job without restarting it. :param client_id: Capability. :param job_id: Opaque ID."""
@@ -554,6 +703,8 @@ class AcquisitionManager:
                     raise AcquisitionError("export_root_unsafe")
                 if job.get("export_name"):
                     return dict(filename=job["export_name"], length=job["length"], sha256=job["sha256"])
+                if self.storage_bytes() + job["length"] > 134217728:
+                    raise AcquisitionError("capacity_limit")
                 name = uuid.uuid4().hex + ".bin"
                 source = os.open(artifact_id + ".bin", os.O_RDONLY | os.O_NOFOLLOW, dir_fd=self.fd)
                 try:

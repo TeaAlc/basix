@@ -116,11 +116,11 @@ case "${1-}" in
       if ((tor)); then
         entrypoint='"python3 /opt/basix/service_supervisor.py tor"'
         runtime_command='"Path":"python3","Args":["/opt/basix/service_supervisor.py","tor"],'
-        health='{"Test":["CMD-SHELL","python3 /opt/basix/service_supervisor.py --probe tor"]}'
+        health='{"Test":["CMD-SHELL","python3 /opt/basix/service_supervisor.py --probe tor >/dev/null 2>&1"]}'
         [[ ${MOCK_NEW_TOR_ALIAS_MISSING:-false} != true ]] || nets='{"basix-tor-egress":{},"basix-scrapling-internal":{}}'
       else
         cmd='["/opt/basix/service_supervisor.py","mcp"]'
-        health='{"Test":["CMD-SHELL","/app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp"]}'
+        health='{"Test":["CMD-SHELL","/app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp >/dev/null 2>&1"]}'
         mounts=${mounts%]}
         mounts+=",{\"Source\":\"$MOCK_ROOT/home/codex/basix/scrapling-tor/service_supervisor.py\",\"Destination\":\"/opt/basix/service_supervisor.py\",\"RW\":false}]"
         if [[ -f $MOCK_ROOT/acquisition-$name ]]; then
@@ -136,7 +136,7 @@ case "${1-}" in
     restart=${MOCK_RESTART:-unless-stopped}
     [[ $restart != legacy-empty || -f $MOCK_ROOT/restart-current-$name ]] || restart=''
     [[ $restart != legacy-empty ]] || restart=unless-stopped
-    printf '[{%s"Image":"%s","EffectiveCaps":[],"BoundingCaps":[],"Mounts":%s,"Config":{"Image":"%s","Env":%s,"Entrypoint":%s,"Cmd":%s,"Healthcheck":%s,"CreateCommand":["podman","run","--cap-drop","ALL"],"Labels":{"io.basix.scrapling-tor.managed":"%s"}},"HostConfig":{"AutoRemove":%s,"Privileged":false,"CapAdd":null,"CapDrop":["ALL"],"PortBindings":%s,"SecurityOpt":["no-new-privileges"],"RestartPolicy":{"Name":"%s"}},"NetworkSettings":{"Networks":%s}}]\n' "$runtime_command" "$image" "$mounts" "$config_image" "$env" "$entrypoint" "$cmd" "$health" "$owner" "$autoremove" "$ports" "$restart" "$nets" ;;
+    printf '[{%s"Image":"%s","EffectiveCaps":[],"BoundingCaps":[],"Mounts":%s,"Config":{"Image":"%s","Env":%s,"Entrypoint":%s,"Cmd":%s,"Healthcheck":%s,"CreateCommand":["podman","run","--cap-drop","ALL"],"Labels":{"io.basix.scrapling-tor.managed":"%s"}},"HostConfig":{"LogConfig":{"Type":"none"},"AutoRemove":%s,"Privileged":false,"CapAdd":null,"CapDrop":["ALL"],"PortBindings":%s,"SecurityOpt":["no-new-privileges"],"RestartPolicy":{"Name":"%s"}},"NetworkSettings":{"Networks":%s}}]\n' "$runtime_command" "$image" "$mounts" "$config_image" "$env" "$entrypoint" "$cmd" "$health" "$owner" "$autoremove" "$ports" "$restart" "$nets" ;;
   exec)
     if [[ $* == *'/var/log/tor/notices.log'* || $* == *'--probe tor'* ]]; then
       [[ ${MOCK_BOOTSTRAP:-true} == true ]]
@@ -220,7 +220,10 @@ check() {
 }
 
 make_mocks; run_installer
-grep -qx 'PORT=8002' "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
+[[ $(grep -c -- '--name basix-scrapling-.*--log-driver=none' "$log") == 2 ]] || status=99
+[[ $(grep -c -- '--health-cmd .*--probe .* >/dev/null 2>&1' "$log") == 2 ]] || status=99
+! grep -q 'podman logs\|/var/log/tor/notices.log' "$log" || status=99
+grep -qx 'PORT=8002'  "$case_dir/home/codex/basix/scrapling-tor/config" || status=99
 grep -q -- '--network basix-scrapling-internal.*-p 127.0.0.1:8002:8002' "$log" || status=99
 grep -q 'codex mcp add scrapling --url http://127.0.0.1:8002/mcp' "$log" || status=99
 check 'default installs isolated persistent HTTP service' 0 'Endpoint: http://127.0.0.1:8002/mcp'
@@ -268,7 +271,7 @@ grep -q 'rm -f tor-created-id' "$log" || status=99
 check 'failed Tor run rolls back the exact created container ID' 9 'Managed Tor failed validation or bootstrap' 'codex mcp add'
 
 make_mocks; MOCK_NEW_TOR_ALIAS_MISSING=true run_installer
-diag_line=$(grep -n 'podman logs --tail 200 basix-scrapling-tor' "$log" | head -n1 | cut -d: -f1)
+diag_line=$(grep -n 'podman exec basix-scrapling-tor python3 /opt/basix/service_supervisor.py --probe tor' "$log" | head -n1 | cut -d: -f1)
 rollback_line=$(grep -n 'podman rm -f tor-running-id' "$log" | head -n1 | cut -d: -f1)
 [[ -n $diag_line && -n $rollback_line && $diag_line -lt $rollback_line ]] || status=99
 grep -q 'Managed service preparation failed at launcher line .* (exit 10)' "$output" || status=99
@@ -356,7 +359,7 @@ mkdir -p "$old_support"
 printf 'old support\n' >"$old_support/old-marker"
 MOCK_HANDSHAKE=fail run_installer
 [[ ! -e "$old_support/old-marker" && -f "$old_support/policy_mcp.py" ]] || status=99
-diag_line=$(grep -n 'podman logs --tail 200 basix-scrapling-tor' "$log" | tail -n1 | cut -d: -f1)
+diag_line=$(grep -n 'podman exec basix-scrapling-tor python3 /opt/basix/service_supervisor.py --probe tor' "$log" | tail -n1 | cut -d: -f1)
 rollback_line=$(grep -n 'podman rm -f tor-running-id' "$log" | tail -n1 | cut -d: -f1)
 [[ -n $diag_line && -n $rollback_line && $diag_line -lt $rollback_line ]] || status=99
 grep -q 'Managed service preparation failed; collecting container diagnostics before rollback' "$output" || status=99

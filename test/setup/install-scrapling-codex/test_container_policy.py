@@ -99,6 +99,7 @@ class CandidateTests(unittest.TestCase):
 
     def test_each_security_invariant_blocks_migration(self):
         mutations = (
+            lambda c: c["HostConfig"].update(LogConfig={"Type": []}),
             lambda c: c["Config"]["Labels"].clear(),
             lambda c: c["NetworkSettings"]["Networks"].update({"host": {}}),
             lambda c: c["Config"]["Env"].remove("HTTP_PROXY=socks5h://10.89.1.1:9050"),
@@ -143,7 +144,8 @@ class SupervisorPolicyTests(unittest.TestCase):
         """Return self's fixture with the exact canonical supervisor mount and probe."""
         current = copy.deepcopy(self.current)
         current["Config"]["Cmd"] = [policy.SUPERVISOR, "mcp"]
-        current["Config"]["Healthcheck"] = {"Test": ["CMD-SHELL", f"{policy.PYTHON} {policy.SUPERVISOR} --probe mcp"]}
+        current["HostConfig"]["LogConfig"] = {"Type": "none"}
+        current["Config"]["Healthcheck"] = {"Test": ["CMD-SHELL", f"{policy.PYTHON} {policy.SUPERVISOR} --probe mcp >/dev/null 2>&1"]}
         current["Mounts"].append({"Source": "/tmp/codex/basix/scrapling-tor/service_supervisor.py", "Destination": policy.SUPERVISOR, "RW": False})
         for name in ("binary_acquisition.py", "health_check.py"):
             current["Mounts"].append({"Source": "/tmp/codex/basix/scrapling-tor/" + name, "Destination": "/opt/basix/" + name, "RW": False})
@@ -162,6 +164,21 @@ class SupervisorPolicyTests(unittest.TestCase):
         disabled["HostConfig"]["RestartPolicy"]["Name"] = "always"
         self.assertEqual(policy.managed(disabled, self.args), 1)
 
+    def test_logging_drift_and_malformed_inspect(self):
+        """Require self's silent current logging while recognizing safe old runtimes."""
+        current = self.supervised()
+        for driver in ("k8s-file", "journald", "json-file"):
+            current["HostConfig"]["LogConfig"] = {"Type": driver}
+            self.assertEqual(policy.managed(current, self.args), 10)
+        for config in (None, {}, [], {"Type": []}, {"Type": "unknown"}, {"Type": "none", "Config": []}, {"Type": "none", "Path": []}, {"Type": "none", "Size": -1}, {"Type": "none", "Foreign": "value"}):
+            current["HostConfig"]["LogConfig"] = config
+            self.assertEqual(policy.managed(current, self.args), 1)
+        current = self.supervised()
+        current["Config"]["Healthcheck"]["Test"][1] = f"{policy.PYTHON} {policy.SUPERVISOR} --probe mcp"
+        self.assertEqual(policy.managed(current, self.args), 10)
+        current["Config"]["Labels"].clear()
+        self.assertEqual(policy.managed(current, self.args), 1)
+
     def test_published_autoremove_http_is_owned_retired(self):
         """Identify retired resources without permitting reuse or altering inspect data."""
         current = self.supervised()
@@ -179,6 +196,7 @@ class SupervisorPolicyTests(unittest.TestCase):
             lambda c: c["Config"].update(Cmd=[policy.SUPERVISOR, "tor"]),
             lambda c: c["Config"].update(Healthcheck={"Test": ["CMD-SHELL", "true"]}),
             lambda c: c["NetworkSettings"]["Networks"].update({"host": {}}),
+            lambda c: c["HostConfig"].update(LogConfig={"Type": []}),
             lambda c: c["Config"]["Labels"].clear(),
         )
         for mutation in mutations:
@@ -213,7 +231,8 @@ class SupervisorPolicyTests(unittest.TestCase):
                 self.assertEqual(policy.managed(modified, self.args), 1)
         current["Config"]["Entrypoint"] = ["python3", policy.SUPERVISOR, "tor"]
         current["Config"]["Cmd"] = []
-        current["Config"]["Healthcheck"]["Test"] = ["CMD-SHELL", f"python3 {policy.SUPERVISOR} --probe tor"]
+        current["HostConfig"]["LogConfig"] = {"Type": "none"}
+        current["Config"]["Healthcheck"]["Test"] = ["CMD-SHELL", f"python3 {policy.SUPERVISOR} --probe tor >/dev/null 2>&1"]
         self.assertEqual(policy.managed(current, self.args), 0)
         current["Config"]["Entrypoint"] = ["sh", "-c", "sleep infinity"]
         self.assertEqual(policy.managed(current, self.args), 1)
@@ -228,8 +247,9 @@ class SupervisorPolicyTests(unittest.TestCase):
         current["HostConfig"]["PortBindings"] = {}
         current["NetworkSettings"]["Networks"] = {policy.EGRESS: {}, policy.INTERNAL: {"Aliases": [policy.TOR_HOST]}}
         self.args.kind = "tor"
+        current["HostConfig"]["LogConfig"] = {"Type": "none"}
         for argv, probe, expected in (
-            (["python3", policy.SUPERVISOR, "tor"], f"python3 {policy.SUPERVISOR} --probe tor", 0),
+            (["python3", policy.SUPERVISOR, "tor"], f"python3 {policy.SUPERVISOR} --probe tor >/dev/null 2>&1", 0),
             (["tor", "-f", "/etc/tor/torrc"], "grep -q 'Bootstrapped 100%' /var/log/tor/notices.log", 10),
         ):
             if expected == 10:
@@ -256,7 +276,8 @@ class SupervisorPolicyTests(unittest.TestCase):
                     lambda c: c.pop("Args"),
                     lambda c: c["Config"].update(Entrypoint='["' + '","'.join(argv) + '"]'),
                     lambda c: c["Config"].update(Entrypoint="  ".join(argv)),
-                    lambda c: c["Config"]["Labels"].clear(),
+                    lambda c: c["HostConfig"].update(LogConfig={"Type": []}),
+            lambda c: c["Config"]["Labels"].clear(),
                     lambda c: c["NetworkSettings"]["Networks"].update({"host": {}}),
                     lambda c: c["Mounts"].append({"Destination": "/tmp", "RW": True}),
                 )

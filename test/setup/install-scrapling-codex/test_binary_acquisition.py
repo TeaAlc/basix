@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic socket-pair protocol and artifact security acceptance."""
 import asyncio
+import gc
 import gzip
 import hashlib
 import importlib.util
@@ -194,6 +195,38 @@ class TransportTests(unittest.TestCase):
             self.assertEqual(connect.call_count, 1)
             self.assertEqual(connect.call_args.args[0], ("basix-tor-proxy", 9050))
 
+    def test_actual_socket_timeouts_observe_absolute_budget(self):
+        """Classify self's stalled SOCKS, headers, TLS and body by the absolute budget."""
+        for stage in ("socks", "headers", "tls", "body"):
+            with self.subTest(stage=stage):
+                client, peer = socket.socketpair()
+                stop = threading.Event()
+                def stalled():
+                    """Keep the fixture peer open until its caller finishes."""
+                    stop.wait(1)
+                worker = threading.Thread(target=stalled)
+                worker.start()
+                try:
+                    transport = binary.TorTransport()
+                    deadline = time.monotonic() + .04
+                    if stage == "socks":
+                        with patch.object(binary, "proxy_connect", return_value=client), self.assertRaisesRegex(binary.AcquisitionError, "time_limit"):
+                            transport.response("http://8.8.8.8/", deadline)
+                    elif stage in ("headers", "tls"):
+                        with patch.object(transport, "command", return_value=(client, "8.8.8.8")), self.assertRaisesRegex(binary.AcquisitionError, "time_limit"):
+                            transport.response(("https" if stage == "tls" else "http") + "://8.8.8.8/", deadline)
+                    else:
+                        peer.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n")
+                        with patch.object(transport, "command", return_value=(client, "8.8.8.8")), self.assertRaisesRegex(binary.AcquisitionError, "time_limit"):
+                            transport.download("http://8.8.8.8/", io.BytesIO(), 10, deadline, threading.Event())
+                finally:
+                    stop.set()
+                    client.close()
+                    peer.close()
+                    worker.join(1)
+        with patch.object(binary, "proxy_connect", side_effect=socket.timeout()), self.assertRaisesRegex(binary.AcquisitionError, "tor_transport_failed"):
+            binary.TorTransport().response("http://8.8.8.8/", time.monotonic() + 10)
+
     def test_url_rejections_before_socket(self):
         with self.assertRaises(binary.AcquisitionError):
             binary.target("http://example.com:0/")
@@ -272,6 +305,143 @@ class JobTests(unittest.IsolatedAsyncioTestCase):
             return True
         self.manager = binary.AcquisitionManager(self.temp.name, self.transport, ready)
 
+    async def test_cancel_interrupts_blocked_socket_stages(self):
+        """Self's cancellation wakes real SOCKS, TLS, headers and body I/O before release."""
+        for stage in ("socks", "tls", "headers", "body"):
+            with self.subTest(stage=stage):
+                client, peer = socket.socketpair()
+                reached, stop = threading.Event(), threading.Event()
+                errors = []
+                def serve():
+                    """Hold a protocol stage open until the test cancels its worker."""
+                    try:
+                        self.assertEqual(binary.receive(peer, 3), b"\x05\x01\x00")
+                        if stage != "socks":
+                            peer.sendall(b"\x05\x00")
+                            self.assertEqual(len(binary.receive(peer, 10)), 10)
+                            peer.sendall(b"\x05\x00\x00\x01\x08\x08\x08\x08\x00\x50")
+                            if stage != "tls":
+                                request = b""
+                                while not request.endswith(b"\r\n\r\n"):
+                                    request += binary.receive(peer, 1)
+                                if stage == "body":
+                                    peer.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nx")
+                        reached.set()
+                        stop.wait(3)
+                    except Exception as exc:
+                        errors.append(exc)
+                thread = threading.Thread(target=serve)
+                thread.start()
+                self.manager.transport = binary.TorTransport()
+                try:
+                    with patch.object(binary, "proxy_connect", return_value=client):
+                        job = await self.manager.download_start(self.client, ("https" if stage == "tls" else "http") + "://8.8.8.8/", time_budget=30)
+                        self.assertTrue(await asyncio.to_thread(reached.wait, 1))
+                        # Let the worker enter the deliberately blocked protocol read.
+                        await asyncio.sleep(.03)
+                        self.assertIn(job["job_id"], self.manager.reservations)
+                        task = self.manager.tasks[job["job_id"]]
+                        started = time.monotonic()
+                        await self.manager.download_cancel(self.client, job["job_id"])
+                        await asyncio.wait_for(asyncio.shield(task), 1)
+                        self.assertLess(time.monotonic() - started, .5)
+                        result = await self.manager.download_status(self.client, job["job_id"])
+                        self.assertEqual(result["state"], "cancelled")
+                        self.assertEqual(result["error"], "cancelled")
+                        self.assertFalse(result["retryable"])
+                        self.assertNotIn(job["job_id"], self.manager.reservations)
+                        self.assertNotIn(job["job_id"], self.manager.tasks)
+                        self.assertEqual(list(Path(self.temp.name).glob("*.part")), [])
+                        self.assertEqual(list(Path(self.temp.name).glob("*.bin")), [])
+                        manifest = json.loads((Path(self.temp.name)/(job["job_id"] + ".json")).read_text())
+                        self.assertEqual(manifest["state"], "cancelled")
+                finally:
+                    stop.set()
+                    peer.close()
+                    thread.join(1)
+                    client.close()
+                self.assertEqual(errors, [])
+
+    async def test_task_cancellation_keeps_reservation_until_worker_stops(self):
+        """Self's executor remains joined even when its asyncio owner is cancelled."""
+        loop = asyncio.get_running_loop()
+        errors = []
+        previous = loop.get_exception_handler()
+        def capture(loop, context):
+            """Record orphan errors. :param loop: Active loop. :param context: Unhandled exception context."""
+            errors.append(context)
+        loop.set_exception_handler(capture)
+        self.addCleanup(loop.set_exception_handler, previous)
+        entered, finish = threading.Event(), threading.Event()
+        def held(url, output, maximum, deadline, cancelled):
+            """Hold worker. :param url: URL. :param output: Sink. :param maximum: Cap. :param deadline: Deadline. :param cancelled: Event."""
+            entered.set()
+            finish.wait(2)
+            output.write(b"x")
+            raise binary.AcquisitionError("time_limit")
+        self.manager.transport.download = held
+        job = await self.manager.download_start(self.client, "https://example.com/")
+        self.assertTrue(await asyncio.to_thread(entered.wait, 1))
+        task = self.manager.tasks[job["job_id"]]
+        task.cancel()
+        await asyncio.sleep(.03)
+        self.assertFalse(task.done())
+        self.assertIn(job["job_id"], self.manager.reservations)
+        self.assertTrue(self.manager.events[job["job_id"]].is_set())
+        finish.set()
+        await asyncio.wait_for(asyncio.shield(task), 1)
+        self.assertEqual(self.manager.jobs[job["job_id"]]["state"], "cancelled")
+        self.assertNotIn(job["job_id"], self.manager.reservations)
+        self.assertEqual(list(Path(self.temp.name).glob("*.part")), [])
+        gc.collect()
+        await asyncio.sleep(0)
+        self.assertEqual(errors, [])
+
+    async def test_cancellation_before_entry_releases_both_slots(self):
+        """Unentered cancelled tasks cannot leak persisted running jobs or capacity."""
+        jobs, tasks = [], []
+        for _ in range(2):
+            job = await self.manager.download_start(self.client, "https://example.com/")
+            jobs.append(job)
+            task = self.manager.tasks[job["job_id"]]
+            tasks.append(task)
+            task.cancel()
+        self.assertEqual(len(self.manager.reservations), 2)
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.sleep(0)
+        self.assertEqual(self.transport.calls, 0)
+        self.assertFalse(self.manager.tasks)
+        self.assertFalse(self.manager.events)
+        self.assertFalse(self.manager.reservations)
+        for job, task in zip(jobs, tasks):
+            self.manager.cancel_before_entry(self.manager.jobs[job["job_id"]], task)
+            status = await self.manager.download_status(self.client, job["job_id"])
+            self.assertEqual((status["state"], status["error"], status["retryable"]), ("cancelled", "cancelled", False))
+            manifest = json.loads((Path(self.temp.name)/(job["job_id"] + ".json")).read_text())
+            self.assertEqual(manifest["state"], "cancelled")
+        self.assertFalse(self.manager.tasks)
+        self.assertFalse(self.manager.events)
+        self.assertFalse(self.manager.reservations)
+        self.assertEqual(list(Path(self.temp.name).glob("*.part")), [])
+        self.assertEqual(list(Path(self.temp.name).glob("*.bin")), [])
+        restarted = [await self.manager.download_start(self.client, "https://example.com/") for _ in range(2)]
+        self.assertEqual(len(self.manager.reservations), 2)
+        await asyncio.gather(*list(self.manager.tasks.values()))
+        self.assertTrue(all(self.manager.jobs[job["job_id"]]["state"] == "completed" for job in restarted))
+
+    async def test_cancel_before_entry_persistence_failure_is_contained(self):
+        """Failed terminal persistence reports storage failure and releases unused capacity."""
+        job = await self.manager.download_start(self.client, "https://example.com/")
+        task = self.manager.tasks[job["job_id"]]
+        task.cancel()
+        with patch.object(self.manager, "persist", side_effect=OSError("disk full")):
+            await asyncio.gather(task, return_exceptions=True)
+            await asyncio.sleep(0)
+        self.assertEqual(self.manager.jobs[job["job_id"]]["error"], "storage_or_transport_failed")
+        self.assertFalse(self.manager.tasks)
+        self.assertFalse(self.manager.events)
+        self.assertFalse(self.manager.reservations)
+
     async def test_periodic_orphan_cleanup_preserves_active_workers(self):
         """Transient deletion failures cannot accumulate unaccounted managed staging."""
         root = Path(self.temp.name)
@@ -325,11 +495,62 @@ class JobTests(unittest.IsolatedAsyncioTestCase):
         await self.manager.artifact_export(self.client, job["artifact_id"])
 
     async def test_storage_reservation_includes_every_active_worker(self):
-        """Originals and exports reserve space for all active jobs, including a new one."""
-        self.manager.jobs = {"complete": {"state": "completed", "length": 33554432, "created": time.time()}, "active": {"state": "running", "created": time.time()}}
+        """Retained data and all of self's active reservations enforce the disk bound."""
+        root = Path(self.temp.name)
+        with (root/("a"*32 + ".bin")).open("wb") as sink:
+            sink.truncate(100663297)
+        self.manager.reservations["active"] = 1
         with self.assertRaisesRegex(binary.AcquisitionError, "capacity_limit"):
             await self.manager.download_start(self.client, "https://example.com/")
-        self.manager.jobs = {}
+        self.manager.reservations.clear()
+
+    async def test_small_retained_artifact_allows_two_default_jobs(self):
+        """Keep self's real small artifact and export while admitting two default jobs."""
+        complete = await self.start()
+        await self.manager.artifact_export(self.client, complete["artifact_id"])
+        first = await self.manager.download_start(self.client, "https://example.com/one")
+        second = await self.manager.download_start(self.client, "https://example.com/two")
+        self.assertEqual(len(self.manager.reservations), 2)
+        self.assertLess(self.manager.storage_bytes(), 134217728)
+        with self.assertRaisesRegex(binary.AcquisitionError, "capacity_limit"):
+            await self.manager.download_start(self.client, "https://example.com/three")
+        await asyncio.gather(*list(self.manager.tasks.values()))
+        self.assertEqual(self.manager.reservations, {})
+        self.assertEqual(self.manager.storage_bytes(), 4 * len(self.transport.body))
+
+    async def test_full_size_retained_artifact_does_not_block_second_worker(self):
+        """Self's full cap original and export coexist with two 32-MiB reservations."""
+        self.transport.body = b"x" * 33554432
+        complete = await self.start()
+        await self.manager.artifact_export(self.client, complete["artifact_id"])
+        self.transport.body = b"small"
+        await self.manager.download_start(self.client, "https://example.com/one")
+        await self.manager.download_start(self.client, "https://example.com/two")
+        self.assertEqual(self.manager.storage_bytes(), 134217728)
+        await asyncio.gather(*list(self.manager.tasks.values()))
+        restored = binary.AcquisitionManager(self.temp.name, self.transport, self.manager.ready)
+        try:
+            self.assertEqual(restored.storage_bytes(), 67108864 + 10)
+            self.assertEqual(restored.reservations, {})
+        finally:
+            os.close(restored.fd)
+
+    async def test_export_admission_counts_retained_and_reserved_bytes(self):
+        """Reject self's export temporary copy when actual disk use fills the bound."""
+        complete = await self.start()
+        root = Path(self.temp.name)
+        filler = root/("a"*32 + ".bin")
+        with filler.open("wb") as sink:
+            sink.truncate(134217728 - len(self.transport.body))
+        with self.assertRaisesRegex(binary.AcquisitionError, "capacity_limit"):
+            await self.manager.artifact_export(self.client, complete["artifact_id"])
+        self.assertEqual(list((root/"export").iterdir()), [])
+        filler.unlink()
+        self.manager.reservations["active"] = 134217728 - len(self.transport.body)
+        with self.assertRaisesRegex(binary.AcquisitionError, "capacity_limit"):
+            await self.manager.artifact_export(self.client, complete["artifact_id"])
+        self.manager.reservations.clear()
+        await self.manager.artifact_export(self.client, complete["artifact_id"])
 
     async def test_start_manifest_failure_does_not_leak_worker_capacity(self):
         """Failed acceptance leaves no anonymous running job or cancellation state."""

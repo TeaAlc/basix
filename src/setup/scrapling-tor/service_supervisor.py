@@ -189,7 +189,7 @@ def supervise(args: argparse.Namespace) -> int:
                     break
                 if now >= next_probe:
                     try:
-                        result = subprocess.run(probe_command, timeout=args.probe_timeout, check=False)
+                        result = subprocess.run(probe_command, timeout=args.probe_timeout, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                         healthy = result.returncode == 0 or (args.kind == "tor" and result.returncode == 2)
                         detail = f"status={result.returncode}"
                     except subprocess.TimeoutExpired:

@@ -78,8 +78,12 @@ failed transfers never publish completed artifacts. A self-computed SHA-256 prov
 consistency, not publisher authenticity.
 
 Administrator defaults: 32 MiB/artifact, two active workers, maximum 300 seconds
-(default 120), 128 retained jobs, conservative 128-MiB reservation for originals
-plus one export each, and 24-hour expiry. Cleanup is lazy at startup/start/resource
+(default 120), 128 retained jobs, a 128-MiB data-storage bound, and 24-hour artifact expiry.
+Admission counts actual retained originals/exports plus each active job’s requested
+cap (clamped to 32 MiB), replacing its partial-byte count with that reservation.
+Export admission also reserves the full temporary copy before writing; publication
+uses a hard link, so temporary and final names share one allocation.
+Manifests have a separate 16-KiB/job read limit. Cleanup is lazy at startup/start/resource
 access, excludes active jobs and serializes with exports. `bytes_received` reports
 progress. No response body is retained in an unbounded in-memory buffer.
 
@@ -210,10 +214,29 @@ acceptance or establish controlled observer evidence.
 
 ## Continuous operation
 
+Managed Tor and Scrapling containers use `--log-driver=none`: container stdout and
+stderr have zero retention, including while stopped. Tor emits notices to stdout
+and has no file-log sink. Runtime healthchecks discard all output; health status
+and timestamps remain available. Explicit launcher status/readiness probes provide
+current diagnostics on demand. Prior owned logging configurations are replaced
+only after full ownership and security validation. This log policy is separate
+from the 24-hour artifact/export TTL below.
+
 The service retains at most 128 jobs and two active download workers, with a
-128-MiB reservation across original bytes and managed export staging. Each job is
+128-MiB data bound across original bytes, active reservations and managed export staging. Each job is
 bounded by 32 MiB and 300 seconds; cancellation cooperates with bounded socket,
-resolver and gateway deadlines. The event loop owns one retention task, started
+resolver and gateway deadlines. Cancellation shuts down registered sockets to wake
+SOCKS, TLS, header and body waits promptly, then joins the worker before deleting
+partials or releasing its reservation. Cancellation before the manager coroutine's
+first step persists a cancelled result and releases its unused reservation through
+an idempotent completion callback. Executor completion is consumed directly after
+a cancellation-safe wait, avoiding abandoned shield futures and unhandled errors.
+Requested cancellation takes precedence over
+transport/timeout errors from the interrupted I/O. The managed-alias resolver and
+initial proxy connect precede socket registration and retain their existing shared
+10-second maximum (or shorter remaining absolute deadline); cancellation during
+that phase finishes only after it returns. No capacity is released while that
+worker can still write. The event loop owns one retention task, started
 by initial managed MCP traffic; it expires terminal jobs and their staging every
 minute after the 24-hour TTL. Startup reconciles orphan partials and publications. The periodic task also retries
 orphan temporary-file cleanup and positively identified failed export deletions;

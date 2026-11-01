@@ -82,11 +82,30 @@ assert {"allowed_hosts","allow_unauthenticated"} <= set(inspect.signature(s.serv
 # Prove a clean install before exercising removal of owned retired resources.
 "$ROOT/src/setup/install-scrapling-codex.sh" --runtime podman --image "$pinned" --port "$port" --force
 verify_traffic_boundary "http://127.0.0.1:$port/mcp"
+# Runtime health retains status/timestamps only; every captured output is empty.
+for container in basix-scrapling-tor basix-scrapling-mcp; do
+  [[ $(podman inspect --format '{{.HostConfig.LogConfig.Type}}' "$container") == none ]]
+  podman healthcheck run "$container" >/dev/null 2>&1
+  podman inspect "$container" | PYTHONDONTWRITEBYTECODE=1 python3 -c 'import json,sys; c=json.load(sys.stdin)[0]; assert all(not x.get("Output") for x in (c["State"].get("Health") or {}).get("Log",[]))'
+  [[ -z $(podman logs "$container" 2>/dev/null) ]]
+done
+podman exec basix-scrapling-tor test ! -e /var/log/tor/notices.log
+# Zero retention also holds after service shutdown, without a cleanup timer.
+podman stop basix-scrapling-mcp basix-scrapling-tor >/dev/null
+for container in basix-scrapling-tor basix-scrapling-mcp; do
+  [[ $(podman inspect --format '{{.State.Status}}' "$container") == exited ]]
+  [[ $(podman inspect --format '{{.HostConfig.LogConfig.Type}}' "$container") == none ]]
+  [[ -z $(podman logs "$container" 2>/dev/null) ]]
+done
 clean_scrapling_id=$(podman inspect --format '{{.Id}}' basix-scrapling-mcp)
 clean_tor_id=$(podman inspect --format '{{.Id}}' basix-scrapling-tor)
 podman rm -f "$clean_scrapling_id" "$clean_tor_id" >/dev/null
 podman network rm basix-scrapling-internal basix-tor-egress >/dev/null
-podman build --format docker --label io.basix.scrapling-tor.managed=true -t localhost/basix-scrapling-tor:legacy "$ROOT/src/setup/scrapling-tor" >/dev/null
+# Preserve intentionally retired file-log semantics only in this temporary fixture.
+cp -R "$ROOT/src/setup/scrapling-tor" "$gate/legacy-tor"
+sed -i 's|Log notice stdout|Log notice file /var/log/tor/notices.log|' "$gate/legacy-tor/torrc"
+sed -i '/COPY torrc/i RUN mkdir -p /var/log/tor && chown debian-tor:debian-tor /var/log/tor' "$gate/legacy-tor/Containerfile"
+podman build --format docker --label io.basix.scrapling-tor.managed=true -t localhost/basix-scrapling-tor:legacy "$gate/legacy-tor" >/dev/null
 podman network create --driver bridge --label io.basix.scrapling-tor.managed=true basix-tor-egress >/dev/null
 podman network create --driver bridge --internal --disable-dns --label io.basix.scrapling-tor.managed=true basix-scrapling-internal >/dev/null
 podman run -d --name basix-scrapling-tor --label io.basix.scrapling-tor.managed=true \
@@ -198,20 +217,20 @@ for _ in $(seq 1 180); do
   fi
   sleep 2
 done
-if ! $recovered; then podman logs --tail 100 basix-scrapling-tor >&2; printf 'Tor child-exit recovery failed\n' >&2; exit 9; fi
+if ! $recovered; then "$CODEX_HOME/basix/scrapling-tor/launcher.sh" status >&2 || true; printf 'Tor child-exit recovery failed\n' >&2; exit 9; fi
 verify_traffic_boundary "http://127.0.0.1:$port/mcp"
 
 mcp_started=$(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-mcp)
 stopped_pid=$(signal_managed_child basix-scrapling-mcp /app/.venv/bin/python /opt/basix/policy_mcp.py 19)
 recovered=false
 for _ in $(seq 1 120); do
-  if podman logs basix-scrapling-mcp 2>&1 | grep -F 'restarting mcp after cooldown=' >/dev/null && \
+  if podman exec basix-scrapling-mcp /app/.venv/bin/python -c 'import os,sys; assert not os.path.exists("/proc/"+sys.argv[1])' "$stopped_pid" && \
     podman exec basix-scrapling-mcp /app/.venv/bin/python /opt/basix/service_supervisor.py --probe mcp >/dev/null 2>&1; then
     recovered=true; break
   fi
   sleep 2
 done
-if ! $recovered; then podman logs --tail 100 basix-scrapling-mcp >&2; printf 'MCP hung-child recovery failed\n' >&2; exit 9; fi
+if ! $recovered; then "$CODEX_HOME/basix/scrapling-tor/launcher.sh" status >&2 || true; printf 'MCP hung-child recovery failed\n' >&2; exit 9; fi
 [[ $(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-mcp) == "$mcp_started" ]]
 podman exec basix-scrapling-mcp /app/.venv/bin/python -c 'import os,sys; assert not os.path.exists("/proc/"+sys.argv[1])' "$stopped_pid"
 verify_traffic_boundary "http://127.0.0.1:$port/mcp"
@@ -226,7 +245,7 @@ for _ in $(seq 1 75); do
   fi
   sleep 2
 done
-if ! $recovered; then podman logs --tail 100 basix-scrapling-mcp >&2; printf 'Policy degradation recovery failed\n' >&2; exit 9; fi
+if ! $recovered; then "$CODEX_HOME/basix/scrapling-tor/launcher.sh" status >&2 || true; printf 'Policy degradation recovery failed\n' >&2; exit 9; fi
 [[ $(podman inspect --format '{{.State.StartedAt}}' basix-scrapling-mcp) == "$mcp_started" ]]
 printf 'Irreversible policy health signal recovered through bounded child supervision.\n'
 verify_traffic_boundary "http://127.0.0.1:$port/mcp"

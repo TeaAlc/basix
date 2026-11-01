@@ -60,6 +60,15 @@ while True: time.sleep(0.05)
             time.sleep(0.02)
         self.fail("timed out waiting for lifecycle evidence")
 
+    def test_periodic_probe_output_is_discarded(self):
+        """Self's periodic probes cannot copy content into supervisor output."""
+        self.probe.write_text("import sys; print('private-probe-body'); print('private-probe-error', file=sys.stderr)\n")
+        self.child.write_text("import time; time.sleep(.4)\n")
+        result = subprocess.run(self.command(), capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("private-probe", result.stdout + result.stderr)
+        self.assertIn("child exited", result.stderr)
+
     def test_child_exit_exits_for_container_restart(self):
         """Assert self's unexpected child exit produces a failing container exit."""
         self.child.write_text("raise SystemExit(0)\n")
