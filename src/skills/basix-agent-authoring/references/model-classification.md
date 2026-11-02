@@ -33,8 +33,10 @@ Its leading metadata block must include level `principal` and the standardized
 ## Highly complex reference roles
 
 The canonical `basix_pager` and `basix_verifier` are reference examples for the
-**Highly complex** class. Both use `gpt-6-luna` with `xhigh` reasoning as their
-classification default, without an explicit model override marker.
+**Highly complex** class. Their classification default is
+`gpt-6-luna` with `xhigh` reasoning. The explicit user override selects
+`gpt-6.1-terra` with `low` reasoning for both; each carries the adjacent
+`explicit-model-override` marker.
 
 `basix_pager` performs demanding implementation and integration work while
 coordinating scoped specialists. It is also the sole native agent authorized to

@@ -7,3 +7,5 @@
 - [ADR 0006: Internal Tor alias DNS](ADR_0006_internal-tor-alias-dns.md) — Superseded by ADR 0007; NXDOMAIN requirement relaxed
 
 - [ADR 0009: Silent subagent orchestration](ADR_0009_silent-subagent-orchestration.md) — Superseded by ADR 0010; generic selection clarified
+
+- [ADR 0008: GPT-6 agent models](ADR_0008_gpt-6-agent-models.md) — Superseded by ADR 0019; Terra low overrides

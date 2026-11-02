@@ -39,7 +39,9 @@ retains applicable effort.
    `# basix-agent-authoring: explicit-model-override` immediately before
    `model =` only for an explicit override. `xhigh` is the standard Luna level for
    the documented Highly complex class; `basix_pager` and `basix_verifier` are
-   canonical examples. Reserve `max` for Exceptional work.
+   canonical examples, both explicitly overridden by the user to
+   `gpt-6.1-terra`/`low`. Preserve their adjacent model override markers.
+   Reserve `max` for Exceptional work.
 5. Keep every native agent read-only. The canonical `basix_pager` is the sole
    exception: `workspace-write` requires
    `# basix-agent-authoring: explicit-sandbox-override` immediately before

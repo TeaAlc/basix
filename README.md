@@ -103,9 +103,9 @@ research, specialized work, and larger assignments to dedicated agents.
 | `basix_verifier` | Independent inspection of a frozen result | Read-only |
 | `basix_miraculix` | Bounded second opinion, especially under extreme uncertainty | Read-only |
 
-Native agents default to `gpt-6-luna`, except Miraculix, which uses `gpt-6-astra`.
-Reasoning effort varies by role: low for Explorer and Miraculix, medium for
-Researcher, and `xhigh` for Pager and Verifier. Explicit user overrides follow
+Explorer uses `gpt-6-luna`/`low`, Researcher uses `gpt-6-luna`/`medium`,
+and Miraculix uses `gpt-6-astra`/`low`. Pager and Verifier use the explicit
+user override `gpt-6.1-terra`/`low`. Explicit user overrides follow
 the model and effort precedence described under [Development](#development).
 Agent level governs delegation separately from model and reasoning effort: Root
 is principal; Pager and Verifier are seniors; Explorer, Researcher, and Miraculix

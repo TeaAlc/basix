@@ -288,8 +288,8 @@ class AgentTests(unittest.TestCase):
         validator.validate_agent(PAGER_NATIVE)
         agent = tomllib.loads(PAGER_NATIVE.read_text())
         self.assertEqual(agent["name"], "basix_pager")
-        self.assertEqual(agent["model"], "gpt-6-luna")
-        self.assertEqual(agent["model_reasoning_effort"], "xhigh")
+        self.assertEqual(agent["model"], "gpt-6.1-terra")
+        self.assertEqual(agent["model_reasoning_effort"], "low")
         self.assertEqual(agent["sandbox_mode"], "workspace-write")
         instructions = agent["developer_instructions"]
         for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
@@ -303,8 +303,8 @@ class AgentTests(unittest.TestCase):
         validator.validate_agent(VERIFIER_NATIVE)
         agent = tomllib.loads(VERIFIER_NATIVE.read_text())
         self.assertEqual(agent["name"], "basix_verifier")
-        self.assertEqual(agent["model"], "gpt-6-luna")
-        self.assertEqual(agent["model_reasoning_effort"], "xhigh")
+        self.assertEqual(agent["model"], "gpt-6.1-terra")
+        self.assertEqual(agent["model_reasoning_effort"], "low")
         self.assertEqual(agent["sandbox_mode"], "read-only")
         instructions = agent["developer_instructions"]
         for phrase in ("immutable", "inconclusive", "remediation", "fork_turns=\"none\"",
@@ -525,48 +525,26 @@ class AgentTests(unittest.TestCase):
             with directory, self.assertRaisesRegex(validator.Invalid, "sandbox_mode|workspace-write"):
                 validator.validate_agent(path)
 
-    def test_pager_xhigh_is_classified_and_workspace_write_needs_marker(self):
-        directory, path = self.write_agent(name="basix_pager", effort="xhigh", sandbox="workspace-write")
-        with directory, self.assertRaisesRegex(validator.Invalid, "sandbox override"):
-            validator.validate_agent(path)
-
-        directory, path = self.write_agent(
-            name="basix_pager", effort="xhigh", sandbox="workspace-write",
-            sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
-        )
-        with directory:
-            validator.validate_agent(path)
-
-        directory, path = self.write_agent(
-            name="basix_pager", effort="xhigh", marker=validator.OVERRIDE + "\n",
-            sandbox="workspace-write", sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
-        )
-        with directory, self.assertRaisesRegex(validator.Invalid, "without an override"):
-            validator.validate_agent(path)
-
-        for effort in ("high", "max"):
-            directory, path = self.write_agent(
-                name="basix_pager", effort=effort, sandbox="workspace-write",
-                sandbox_marker=validator.SANDBOX_OVERRIDE + "\n",
-            )
-            with directory, self.assertRaisesRegex(validator.Invalid, "xhigh reasoning"):
+    def test_terra_roles_require_explicit_override_low_and_preserve_sandbox(self):
+        """Check canonical Terra settings and rejected variants; self is the test case."""
+        for role in ("pager", "verifier"):
+            sandbox = "workspace-write" if role == "pager" else "read-only"
+            sandbox_marker = validator.SANDBOX_OVERRIDE + "\n" if role == "pager" else ""
+            baseline = dict(name=f"basix_{role}", model="gpt-6.1-terra", effort="low",
+                            marker=validator.OVERRIDE + "\n", sandbox=sandbox,
+                            sandbox_marker=sandbox_marker)
+            directory, path = self.write_agent(**baseline)
+            with directory:
                 validator.validate_agent(path)
-
-    def test_verifier_uses_classified_xhigh_without_override_and_read_only(self):
-        directory, path = self.write_agent(name="basix_verifier", effort="xhigh")
-        with directory:
-            validator.validate_agent(path)
-        directory, path = self.write_agent(name="basix_verifier", effort="xhigh", sandbox="workspace-write")
-        with directory, self.assertRaisesRegex(validator.Invalid, "reserved for basix_pager|read-only"):
-            validator.validate_agent(path)
-
-        directory, path = self.write_agent(name="basix_verifier", effort="xhigh", marker=validator.OVERRIDE + "\n")
-        with directory, self.assertRaisesRegex(validator.Invalid, "without an override"):
-            validator.validate_agent(path)
-        for effort in ("high", "max"):
-            directory, path = self.write_agent(name="basix_verifier", effort=effort)
-            with directory, self.assertRaisesRegex(validator.Invalid, "xhigh reasoning"):
-                validator.validate_agent(path)
+            variants = [dict(model="gpt-6-luna", effort="xhigh", marker=""),
+                        dict(marker=""), dict(model="gpt-6-astra")]
+            variants += [dict(effort=effort) for effort in ("medium", "high", "xhigh", "max")]
+            variants += [dict(sandbox_marker="")] if role == "pager" else [dict(sandbox="workspace-write")]
+            for changes in variants:
+                with self.subTest(role=role, changes=changes):
+                    directory, path = self.write_agent(**(baseline | changes))
+                    with directory, self.assertRaises(validator.Invalid):
+                        validator.validate_agent(path)
 
     def test_sandbox_override_is_reserved_for_pager(self):
         directory, path = self.write_agent(

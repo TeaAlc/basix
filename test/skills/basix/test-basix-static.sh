@@ -250,7 +250,7 @@ assert router_levels == {"/root": "principal", **native_levels}
 pager_path = root / "agents/native/basix-pager.toml"
 pager = tomllib.loads(pager_path.read_text())
 assert pager["name"] == "basix_pager"
-assert pager["model"] == "gpt-6-luna" and pager["model_reasoning_effort"] == "xhigh"
+assert pager["model"] == "gpt-6.1-terra" and pager["model_reasoning_effort"] == "low"
 assert pager["sandbox_mode"] == "workspace-write"
 assert "task_profile" in pager["developer_instructions"]
 for profile in ("ui_ux", "frontend", "backend_web", "fullstack", "integration"):
@@ -263,7 +263,7 @@ assert ".basix/contracts/<chain-id>.md" in pager["developer_instructions"]
 verifier_path = root / "agents/native/basix-verifier.toml"
 verifier = tomllib.loads(verifier_path.read_text())
 assert verifier["name"] == "basix_verifier"
-assert verifier["model"] == "gpt-6-luna" and verifier["model_reasoning_effort"] == "xhigh"
+assert verifier["model"] == "gpt-6.1-terra" and verifier["model_reasoning_effort"] == "low"
 assert verifier["sandbox_mode"] == "read-only"
 for phrase in (
     "immutable", "inconclusive", "fork_turns=\"none\"", "spawning parent", "write freeze",

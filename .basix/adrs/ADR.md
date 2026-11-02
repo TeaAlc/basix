@@ -10,7 +10,7 @@
 - [ADR 0004: Project local access permissions](ADR_0004_project-local-access-permissions.md) — Separate local network and test socket access
 - [ADR 0005: Relative installer state](ADR_0005_relative_installer_state.md) — Root-relative state survives moved installs
 - [ADR 0007: Internal Tor alias egress](ADR_0007_internal-tor-alias-egress.md) — Alias with direct-egress isolation
-- [ADR 0008: GPT-6 agent models](ADR_0008_gpt-6-agent-models.md) — Luna default; Astra for Miraculix
+- [ADR 0019: Native agent model overrides](ADR_0019_native-agent-model-overrides.md) — Terra low replaces Luna above medium
 - [ADR 0015: Plan executor capacity](ADR_0015_plan-executor-capacity.md) — Feature executors and bounded read-only helpers
 - [ADR 0011: Context-related agent continuations](ADR_0011_context-related-agent-continuations.md) — Parent-authorized fixes and related follow-ups
 

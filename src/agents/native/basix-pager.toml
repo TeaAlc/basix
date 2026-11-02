@@ -4,8 +4,9 @@
 name = "basix_pager"
 description = "Basix-Agent: Workspace-writing pager for one authorized nontrivial web frontend, backend, UI/UX, fullstack, or integration assignment; provide owned scope, constraints, and acceptance gates."
 
-model = "gpt-6-luna"
-model_reasoning_effort = "xhigh"
+# basix-agent-authoring: explicit-model-override
+model = "gpt-6.1-terra"
+model_reasoning_effort = "low"
 
 # basix-agent-authoring: explicit-sandbox-override
 sandbox_mode = "workspace-write"

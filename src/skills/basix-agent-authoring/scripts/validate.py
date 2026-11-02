@@ -265,15 +265,15 @@ def validate_agent(path: Path) -> None:
         need(parsed["sandbox_mode"] == "read-only",
              f"{path}: basix_miraculix must remain read-only")
     if parsed["name"] == "basix_pager":
-        need(not override and parsed["model"] == "gpt-6-luna",
-             f"{path}: basix_pager must use classified gpt-6-luna without an override")
-        need(parsed["model_reasoning_effort"] == "xhigh",
-             f"{path}: basix_pager must use xhigh reasoning effort")
+        need(override and parsed["model"] == "gpt-6.1-terra",
+             f"{path}: basix_pager must use explicitly overridden gpt-6.1-terra")
+        need(parsed["model_reasoning_effort"] == "low",
+             f"{path}: basix_pager must use low reasoning effort")
     if parsed["name"] == "basix_verifier":
-        need(not override and parsed["model"] == "gpt-6-luna",
-             f"{path}: basix_verifier must use classified gpt-6-luna without an override")
-        need(parsed["model_reasoning_effort"] == "xhigh",
-             f"{path}: basix_verifier must use xhigh reasoning effort")
+        need(override and parsed["model"] == "gpt-6.1-terra",
+             f"{path}: basix_verifier must use explicitly overridden gpt-6.1-terra")
+        need(parsed["model_reasoning_effort"] == "low",
+             f"{path}: basix_verifier must use low reasoning effort")
         need(parsed["sandbox_mode"] == "read-only",
              f"{path}: basix_verifier must remain read-only")
     instructions = parsed["developer_instructions"]

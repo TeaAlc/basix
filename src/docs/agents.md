@@ -58,8 +58,8 @@ only `/root` may directly spawn a generic principal. Generic agents carry
 `agent_level` in their Principal assignment, default to junior, and have no native
 TOML metadata.
 
-- `basix_pager` is a Highly complex reference role using `gpt-6-luna` with
-  `xhigh` reasoning and is the sole native agent with `workspace-write`. It
+- `basix_pager` is a Highly complex reference role using explicitly overridden
+  `gpt-6.1-terra` with `low` reasoning and is the sole native agent with `workspace-write`. It
   is a bounded nontrivial web senior selected by its spawning parent with exactly one
   profile: `ui_ux`, `frontend`, `backend_web`, `fullstack`, or `integration`.
   the spawning parent owns the architecture, scope, acceptance gates, and any shared contract;
@@ -67,8 +67,8 @@ TOML metadata.
 
 The native read-only agents are:
 
-- `basix_verifier` is a Highly complex reference role using `gpt-6-luna` with
-  `xhigh` reasoning. It receives one immutable, bounded result per authorized cycle
+- `basix_verifier` is a Highly complex reference role using explicitly overridden
+  `gpt-6.1-terra` with `low` reasoning. It receives one immutable, bounded result per authorized cycle
   and reports `pass`, `pass_with_findings`, `remediation_required`, or
   `inconclusive` without modifying the target. Parent-authorized reuse, including
   related remediation or changed targets between frozen cycles, follows Contract 2.0.

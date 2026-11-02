@@ -1,7 +1,7 @@
 # ADR 0008: GPT-6 agent models
 
 ## Status
-Active
+Superseded by ADR 0019
 
 ## Context
 Basix agent models need a GPT-6 default and a stronger Miraculix model.
