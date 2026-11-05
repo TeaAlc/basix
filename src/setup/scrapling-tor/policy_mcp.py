@@ -26,10 +26,16 @@ EXPECTED_TOOLS = {
 CURRENT_SIGNATURES = {'browser_open': ['session_id', 'headless', 'real_chrome', 'timezone_id', 'locale', 'useragent', 'proxy', 'cdp_url', 'executable_path', 'cookies', 'hide_canvas', 'block_webrtc', 'allow_webgl', 'additional_args'], 'browser_save_state': ['session_id', 'path'], 'browser_load_state': ['session_id', 'path'], 'open_request_session': ['session_id', 'impersonate', 'proxy'], 'close_session': ['session_id'], 'list_sessions': [], 'browser_network_requests': ['session_id', 'url_pattern', 'include_static', 'after_id', 'limit'], 'browser_network_request': ['session_id', 'request_id', 'part'], 'browser_extract': ['session_id', 'extraction_type', 'target', 'depth', 'boxes', 'search', 'main_content_only'], 'browser_actions': ['session_id', 'actions', 'slowly'], 'browser_evaluate': ['session_id', 'expression', 'arg', 'isolated_context'], 'browser_screenshot': ['session_id', 'image_type', 'full_page', 'quality', 'timeout', 'selector', 'ref'], 'make_request': ['url', 'method', 'impersonate', 'extraction_type', 'css_selector', 'main_content_only', 'params', 'data', 'json', 'headers', 'cookies', 'timeout', 'follow_redirects', 'max_redirects', 'retries', 'retry_delay', 'proxy', 'proxy_auth', 'auth', 'verify', 'http3', 'stealthy_headers'], 'browser_fetch_once': ['url', 'extraction_type', 'css_selector', 'main_content_only', 'headless', 'google_search', 'real_chrome', 'wait', 'proxy', 'timezone_id', 'locale', 'extra_headers', 'useragent', 'hide_canvas', 'cdp_url', 'executable_path', 'timeout', 'disable_resources', 'wait_selector', 'cookies', 'network_idle', 'wait_selector_state', 'block_webrtc', 'allow_webgl', 'solve_cloudflare', 'additional_args', 'pierce_shadow'], 'browser_fetch': ['url', 'session_id', 'extraction_type', 'css_selector', 'main_content_only', 'wait', 'timeout', 'google_search', 'network_idle', 'load_dom', 'disable_resources', 'wait_selector', 'wait_selector_state', 'extra_headers', 'blocked_domains', 'solve_cloudflare', 'pierce_shadow'], 'session_make_request': ['url', 'session_id', 'method', 'extraction_type', 'css_selector', 'main_content_only', 'params', 'data', 'json', 'headers', 'cookies', 'timeout', 'follow_redirects', 'max_redirects', 'retries', 'retry_delay', 'auth', 'verify', 'http3', 'stealthy_headers']}
 DISABLED_CURRENT_TOOLS = {"browser_save_state", "browser_load_state", "browser_actions", "browser_evaluate", "browser_network_requests", "browser_network_request"}
 CURRENT_PUBLIC_TOOLS = set(CURRENT_SIGNATURES) - DISABLED_CURRENT_TOOLS
+# 0.5.1 separates remote sessions and adds bounded, local screencast observation.
+LATEST_SIGNATURES = {name: list(parameters) for name, parameters in CURRENT_SIGNATURES.items()}
+LATEST_SIGNATURES["browser_open"].insert(8, "new_context")
+LATEST_SIGNATURES["browser_fetch_once"].remove("cdp_url")
+LATEST_SIGNATURES["browser_observe"] = ["session_id", "duration_ms", "max_frames"]
+LATEST_PUBLIC_TOOLS = set(LATEST_SIGNATURES) - DISABLED_CURRENT_TOOLS
 NETWORK_OVERRIDES = {
     "proxy", "proxy_auth", "cdp_url", "real_chrome", "executable_path",
     "additional_args", "block_webrtc", "dns_over_https", "http3", "extra_flags",
-    "auth", "verify", "follow_redirects", "max_redirects", "retries",
+    "auth", "verify", "follow_redirects", "max_redirects", "retries", "new_context",
 }
 SESSION_TOOLS = {
     "close_session", "session_fetch", "session_make_request", "screenshot",
@@ -545,6 +551,41 @@ class ClientPolicy:
         guarded.__doc__ = self._description(method, alias_guidance=alias_guidance)
         return self.deadline(guarded)
 
+    def observation_tool(self, method):
+        """Observe only an owned existing page, without retries or session recreation.
+
+        :param method: Reviewed upstream browser_observe implementation.
+        """
+        signature = inspect.signature(method)
+
+        @functools.wraps(method)
+        async def guarded(*args, client_id, **kwargs):
+            """Bound capture. :param args: Inputs. :param client_id: Owner. :param kwargs: Inputs."""
+            canonical_client_id(client_id)
+            self.ensure_maintenance()
+            bound = signature.bind(*args, **kwargs)
+            bound.apply_defaults()
+            session_id = bound.arguments["session_id"]
+            if self.owners.get(session_id) != client_id:
+                return SESSION_UNAVAILABLE.copy()
+            for name, lower, upper in (("duration_ms", 100, 5000), ("max_frames", 2, 20)):
+                value = bound.arguments[name]
+                if type(value) is not int or not lower <= value <= upper:
+                    raise ValueError("Observation limits exceeded")
+            async with self.session_guard(session_id):
+                state = self.session_state.get(session_id)
+                if state is None or state.get("poisoned") or self.owners.get(session_id) != client_id:
+                    return SESSION_UNAVAILABLE.copy()
+                if not await self.monitor.check():
+                    raise RuntimeError(TOR_UNAVAILABLE["error"])
+                state["last_used"] = time.monotonic()
+                bound.arguments["session_id"] = state["upstream_id"]
+                return await self.bounded(method(*bound.args, **bound.kwargs), SESSION_OPERATION_TIMEOUT, state)
+
+        guarded.__signature__ = self._signature(method)
+        guarded.__doc__ = self._description(method)
+        return self.deadline(guarded)
+
     def singular_network_tool(self, method, bulk_method):
         """Adapt alias. :param method: Singular method. :param bulk_method: Policy-wrapped bulk method."""
         bulk_guarded = bulk_method
@@ -681,11 +722,12 @@ class ClientPolicy:
 def assert_upstream_tools(server):
     """Reject upstream drift. :param server: Unmodified upstream server."""
     actual = {tool.name for tool in asyncio.run(server._build_server("127.0.0.1", PORT).list_tools())}
-    if actual == set(CURRENT_SIGNATURES):
-        for name, parameters in CURRENT_SIGNATURES.items():
+    reviewed = LATEST_SIGNATURES if actual == set(LATEST_SIGNATURES) else CURRENT_SIGNATURES
+    if actual == set(reviewed):
+        for name, parameters in reviewed.items():
             signature = inspect.signature(getattr(server, name))
             if list(signature.parameters) != parameters or any(p.kind not in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY) for p in signature.parameters.values()):
-                raise RuntimeError("Unreviewed Scrapling 0.5 signature: " + name)
+                raise RuntimeError("Unreviewed Scrapling 0.5/0.5.1 signature: " + name)
         if not callable(getattr(server._build_server("127.0.0.1", PORT), "remove_tool", None)):
             raise RuntimeError("MCP tool removal API unavailable")
         return
@@ -750,6 +792,8 @@ def configure_server(server, monitor=None):
         server.browser_fetch_once = policy.network_tool(server.browser_fetch_once, browser=True, forced={"block_webrtc": True})
         for name in ("browser_fetch", "browser_extract", "browser_screenshot"):
             setattr(server, name, policy.network_tool(getattr(server, name), browser=True, session_aware=True))
+        if hasattr(server, "browser_observe"):
+            server.browser_observe = policy.observation_tool(server.browser_observe)
         original_build = server._build_server
         def reviewed_build(host, port):
             """Remove unreviewed upstream capabilities. :param host: Listener host. :param port: Listener port."""

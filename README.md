@@ -208,6 +208,10 @@ This container boundary does not reproduce Tor Browser's fingerprinting
 protections. The loopback service has no TLS or global authentication; remote
 access is outside its trust model.
 
+Scrapling 0.5.1 adds `browser_observe` for bounded motion snapshots of an owned
+browser session. Remote browser contexts, action chains, arbitrary JavaScript,
+state-file access and network-history tools remain disabled by the Tor policy.
+
 Replacing a noncanonical single Scrapling registration requires interactive
 approval or `--force`. Multiple registrations, foreign running services, and
 unsafe runtime resources cause an abort even with `--force`. Positively identified

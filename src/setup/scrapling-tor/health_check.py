@@ -25,7 +25,7 @@ CLIENT_DESCRIPTION_MARKERS = (
 HIDDEN_ARGUMENTS = {
     "proxy", "proxy_auth", "auth", "cdp_url", "real_chrome", "executable_path",
     "additional_args", "block_webrtc", "dns_over_https", "http3", "extra_flags",
-    "verify", "follow_redirects", "max_redirects", "retries",
+    "verify", "follow_redirects", "max_redirects", "retries", "new_context",
 }
 TOR_HOST = os.environ.get("BASIX_TOR_HOST", os.environ.get("BASIX_TOR_IP", "tor"))
 
@@ -103,7 +103,7 @@ def validate_tool_inventory(endpoint, listing):
                 f"MCP phase tools/list failed at {endpoint}: tool name at index {index} was not a string"
             )
         names.append(name)
-    if len(names) != len(set(names)) or set(names) not in (EXPECTED_TOOLS, CURRENT_TOOLS):
+    if len(names) != len(set(names)) or set(names) not in (EXPECTED_TOOLS, CURRENT_TOOLS, CURRENT_TOOLS | {"browser_observe"}):
         raise RuntimeError(f"MCP phase tools/list failed at {endpoint}: Scrapling tool inventory is not canonical")
     for tool in tools:
         description = tool.get("description")

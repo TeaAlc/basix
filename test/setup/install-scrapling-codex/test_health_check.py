@@ -65,8 +65,17 @@ class HealthCheckTests(unittest.TestCase):
         template = listing["result"]["tools"][0]
         listing["result"]["tools"] = [dict(template, name=name) for name in health_check.CURRENT_TOOLS]
         health_check.validate_tool_inventory(self.endpoint, listing)
+        listing["result"]["tools"].append(dict(template, name="browser_observe"))
+        health_check.validate_tool_inventory(self.endpoint, listing)
         listing["result"]["tools"].append(dict(template, name="browser_evaluate"))
         with self.assertRaisesRegex(RuntimeError, "inventory"):
+            health_check.validate_tool_inventory(self.endpoint, listing)
+
+    def test_remote_context_override_is_never_public(self):
+        """Remote context settings must stay outside every public tool schema."""
+        listing = self.canonical_listing()
+        listing["result"]["tools"][0]["inputSchema"]["properties"]["new_context"] = {"type": "boolean"}
+        with self.assertRaisesRegex(RuntimeError, "network controls"):
             health_check.validate_tool_inventory(self.endpoint, listing)
 
     def test_loopback_client_uses_an_empty_proxy_handler(self):

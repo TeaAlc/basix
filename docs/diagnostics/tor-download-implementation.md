@@ -111,26 +111,44 @@ verify recorded length/hash before offline use.
 
 ## Compatibility and deployment
 
-The current reviewed upstream contract is Scrapling 0.5: all 16 source methods
-must match their reviewed parameter-name inventory before policy configuration.
-Ten retrieval/session tools remain public; `browser_save_state`,
+The reviewed upstream contracts are Scrapling 0.5 (16 methods) and 0.5.1
+(17 methods). Each must match its exact reviewed parameter-name inventory before
+policy configuration. Ten retrieval/session tools remain public in 0.5;
+0.5.1 additionally exposes `browser_observe`. `browser_save_state`,
 `browser_load_state`, `browser_actions`, `browser_evaluate`,
 `browser_network_requests` and `browser_network_request` are removed using the
 public synchronous MCP `remove_tool` API. This avoids exposing arbitrary disk
 state, JavaScript/actions or unreviewed captured response history. All public tools
 require caller capabilities. TLS verification, safe request redirects, five
 redirects, one request attempt and disabled HTTP/3 are administrator-controlled.
+The 0.5.1 observer samples an existing owned page for 100–5000 milliseconds and
+2–20 maximum frames, with limits enforced by both schema and policy. It shares
+the session lock, owner validation, administrator deadline and timeout poisoning.
+It never retries capture or recreates a session after a capture error. Screencast
+frames travel over the local browser connection; page traffic retains the
+browser's forced Tor proxy and WebRTC/QUIC controls.
+
+Remote sessions and login-context reuse remain unavailable: `cdp_url` and the
+new `new_context` input are hidden and rejected. Upstream documents that a
+borrowed default context can ignore the requested proxy. The removed CDP input
+on `browser_fetch_once` is recognized only in the exact 0.5.1 contract.
+Mouse dragging and other action chains remain disabled along with arbitrary
+JavaScript, state files and network history. Enabling actions needs a separate
+review of navigation/local-resource effects and non-replayable partial effects;
+the existing retrieval retry wrapper is unsuitable for action chains.
 The prior 13-tool reviewed contract is retained for older images; unknown inventory
 or new current parameter names fail closed. The real installer executes the shared
 assertion in an isolated image before managed service mutation.
 
 Reviewed primary source:
 [Scrapling v0.5 server](https://raw.githubusercontent.com/D4Vinci/Scrapling/v0.5/scrapling/core/ai/server.py),
+[Scrapling v0.5.1 release](https://github.com/D4Vinci/Scrapling/releases/tag/v0.5.1),
+[Scrapling v0.5.1 server](https://github.com/D4Vinci/Scrapling/blob/v0.5.1/scrapling/core/ai/server.py),
 [dependency declaration](https://raw.githubusercontent.com/D4Vinci/Scrapling/v0.5/pyproject.toml),
 [MCP SDK v2.0.0 public registration API](https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/v2.0.0/src/mcp/server/mcpserver/server.py).
 Tagged source proves the minimum dependency API, not the floating image contents;
 the mandatory isolated runtime gate must corroborate the exact installed versions,
-immutable image identity and emitted tools/list schema. Current selected image:
+immutable image identity and emitted tools/list schema. Previously verified 0.5 image:
 `docker.io/pyd4vinci/scrapling@sha256:1d876879813759959bc4ba6fbb1ce8247ebbc2b67eee77b140baf7c80af6ae6b`.
 The successful isolated runtime reported Scrapling **0.5**, MCP SDK **2.3.0**
 and Debian Tor package **0.4.9.11-0+deb12u1**. The Tor image is built locally and
@@ -358,3 +376,33 @@ or production recovery policy was weakened. Those target failures alone do not
 prove a global Tor outage. All started tests finished and isolated scratch was
 removed. Controlled observer/DNS acceptance and actual Aqara integration remain
 unmet as identified above; this is not full P0 or multi-day soak evidence.
+
+## Scrapling 0.5.1 verification (2026-11-05)
+
+The focused deterministic aggregation
+`bash test/setup/install-scrapling-codex/test-install-scrapling-codex.sh` passed,
+including 35 policy tests, 10 MCP health tests and 44 installer scenarios.
+`bash test/setup/install-scrapling-codex/release-gate-podman.sh` then passed against
+Scrapling 0.5.1 and MCP SDK 2.3.0, with immutable upstream image
+`docker.io/pyd4vinci/scrapling@sha256:5ed7aeef430515fd35f3d97f482da73fb1d519dc17b6cb28ea366869c8642d98`.
+The final Tor image ID was
+`0498f2f2e88663ad0207ff597d36c13bce3dbe7e3157eee94eb52da92b9d92f9`.
+
+The live gate verified the 16 public tool schemas, HTTP and browser IsTor
+responses, bounded observation of the existing Tor-loaded page, foreign-owner
+denial, direct TCP/UDP isolation, restart/IP-drift recovery, log non-retention,
+numeric SafeSocks mapping cleanup and control/gateway access restrictions.
+A static page was sufficient for the screencast API smoke; this does not prove
+every animation or challenge workflow. Evidence logs are under
+`/tmp/basix-scrapling-051-checks/`: `deterministic-final.log` and
+`live-gate-retry.log` (including the complete emitted runtime schema).
+The older checked-in schema snapshot remains the historical 0.5 baseline.
+
+The initial gate failed because the proposed data-URL test page was rejected;
+the test now observes the existing Tor-loaded page. The next gate failed an
+external IsTor canary after child recovery. The final unchanged retry passed;
+no TLS, Tor routing, canary or recovery conditions were weakened. The official
+release notes and tagged implementation were checked against the real image;
+third-party release listings were discovery leads, not independent security
+evidence. These are isolated runtime results, not a host deployment or a soak.
+ADR 0007's system-DNS exception and the existing acceptance gaps remain.

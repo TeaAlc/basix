@@ -267,7 +267,7 @@ def call(name,**arguments):
     arguments["client_id"]=client.client_id
     result=client.send({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":name,"arguments":arguments}})
     payload=result["result"]
-    assert not payload.get("isError"),"MCP tool rejected release call"
+    assert not payload.get("isError"),f"MCP tool rejected release call: {name}"
     return json.loads(payload["content"][0]["text"])
 job=call("download_start",url="https://example.com/",maximum_bytes=1048576,time_budget=60,idempotency_key="release-smoke")
 assert job["state"]=="running",job
@@ -280,6 +280,33 @@ export=call("artifact_export",artifact_id=job["artifact_id"])
 body=(pathlib.Path(home)/"basix/scrapling-artifacts/export"/export["filename"]).read_bytes()
 assert len(body)==export["length"] and hashlib.sha256(body).hexdigest()==export["sha256"]
 print("Neutral HTTPS binary runtime smoke:",json.dumps({"length":len(body),"sha256":export["sha256"],"policy":job["policy"]},sort_keys=True))
+# The latest observer must use the existing Tor browser and remain owner-scoped.
+names={tool["name"] for tool in schemas["result"]["tools"]}
+if "browser_observe" in names:
+    opened=call("browser_open")
+    session_id=opened["session_id"]
+    try:
+        fetched=call("browser_fetch",session_id=session_id,url="https://check.torproject.org/api/ip",extraction_type="text")
+        def contains_tor(value):
+            """Inspect browser extraction. :param value: Nested extraction payload."""
+            if isinstance(value,dict):return value.get("IsTor") is True or any(contains_tor(v) for v in value.values())
+            if isinstance(value,list):return any(contains_tor(v) for v in value)
+            if isinstance(value,str):
+                try:return contains_tor(json.loads(value))
+                except ValueError:return False
+            return False
+        assert contains_tor(fetched),"browser did not confirm Tor egress"
+        # Observe the existing Tor-loaded page; even a static page yields a frame.
+        observed=client.send({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"browser_observe","arguments":{"client_id":client.client_id,"session_id":session_id,"duration_ms":500,"max_frames":3}}})["result"]
+        assert not observed.get("isError"),"observation failed"
+        images=[item for item in observed["content"] if item["type"]=="image"]
+        assert 1<=len(images)<=3,"observation frame bound failed"
+        import uuid
+        foreign=client.send({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"browser_observe","arguments":{"client_id":str(uuid.uuid4()),"session_id":session_id}}})["result"]
+        assert json.loads(foreign["content"][0]["text"])=={"error":"session not available"}
+        print("Live browser Tor egress, bounded motion capture and foreign-owner denial verified.")
+    finally:
+        call("close_session",session_id=session_id)
 PYLIVE
 # Verify the actual Tor addressmap and SafeSocks numeric path, not only doubles.
 podman exec -i basix-scrapling-tor python3 - <<'PYGATEWAY'

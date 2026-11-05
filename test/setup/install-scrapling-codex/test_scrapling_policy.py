@@ -760,13 +760,14 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
 
 class CurrentContractTests(unittest.TestCase):
     """Review exact 0.5 inventory, removed tools and forced network controls."""
-    def make_server(self):
-        """Build a source-signature fixture without importing external dependencies."""
+    def make_server(self, signatures=None):
+        """Build fixture. :param signatures: Reviewed upstream version signatures."""
+        signatures = signatures or policy.CURRENT_SIGNATURES
         class CurrentMCP:
             """Expose supported SDK registration interfaces."""
             def __init__(self):
                 """Initialize tool names."""
-                self.names = set(policy.CURRENT_SIGNATURES)
+                self.names = set(signatures)
             async def list_tools(self):
                 """Return registered names."""
                 return [types.SimpleNamespace(name=name) for name in self.names]
@@ -781,7 +782,7 @@ class CurrentContractTests(unittest.TestCase):
             def _build_server(self, host, port):
                 """Build fixture. :param host: Host. :param port: Port."""
                 return CurrentMCP()
-        for name, parameters in policy.CURRENT_SIGNATURES.items():
+        for name, parameters in signatures.items():
             documentation = " ".join(":param " + name + ": Fixture input." for name in parameters)
             namespace = {}
             body = "async def " + name + "(self" + "".join(", " + parameter + "=None" for parameter in parameters) + "):\n"
@@ -838,6 +839,87 @@ class CurrentContractTests(unittest.TestCase):
             signature = inspect.signature(getattr(server, name))
             self.assertEqual(signature.parameters['client_id'].default, inspect.Parameter.empty)
             self.assertFalse(policy.NETWORK_OVERRIDES.intersection(signature.parameters))
+
+    def test_latest_contract_and_remote_context_are_closed(self):
+        """Accept exact 0.5.1 only and prohibit remote context overrides."""
+        server = self.make_server(policy.LATEST_SIGNATURES)
+        policy.assert_upstream_tools(server)
+        drifted = self.make_server(policy.LATEST_SIGNATURES)
+        drifted.browser_observe = AsyncMock()
+        with self.assertRaisesRegex(RuntimeError, "signature"):
+            policy.assert_upstream_tools(drifted)
+        monitor = Mock(check=AsyncMock(return_value=True))
+        owner = policy.configure_server(server, monitor=monitor)
+        names = {t.name for t in asyncio.run(server._build_server("localhost", 8002).list_tools())}
+        self.assertEqual(names, policy.LATEST_PUBLIC_TOOLS)
+        self.assertFalse(policy.DISABLED_CURRENT_TOOLS & names)
+        self.assertNotIn("new_context", inspect.signature(server.browser_open).parameters)
+        async def exercise():
+            """Reject hidden parameters before upstream session creation."""
+            for key in ("new_context", "cdp_url", "additional_args", "proxy"):
+                with self.assertRaises(ValueError):
+                    await server.browser_open(client_id=str(uuid.uuid4()), **{key: False})
+        asyncio.run(exercise())
+        self.assertFalse(owner.owners)
+
+    def test_observation_ownership_bounds_and_no_replay(self):
+        """Capture stays owned and serialized; errors never retry or recreate pages."""
+        server = self.make_server(policy.LATEST_SIGNATURES)
+        monitor = Mock(check=AsyncMock(return_value=True))
+        owner = policy.configure_server(server, monitor=monitor)
+        client = str(uuid.uuid4())
+        async def exercise():
+            """Exercise capability, limits, readiness, errors and poisoned sessions."""
+            await server.browser_open(client_id=client)
+            inputs = dict(session_id="owned-session", duration_ms=100, max_frames=2, client_id=client)
+            self.assertEqual(await server.browser_observe(**dict(inputs, client_id=str(uuid.uuid4()))), policy.SESSION_UNAVAILABLE)
+            for name, value in (("duration_ms", 99), ("duration_ms", 5001), ("duration_ms", True),
+                                ("max_frames", 1), ("max_frames", 21), ("max_frames", 2.0)):
+                with self.assertRaises(ValueError):
+                    await server.browser_observe(**dict(inputs, **{name: value}))
+            self.assertEqual(len(server.calls), 1)
+            owner.session_state["owned-session"]["upstream_id"] = "replacement-page"
+            result = await server.browser_observe(**inputs)
+            self.assertEqual(result["session_id"], "replacement-page")
+            async with owner.session_guard("owned-session"):
+                with patch.object(policy, "SESSION_LOCK_TIMEOUT", .01):
+                    with self.assertRaises(RuntimeError):
+                        await server.browser_observe(**inputs)
+            monitor.check.return_value = False
+            with self.assertRaisesRegex(RuntimeError, "Tor transport"):
+                await server.browser_observe(**inputs)
+            monitor.check.return_value = True
+            failing = AsyncMock(side_effect=OSError("SOCKS failure"))
+            failing.__signature__ = inspect.signature(server.browser_observe).replace(
+                parameters=[p for p in inspect.signature(server.browser_observe).parameters.values() if p.name != "client_id"])
+            wrapped = owner.observation_tool(failing)
+            with self.assertRaises(OSError):
+                await wrapped(**inputs)
+            self.assertEqual(failing.await_count, 1)
+            self.assertEqual(len([call for call in server.calls if call[0] == "browser_open"]), 1)
+            owner.session_state["owned-session"]["poisoned"] = True
+            self.assertEqual(await server.browser_observe(**inputs), policy.SESSION_UNAVAILABLE)
+            self.assertEqual(await server.browser_observe(**dict(inputs, session_id="missing")), policy.SESSION_UNAVAILABLE)
+        asyncio.run(exercise())
+
+    def test_observation_timeout_poisons_session_without_replay(self):
+        """Unfinished capture must make its session unavailable until safely closed."""
+        server = self.make_server(policy.LATEST_SIGNATURES)
+        owner = policy.configure_server(server, monitor=Mock(check=AsyncMock(return_value=True)))
+        client = str(uuid.uuid4())
+        async def exercise():
+            """Bound a stalled observer and deny subsequent captures."""
+            await server.browser_open(client_id=client)
+            async def stalled(session_id, duration_ms=1500, max_frames=12):
+                """Stall. :param session_id: ID. :param duration_ms: Window. :param max_frames: Bound."""
+                await asyncio.Event().wait()
+            observer = owner.observation_tool(stalled)
+            with patch.object(policy, "SESSION_OPERATION_TIMEOUT", .02):
+                with self.assertRaisesRegex(RuntimeError, "deadline"):
+                    await observer(session_id="owned-session", client_id=client)
+            self.assertTrue(owner.session_state["owned-session"]["poisoned"])
+            self.assertEqual(await observer(session_id="owned-session", client_id=client), policy.SESSION_UNAVAILABLE)
+        asyncio.run(exercise())
 
 
 if __name__ == "__main__":
