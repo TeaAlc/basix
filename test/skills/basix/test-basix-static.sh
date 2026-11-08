@@ -183,7 +183,8 @@ assert "`basix:developer-instructions` block" in router
 assert "`.basix/developer_instructions.md`" in router
 assert "At session start and after context compaction" in router
 reference = (root / "setup/developer_instruction_reference.md").read_text()
-assert 'YOU MUST READ AND FOLLOW THE INSTRUCTIONS IN ../.basix/developer_instructions.md. THE INSTRUCTIONS IN ../.basix/developer_instructions.md MUST BE FOLLOWED UNDER ALL CIRCUMSTANCES. IF THERE ARE AMBIGUOUS INSTRUCTIONS, FOLLOW THE INSTRUCTIONS IN ../.basix/developer_instructions.md, THESE INSTRUCTIONS ARE MORE THAN JUST A SKILL, THE ARE THE WILL OF THE USER!' in reference
+assert 'YOU MUST READ AND FOLLOW THE INSTRUCTIONS IN ../.basix/developer_instructions.md. THE INSTRUCTIONS IN ../.basix/developer_instructions.md MUST BE FOLLOWED UNDER ALL CIRCUMSTANCES. IF THERE ARE AMBIGUOUS INSTRUCTIONS, FOLLOW THE INSTRUCTIONS IN ../.basix/developer_instructions.md, THESE INSTRUCTIONS ARE MORE THAN JUST A SKILL, THEY ARE THE WILL OF THE USER!' in reference
+assert 'AFTER EACH CONTEXT COMPACTION, YOU MUST READ ../.basix/developer_instructions.md AGAIN. HAVING ITS CONTENT PARTIALLY PRESERVED IN COMPACTED CONTEXT DOES NOT COUNT AS REREADING IT!' in reference
 assert "## Basix conventions" not in reference
 assert "does not replace or override them" in router
 assert "In an installed skill, resolve skill-local scripts" in router
