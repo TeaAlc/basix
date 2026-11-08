@@ -34,7 +34,9 @@ that fits your workflow, then restart Codex to load the installed configuration.
 
 The target defaults to the current directory when omitted. Skills are copied to
 `TARGET/.agents/skills/`, agents to `TARGET/.codex/basix/agents/`, and managed
-instructions and agent registrations to `TARGET/.codex/config.toml`.
+instructions to `TARGET/.basix/developer_instructions.md`. Agent registrations
+and selected permissions go into `TARGET/.codex/config.toml`; its
+`developer_instructions` contains only the mandatory reference to the project file.
 
 Local access is opt-in and can be enabled independently:
 
@@ -65,9 +67,10 @@ for permission boundaries, managed configuration, and migration behavior.
 
 The installer creates a plugin bundle at `$CODEX_HOME/basix-plugin-root/`,
 registers the local marketplace `basix-local`, installs the plugin, and stores
-agents under `$CODEX_HOME/basix/agents/`. Managed instructions and absolute agent
-`config_file` registrations go into `$CODEX_HOME/config.toml`. Global installation
-does not configure project local-access permissions.
+agents under `$CODEX_HOME/basix/agents/`. Absolute agent `config_file` registrations go into `$CODEX_HOME/config.toml`.
+Global installation adds the same mandatory project-file reference to
+`developer_instructions`. It does not install the project file or configure
+project local-access permissions. Use the project installer for those settings.
 
 ### Update or uninstall
 
@@ -135,8 +138,9 @@ Mention the relevant skill or agent naturally in Codex. The
 
 ### Working rules installed with Basix
 
-Installing Basix also adds [shared developer instructions](src/setup/developer_instruction.md)
-that shape agent behavior:
+Project installation copies the [shared developer instructions](src/setup/developer_instruction.md)
+to `.basix/developer_instructions.md`. The Basix router reads this file at session
+start and after context compaction. These instructions shape agent behavior:
 
 - Python runs use `PYTHONDONTWRITEBYTECODE=1`.
 - Cron jobs that start an agent harness or trigger agents prepend a prompt marker

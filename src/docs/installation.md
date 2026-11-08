@@ -31,7 +31,15 @@ omitted.
 Native agents live at `$CODEX_HOME/basix/agents` globally or
 `TARGET/.codex/basix/agents` in a project. Managed configuration entries point to
 those private copies; shared agent directories are not used. Project installation
-does not create or manage `.basix`. Installers never create `.basix/adrs/`, ADR
+copies the shared developer instructions verbatim to
+`TARGET/.basix/developer_instructions.md` and inventories that file. The Basix
+router reads it at session start and after context compaction. Both installers write only the mandatory reference to
+`../.basix/developer_instructions.md` into `developer_instructions` in
+`config.toml`, preserving other user instructions. The complete rules remain
+exclusively in the project Markdown file. Global plugin installation
+alone does not install project instructions; use the project installer to provide
+them. Other project-owned `.basix` files remain untouched.
+Installers never create `.basix/adrs/`, ADR
 templates, or an initial ADR; agents create the directory and indexes only when a
 project first needs a qualifying ADR.
 
@@ -48,7 +56,7 @@ parents, special or unreadable source nodes, and targets physically identical to
 their source before mutation.
 
 If a project `.codex/config.toml` is deleted, the next install recreates it from
-the managed instruction, agent, and selected local-access settings while leaving
+the managed agent and selected local-access settings while leaving
 foreign sibling files untouched.
 
 Uninstall removes only files whose current hash matches their recorded install

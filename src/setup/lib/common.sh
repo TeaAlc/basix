@@ -331,8 +331,8 @@ remove_recorded_targets() {
   while IFS=$'\t' read -r kind target expected; do
     [[ $kind == copy || $kind == dircopy ]] || continue
     resolved=$(state_resolve_target "$target") || { REMOVE_PRESERVED=true; continue; }
-    allowed=false; for root in "$@"; do path_is_below "$resolved" "$root" && allowed=true; done; [[ $allowed == true ]] || { REMOVE_PRESERVED=true; continue; }
-    if [[ $kind == copy ]]; then if [[ -f $resolved && ! -L $resolved ]]; then actual=$(sha256_file "$resolved"); if [[ $actual == "$expected" ]]; then REMOVE_CHANGED=true; [[ $DRY_RUN == true ]] || rm -- "$resolved"; else REMOVE_PRESERVED=true; fi; elif [[ -e $resolved || -L $resolved ]]; then REMOVE_PRESERVED=true; fi
+    allowed=false; for root in "$@"; do { [[ $resolved == "$root" ]] || path_is_below "$resolved" "$root"; } && allowed=true; done; [[ $allowed == true ]] || { REMOVE_PRESERVED=true; continue; }
+    if [[ $kind == copy ]]; then target_parent_is_safe '' "$resolved" || { REMOVE_PRESERVED=true; continue; }; if [[ -f $resolved && ! -L $resolved ]]; then actual=$(sha256_file "$resolved"); if [[ $actual == "$expected" ]]; then REMOVE_CHANGED=true; [[ $DRY_RUN == true ]] || rm -- "$resolved"; else REMOVE_PRESERVED=true; fi; elif [[ -e $resolved || -L $resolved ]]; then REMOVE_PRESERVED=true; fi
     else status=$(directory_removal_status "$state" "$resolved"); case $status in changed|partial) REMOVE_CHANGED=true; remove_recorded_directory "$state" "$resolved" ;; preserved) REMOVE_PRESERVED=true ;; esac; fi
   done < "$state"
 }

@@ -180,6 +180,11 @@ assert "test/skills/configure-tmux/test-configure-tmux-suite.sh" not in standard
 assert "test/scripts/test-run-quality-gates.sh" in standard_aggregate
 assert "Follow all active instructions inside the managed" in router
 assert "`basix:developer-instructions` block" in router
+assert "`.basix/developer_instructions.md`" in router
+assert "At session start and after context compaction" in router
+reference = (root / "setup/developer_instruction_reference.md").read_text()
+assert 'YOU MUST READ AND FOLLOW THE INSTRUCTIONS IN ../.basix/developer_instructions.md. THE INSTRUCTIONS IN ../.basix/developer_instructions.md MUST BE FOLLOWED UNDER ALL CIRCUMSTANCES. IF THERE ARE AMBIGUOUS INSTRUCTIONS, FOLLOW THE INSTRUCTIONS IN ../.basix/developer_instructions.md, THESE INSTRUCTIONS ARE MORE THAN JUST A SKILL, THE ARE THE WILL OF THE USER!' in reference
+assert "## Basix conventions" not in reference
 assert "does not replace or override them" in router
 assert "In an installed skill, resolve skill-local scripts" in router
 assert "Write all technical content in English" in router

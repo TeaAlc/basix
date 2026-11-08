@@ -65,6 +65,7 @@ grep -Fq 'local-network-test-socket' "$legacy/.codex/config.toml"
 "$src/setup/install_for_project.sh" "$enabled" --no-local-network --no-test-socket >/dev/null 2>&1
 ! grep -q 'basix:local-access-' "$enabled/.codex/config.toml"
 grep -Fq 'developer_instructions' "$enabled/.codex/config.toml"
+cmp "$src/setup/developer_instruction.md" "$enabled/.basix/developer_instructions.md"
 
 dry="$case_dir/dry"
 "$src/setup/install_for_project.sh" "$dry" --local-network --test-socket --dry-run >/dev/null 2>&1
@@ -108,19 +109,19 @@ test ! -e "$foreign_disable/.agents"
 
 broken_install="$case_dir/broken-install"
 mkdir -p "$broken_install/.codex"
-printf 'developer_instructions = "<!-- basix:developer-instructions:start -->"\n' >"$broken_install/.codex/config.toml"
+printf '# basix:agent-config:start\n' >"$broken_install/.codex/config.toml"
 if "$src/setup/install_for_project.sh" "$broken_install" --local-network --test-socket >/dev/null 2>&1; then
-  printf 'malformed developer markers unexpectedly installed\n' >&2
+  printf 'malformed agent markers unexpectedly installed\n' >&2
   exit 1
 fi
 test ! -e "$broken_install/.agents"
 
 broken_uninstall="$case_dir/broken-uninstall"
 "$src/setup/install_for_project.sh" "$broken_uninstall" --local-network --test-socket >/dev/null 2>&1
-sed -i 's/basix:developer-instructions:end/basix:developer-instructions:broken/' "$broken_uninstall/.codex/config.toml"
+sed -i 's/basix:agent-config:end/basix:agent-config:broken/' "$broken_uninstall/.codex/config.toml"
 before_broken=$(sha256sum "$broken_uninstall/.codex/config.toml")
 if "$src/setup/install_for_project.sh" "$broken_uninstall" --uninstall >/dev/null 2>&1; then
-  printf 'malformed developer markers unexpectedly uninstalled\n' >&2
+  printf 'malformed agent markers unexpectedly uninstalled\n' >&2
   exit 1
 fi
 test "$before_broken" = "$(sha256sum "$broken_uninstall/.codex/config.toml")"

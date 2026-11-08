@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atomically manage Basix developer instructions and native-agent config."""
+"""Atomically manage the Basix instruction reference and native-agent config."""
 
 from __future__ import annotations
 

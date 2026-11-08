@@ -25,9 +25,16 @@ chmod +x "$mock/codex"; export PATH="$mock:$PATH"
 project="$case_dir/project"
 first_output=$("$ROOT/setup/install_for_project.sh" "$project" --no-local-network --no-test-socket)
 if [[ -f $project/.agents/skills/basix/SKILL.md && -f $project/.agents/skills/basix-subagent-management/references/agent-communication-contract.md && -f $project/.agents/skills/basix-experience/scripts/collect-token-usage.py && -f $project/.codex/basix/agents/basix-researcher.toml ]] &&
-   [[ ! -e $project/.basix ]] &&
+   [[ -f $project/.basix/developer_instructions.md && ! -e $project/.basix/adrs ]] &&
    ! find "$project/.agents/skills" "$project/.codex/basix" -type l -print -quit | grep -q . &&
    ! cut -f1 "$project/.codex/.basix-install-state" | grep -Ev '^(copy|dircopy|dirfile)$' | grep -q .; then ok 'fresh project install copies complete trees without ADR artifacts'; else bad 'fresh project install copies complete trees without ADR artifacts'; fi
+check 'config contains only the mandatory instruction reference' python3 - "$project/.codex/config.toml" "$ROOT/setup/developer_instruction_reference.md" <<'PYTEST'
+import sys, tomllib
+from pathlib import Path
+value = tomllib.loads(Path(sys.argv[1]).read_text())["developer_instructions"]
+assert value == Path(sys.argv[2]).read_text().strip()
+assert "## Basix conventions" not in value
+PYTEST
 for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory basix-source-memory; do
   check "project install preserves $skill tree" diff -r "$ROOT/skills/$skill" "$project/.agents/skills/$skill"
 done
@@ -38,12 +45,13 @@ check 'project install preserves token collector bytes' cmp -s "$ROOT/skills/bas
 for agent in "$ROOT"/agents/native/*.toml; do
   check "project install preserves $(basename "$agent") bytes" cmp -s "$agent" "$project/.codex/basix/agents/$(basename "$agent")"
 done
-before=$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml")
+check 'project instructions preserve canonical bytes' cmp -s "$ROOT/setup/developer_instruction.md" "$project/.basix/developer_instructions.md"
+before=$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml" "$project/.basix/developer_instructions.md")
 second_output=$("$ROOT/setup/install_for_project.sh" "$project" --no-local-network --no-test-socket)
 for agent in "$ROOT"/agents/native/*.toml; do
   check "project reinstall reports $(basename "$agent") as unchanged" grep -Fq "$(basename "$agent") — unchanged" <<<"$second_output"
 done
-check 'project reinstall is idempotent' test "$before" = "$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml")"
+check 'project reinstall is idempotent' test "$before" = "$(sha256sum "$project/.codex/.basix-install-state" "$project/.codex/config.toml" "$project/.basix/developer_instructions.md")"
 
 renamed_source="$case_dir/rename-source"
 "$ROOT/setup/install_for_project.sh" "$renamed_source" --no-local-network --no-test-socket >/dev/null
@@ -81,7 +89,7 @@ legacy_source="$case_dir/legacy-source"
 "$ROOT/setup/install_for_project.sh" "$legacy_source" --no-local-network --no-test-socket >/dev/null
 legacy_target="$case_dir/legacy-target"
 mv "$legacy_source" "$legacy_target"
-awk -F '\t' -v OFS='\t' -v old="$legacy_source" '{if ($2 !~ /^\//) $2=old "/" $2; print}' \
+awk -F '\t' -v OFS='\t' -v old="$legacy_source" '{if ($2 !~ /^\// && $2 != ".basix/developer_instructions.md") $2=old "/" $2; print}' \
   "$legacy_target/.codex/.basix-install-state" >"$case_dir/legacy-state"
 mv "$case_dir/legacy-state" "$legacy_target/.codex/.basix-install-state"
 check 'legacy absolute state rebases after project move' \
@@ -108,10 +116,12 @@ cp "$source_copy/skills/basix-subagent-management/references/agent-communication
 rm -- "$legacy_source"
 printf '\ncopy-update\n' >>"$source_copy/skills/basix/SKILL.md"
 printf '\n# report-update\n' >>"$source_copy/agents/native/basix-pager.toml"
+printf '\nInstruction update\n' >>"$source_copy/setup/developer_instruction.md"
 update_output=$("$source_copy/setup/install_for_project.sh" "$update" --no-local-network --no-test-socket)
 check 'project reinstall reports changed agent as updated' grep -Fq 'basix-pager.toml — updated' <<<"$update_output"
 check 'migration removes old router-owned contract path' test ! -e "$legacy_target"
 check 'migration preserves management contract' cmp -s "$source_copy/skills/basix-subagent-management/references/agent-communication-contract.md" "$update/.agents/skills/basix-subagent-management/references/agent-communication-contract.md"
+check 'reinstall synchronizes developer instructions' cmp -s "$source_copy/setup/developer_instruction.md" "$update/.basix/developer_instructions.md"
 check 'reinstall synchronizes source updates' grep -Fq copy-update "$update/.agents/skills/basix/SKILL.md"
 for agent in "$source_copy"/agents/native/*.toml; do
   check "project reinstall preserves $(basename "$agent") bytes" cmp -s "$agent" "$update/.codex/basix/agents/$(basename "$agent")"
@@ -130,7 +140,7 @@ printf '\nlocal-change\n' >>"$changed/.agents/skills/basix/SKILL.md"; printf 'fo
 if grep -Fq local-change "$changed/.agents/skills/basix/SKILL.md" && [[ -f $changed/.agents/skills/basix/foreign.txt && -d $changed/.agents/skills/basix/foreign-empty ]]; then ok 'uninstall preserves local and foreign content'; else bad 'uninstall preserves local and foreign content'; fi
 
 clean="$case_dir/clean"; "$ROOT/setup/install_for_project.sh" "$clean" --no-local-network --no-test-socket >/dev/null; "$ROOT/setup/install_for_project.sh" "$clean" --uninstall >/dev/null
-check 'clean uninstall removes payload state' test ! -e "$clean/.codex/.basix-install-state" -a ! -e "$clean/.agents/skills/basix" -a ! -e "$clean/.codex/basix"
+check 'clean uninstall removes payload state' test ! -e "$clean/.basix" -a ! -e "$clean/.codex/.basix-install-state" -a ! -e "$clean/.agents/skills/basix" -a ! -e "$clean/.codex/basix"
 for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory basix-source-memory; do
   check "project uninstall removes managed $skill tree" test ! -e "$clean/.agents/skills/$skill"
 done

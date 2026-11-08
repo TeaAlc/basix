@@ -21,6 +21,13 @@ done
 
 global="$case_dir/global"; first_output=$(CODEX_HOME="$global" "$ROOT/setup/install_as_plugin.sh")
 if [[ -f $global/basix-plugin-root/skills/basix/SKILL.md && -f $global/basix-plugin-root/skills/basix-experience/scripts/collect-token-usage.py && -f $global/basix/agents/basix-researcher.toml ]] && ! find "$global/basix-plugin-root" "$global/basix" -type l -print -quit | grep -q .; then ok 'fresh global install uses copies only'; else bad 'fresh global install uses copies only'; fi
+check 'config contains only the mandatory instruction reference' python3 - "$global/config.toml" "$ROOT/setup/developer_instruction_reference.md" <<'PYTEST'
+import sys, tomllib
+from pathlib import Path
+value = tomllib.loads(Path(sys.argv[1]).read_text())["developer_instructions"]
+assert value == Path(sys.argv[2]).read_text().strip()
+assert "## Basix conventions" not in value
+PYTEST
 for skill in basix-subagent-management basix-planning basix-adr basix-agent-memory basix-source-memory; do
   check "global plugin install preserves $skill tree" diff -r "$ROOT/skills/$skill" "$global/basix-plugin-root/skills/$skill"
 done

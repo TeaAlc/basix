@@ -8,6 +8,10 @@ description: "Basix-Skill: Use whenever Basix is mentioned or when maintaining o
 Load this skill for every Basix-related task. It routes Basix runtime behavior
 and points source-repository work to its separate development guidance.
 
+- At session start and after context compaction, read the complete project file
+  `.basix/developer_instructions.md` when present and follow its instructions.
+  Project installation provides this file; global plugin installation alone does
+  not provide project instructions.
 - Follow all active instructions inside the managed
   `basix:developer-instructions` block. This router supplements those instructions;
   it does not replace or override them.

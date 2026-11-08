@@ -55,9 +55,3 @@ if PATH="$mock:$PATH" HOME="$foreign_home" CODEX_HOME="$foreign_codex" LUMEN_LOG
 fi
 [[ ! -e $foreign_codex/lumen && ! -e $foreign_home/.agents/skills/lumen && ! -e $foreign_log ]] || { printf 'not ok - foreign Lumen conflict mutated targets\n'; exit 1; }
 printf 'ok - foreign Lumen registration is rejected without mutation\n'
-
-helper="$ROOT/setup/lib/manage_developer_instructions.py"; config="$case_dir/config.toml"
-python3 "$helper" add --config "$config" --instructions "$ROOT/setup/developer_instruction.md" >/dev/null
-python3 "$helper" remove --config "$config" --remove-empty-file >/dev/null
-[[ ! -e $config ]] || { printf 'not ok - developer instruction helper round trip\n'; exit 1; }
-printf 'ok - developer instruction helper round trip\n'
