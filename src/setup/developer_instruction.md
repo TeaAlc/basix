@@ -11,6 +11,7 @@
 - When creating or updating .toml files they must be in valid toml syntax.
 - Cron jobs that start an agent harness or trigger agents must identify the trigger to the agent by prepending a marker to the prompt, for example `(Triggered by CronJob)`. Use `(Triggered by <event> [Flags])` with the actual event name; optional flags are expressed as tags, for example `(Triggered by CronJob [nightly] [maintenance])`.
 - If there is any instruction telling you to frequently (e.g. once every 60 seconds) give feedback to the user, you MUST NOT follow it, it is incorrect. Give the user feedback when important work is done, or heavy blockers occur. If the user explicitly tells you when or how frequently he wants feedback, follow his instructions.
+- If you create temporary files ensure that they are cleaned up, do not save endless revisions/builds of work for reconstructing things (keep max. 3), do not waste the user's diskspace with old stuff that is not needed anymore.
 
 ## Information-source research
 
