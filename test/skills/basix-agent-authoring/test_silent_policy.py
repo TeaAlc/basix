@@ -44,7 +44,11 @@ class SilentPolicyTests(unittest.TestCase):
         """Verify this policy boundary; self is the unittest test instance."""
         management = text('basix-subagent-management')
         for requirement in (
-            'model="gpt-6.1-sol"', 'reasoning_effort="low"', 'fork_turns="none"',
+            'newest Sol model listed by the active dispatch tool',
+            'Compare the major version numerically, then the minor version',
+            'minor version is zero', 'Pass the selected model ID explicitly',
+            'newest version cannot be determined, block dispatch',
+            'reasoning_effort="low"', 'fork_turns="none"',
             'Unsupported model/tool settings block dispatch', 'never silently substitute',
             'at most three ACTIVE plan executors, six ACTIVE read-only helpers and nine ACTIVE descendants overall',
             'Grant nested slots explicitly', 'disjoint writes and isolated mutable resources/logs',
@@ -87,7 +91,7 @@ class SilentPolicyTests(unittest.TestCase):
             content = ' '.join((REPO / path).read_text().split())
             with self.subTest(path=path):
                 self.assertIn('explicit user override, applicable specialist/skill settings, then', content)
-                self.assertIn('`gpt-6.1-sol`/`low` runtime fallback', content)
+                self.assertIn('newest available Sol model with `low` reasoning', content)
                 self.assertIn('retains applicable effort', content)
                 self.assertIn('preserve native specialist routing and configured settings', content)
                 self.assertIn('unsupported selected settings block dispatch without substitution', content.lower())

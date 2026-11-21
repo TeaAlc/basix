@@ -1,8 +1,8 @@
 # Model classification
 
 These native authoring defaults are explicit specialized rules. They remain
-`gpt-6-luna` at classified effort; management's `gpt-6.1-sol`/`low` runtime
-fallback applies only when no more explicit model/effort setting exists.
+`gpt-6-luna` at classified effort. Management uses the newest available Sol
+model with `low` reasoning as the fallback for fields without explicit settings.
 At dispatch native configured model and effort remain selected unless explicitly
 overridden by the user. Resolve overrides independently: a model-only override
 retains applicable effort.

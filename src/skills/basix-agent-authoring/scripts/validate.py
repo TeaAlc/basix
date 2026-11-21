@@ -258,8 +258,8 @@ def validate_agent(path: Path) -> None:
         need(parsed["model_reasoning_effort"] == "medium",
              f"{path}: basix_researcher must use medium reasoning effort")
     if parsed["name"] == "basix_miraculix":
-        need(override and parsed["model"] == "gpt-6-astra",
-             f"{path}: basix_miraculix must use explicitly overridden gpt-6-astra")
+        need(override and parsed["model"] == "gpt-6.2-astra",
+             f"{path}: basix_miraculix must use explicitly overridden gpt-6.2-astra")
         need(parsed["model_reasoning_effort"] == "low",
              f"{path}: basix_miraculix must use low reasoning effort")
         need(parsed["sandbox_mode"] == "read-only",

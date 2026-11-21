@@ -49,8 +49,9 @@ or contract is unreadable, the spawn fails closed.
 Agent level governs coordination and spawn authority; model and reasoning effort
 govern assignment complexity. Never infer one axis from the other. Model/effort
 selection follows the management skill: explicit user override, applicable
-specialist/skill settings, then `gpt-6.1-sol`/`low` runtime fallback, independently
-for each field. Saved plans do not override native specialist configuration.
+specialist/skill settings, then the newest available Sol model with `low`
+reasoning, independently for each field. Saved plans do not override native
+specialist configuration.
 
 | Agent | Level |
 |---|---|

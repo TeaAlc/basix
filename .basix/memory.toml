@@ -307,7 +307,7 @@ usefulness = 4
 [[entries]]
 date = "2026-10-10"
 category = "User Instruction"
-insight = "Use explicit user model/effort first, then applicable specialist or skill settings; otherwise use gpt-6.1-sol/low. Delegate without context forks and with complete assignments; apply current executor/helper and runtime capacity limits."
+insight = "Prefer user overrides, then specialist or skill settings, then newest dispatch-supported Sol with low effort. Delegate complete assignments without context forks and honor executor, helper and runtime limits."
 usefulness = 4
 
 [[entries]]

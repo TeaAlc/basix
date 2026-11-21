@@ -263,10 +263,10 @@ class AgentTests(unittest.TestCase):
         text = MIRACULIX_NATIVE.read_text()
         agent = tomllib.loads(text)
         self.assertEqual(agent["name"], "basix_miraculix")
-        self.assertEqual(agent["model"], "gpt-6-astra")
+        self.assertEqual(agent["model"], "gpt-6.2-astra")
         self.assertEqual(agent["model_reasoning_effort"], "low")
         self.assertEqual(agent["sandbox_mode"], "read-only")
-        model_line = text.splitlines().index('model = "gpt-6-astra"')
+        model_line = text.splitlines().index('model = "gpt-6.2-astra"')
         self.assertEqual(text.splitlines()[model_line - 1], validator.OVERRIDE)
         instructions = agent["developer_instructions"]
         for phrase in (
@@ -400,7 +400,7 @@ class AgentTests(unittest.TestCase):
                       "basix_pager": "xhigh", "basix_verifier": "xhigh"}[name]
             sandbox = "workspace-write" if name == "basix_pager" else "read-only"
             sandbox_marker = validator.SANDBOX_OVERRIDE + "\n" if name == "basix_pager" else ""
-            model = "gpt-6-astra" if name == "basix_miraculix" else "gpt-6-luna"
+            model = "gpt-6.2-astra" if name == "basix_miraculix" else "gpt-6-luna"
             marker = validator.OVERRIDE + "\n" if name == "basix_miraculix" else ""
             directory, path = self.write_agent(name=name, level=wrong, effort=effort,
                                                 model=model, marker=marker, sandbox=sandbox,
@@ -537,7 +537,7 @@ class AgentTests(unittest.TestCase):
             with directory:
                 validator.validate_agent(path)
             variants = [dict(model="gpt-6-luna", effort="xhigh", marker=""),
-                        dict(marker=""), dict(model="gpt-6-astra")]
+                        dict(marker=""), dict(model="gpt-6.2-astra")]
             variants += [dict(effort=effort) for effort in ("medium", "high", "xhigh", "max")]
             variants += [dict(sandbox_marker="")] if role == "pager" else [dict(sandbox="workspace-write")]
             for changes in variants:
@@ -606,15 +606,15 @@ class AgentTests(unittest.TestCase):
 
     def test_miraculix_configuration_is_fixed(self):
         directory, path = self.write_agent(
-            name="basix_miraculix", model="gpt-6-astra", effort="low",
+            name="basix_miraculix", model="gpt-6.2-astra", effort="low",
             marker=validator.OVERRIDE + "\n",
         )
         with directory:
             validator.validate_agent(path)
         cases = (
             {"model": "gpt-6-luna", "marker": ""},
-            {"model": "gpt-6-astra", "marker": ""},
-            {"model": "gpt-6-astra", "effort": "medium", "marker": validator.OVERRIDE + "\n"},
+            {"model": "gpt-6.2-astra", "marker": ""},
+            {"model": "gpt-6.2-astra", "effort": "medium", "marker": validator.OVERRIDE + "\n"},
         )
         for kwargs in cases:
             directory, path = self.write_agent(name="basix_miraculix", **kwargs)

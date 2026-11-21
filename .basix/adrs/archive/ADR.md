@@ -1,5 +1,7 @@
 # Archived ADRs
 
+- [ADR 0015: Plan executor capacity](ADR_0015_plan-executor-capacity.md) — Superseded by ADR 0021; fixed Sol fallback
+
 - [ADR 0010: Subagent model precedence](ADR_0010_subagent-model-selection-precedence.md) — Superseded by ADR 0015; executor/helper capacity
 
 - [ADR 0002: Miraculix bounded consultation](ADR_0002_miraculix-bounded-consultation.md) — Superseded by ADR 0008; former Sol model

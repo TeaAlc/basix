@@ -107,7 +107,7 @@ research, specialized work, and larger assignments to dedicated agents.
 | `basix_miraculix` | Bounded second opinion, especially under extreme uncertainty | Read-only |
 
 Explorer uses `gpt-6-luna`/`low`, Researcher uses `gpt-6-luna`/`medium`,
-and Miraculix uses `gpt-6-astra`/`low`. Pager and Verifier use the explicit
+and Miraculix uses `gpt-6.2-astra`/`low`. Pager and Verifier use the explicit
 user override `gpt-6.1-terra`/`low`. Explicit user overrides follow
 the model and effort precedence described under [Development](#development).
 Agent level governs delegation separately from model and reasoning effort: Root
@@ -329,8 +329,9 @@ Every started test must finish successfully before task completion or commit.
 Managed children work silently under Contract 2.0, sending genuine blockers and
 one mandatory terminal result to their direct parent. Model and effort resolve
 independently: explicit user override, applicable specialist/skill settings, then
-`gpt-6.1-sol`/`low` runtime fallback. A model-only override retains applicable
-effort. Saved plans preserve native specialist routing and configured settings;
+the newest available Sol model with `low` reasoning as the runtime fallback.
+A model-only override retains applicable effort. Saved plans preserve native
+specialist routing and configured settings;
 unsupported selected settings block dispatch without substitution. No forks.
 Root allows at most three active plan executors, six read-only helpers and nine
 active descendants overall; lower runtime limits bind. Each executor may use two

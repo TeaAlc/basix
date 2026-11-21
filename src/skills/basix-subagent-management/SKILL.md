@@ -87,8 +87,12 @@ saved-plan execution, in this order:
    must not silently override role-specific native configuration. If equally
    specific applicable directives conflict, fail closed and resolve the conflict
    rather than inventing precedence.
-3. For each field with no more explicit setting, use the runtime fallback
-   `model="gpt-6.1-sol"` and `reasoning_effort="low"`.
+3. For each field with no more explicit setting, use the runtime fallback.
+   For model, use the newest Sol model listed by the active dispatch tool.
+   Compare the major version numerically, then the minor version (an omitted
+   minor version is zero). Pass the selected model ID explicitly. If the tool
+   lists no Sol model or its newest version cannot be determined, block dispatch.
+   For reasoning effort, use `reasoning_effort="low"`.
 
 A saved plan is an assignment format, not a reason to replace specialist routing:
 pager, researcher and verifier assignments keep their native roles and settings.

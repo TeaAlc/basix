@@ -96,7 +96,7 @@ The native read-only agents are:
   apply to inventories, content searches and fallback commands. While developing
   Basix, exclude repository-local `.codex/` and `.agents/`; in other projects,
   relevant canonical configuration remains eligible unless instructions exclude it.
-- `basix_miraculix` uses an explicit `gpt-6-astra` override with low reasoning
+- `basix_miraculix` uses an explicit `gpt-6.2-astra` override with low reasoning
   for a short, independent second opinion. A senior or principal may consult it,
   and consultation is strongly recommended under extreme uncertainty. Its fresh
   assignment contains one goal and bundled question values totaling at most 1024
@@ -274,7 +274,9 @@ configuration and rules, disables web search, retains a read-only sandbox, and c
 event trace for tool-policy audits.
 
 Every dispatch resolves model and effort independently: explicit user override,
-applicable specialist/skill settings, then `gpt-6.1-sol`/`low` runtime fallback.
+applicable specialist/skill settings, then the newest available Sol model with `low` reasoning.
+For the model fallback, use the newest Sol version listed by the active dispatch
+tool (for example, `gpt-6.2-sol` when it is the highest available version).
 A model-only user override retains applicable effort. Saved plans preserve native
 specialist routing and configured settings; generic executors receive fallback
 only when no more explicit setting applies. Unsupported selected settings block

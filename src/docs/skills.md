@@ -74,9 +74,9 @@ There is no background retry scheduler. The skill contains the exact schemas,
 timestamp semantics, filename encoding and valid JSON examples.
 
 Saved-plan execution resolves model and effort independently: explicit user
-override, applicable specialist/skill settings, then `gpt-6.1-sol`/`low` runtime
-fallback. A model-only override retains applicable effort. Native authoring Luna
-classification defaults are specialized rules; saved plans preserve native
+override, applicable specialist/skill settings, then the newest available Sol model
+with `low` reasoning. A model-only override retains applicable effort. Native
+authoring Luna classification defaults are specialized rules; saved plans preserve native
 specialist routing and configured settings. Unsupported selected settings block
 dispatch without substitution. Every assignment uses no forks, with
 complete ownership, resources, dependencies, acceptance checks and continuation

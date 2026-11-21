@@ -10,10 +10,10 @@ path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
 agent = tomllib.loads(text)
 assert agent["name"] == "basix_miraculix"
-assert agent["model"] == "gpt-6-astra"
+assert agent["model"] == "gpt-6.2-astra"
 assert agent["model_reasoning_effort"] == "low"
 assert agent["sandbox_mode"] == "read-only"
-model_index = text.splitlines().index('model = "gpt-6-astra"')
+model_index = text.splitlines().index('model = "gpt-6.2-astra"')
 assert text.splitlines()[model_index - 1] == "# basix-agent-authoring: explicit-model-override"
 instructions = agent["developer_instructions"]
 for phrase in (
